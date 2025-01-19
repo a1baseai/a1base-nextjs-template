@@ -2,25 +2,7 @@ import { generateAgentResponse } from "../services/openai";
 import { ThreadMessage } from "@/types/chat";
 import { DefaultReplyToMessage, SendEmailFromAgent } from "../workflows/basic_workflow";
 import { triageMessageIntent } from "../services/openai";
-
-type MessageRecord = {
-  message_id: string;
-  content: string;
-  sender_number: string;
-  sender_name: string;
-  timestamp: string;
-};
-
-type TriageParams = {
-  thread_id: string;
-  message_id: string;
-  content: string;
-  sender_name: string;
-  sender_number: string;
-  thread_type: string;
-  timestamp: string;
-  messagesByThread: Map<string, MessageRecord[]>;
-};
+import { MessageRecord, TriageParams } from "@/types/triage";
 
 export async function triageMessage({
   thread_id,
