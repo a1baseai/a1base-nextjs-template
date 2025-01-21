@@ -13,7 +13,7 @@ export default function Home() {
           priority
         />
         <p className="text-lg text-center sm:text-left">
-          Template A1 Agent that can communicate across WhatsApp, Email, Slack, Teams, and SMS.
+          {`Template A1 Agent that can communicate across WhatsApp, Email, Slack, Teams, and SMS.`}
         </p>
 
         <a
@@ -22,38 +22,37 @@ export default function Home() {
           rel="noopener noreferrer" 
           className="rounded-lg px-6 py-3 bg-[#25D366] hover:bg-[#128C7E] text-white flex items-center gap-2 transition-colors"
         >
-          Chat with your agent on WhatApp
+          {`Chat with your agent on WhatApp`}
         </a>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 w-full max-w-4xl">
           <div className="p-6 rounded-xl bg-white dark:bg-black/20 border border-black/[.08] dark:border-white/[.08] shadow-lg">
-            <h2 className="text-xl font-semibold mb-4">Create your A1Base Account</h2>
+            <h2 className="text-xl font-semibold mb-4">{`Create your A1Base Account`}</h2>
             <div className="flex flex-col gap-3">
               <p className="text-sm text-gray-600 dark:text-gray-300">
-                Build your own AI agent in minutes:
+                {`Build your own AI agent in minutes:`}
               </p>
               <ul className="list-disc list-inside text-sm space-y-2">
-                <li>Choose your agent's personality</li>
-                <li>Define custom behaviors</li>
-                <li>Set up communication channels</li>
-                <li>Deploy and start chatting</li>
+                <li>{`Choose your agent's personality`}</li>
+                <li>{`Define custom behaviors`}</li>
+                <li>{`Set up communication channels`}</li>
+                <li>{`Deploy and start chatting`}</li>
               </ul>
             </div>
           </div>
 
-
           <div className="p-6 rounded-xl bg-white dark:bg-black/20 border border-black/[.08] dark:border-white/[.08] shadow-lg col-span-2">
-            <h2 className="text-xl font-semibold mb-4">Getting Started</h2>
+            <h2 className="text-xl font-semibold mb-4">{`Getting Started`}</h2>
             <ol className="list-inside list-decimal text-sm space-y-3 font-[family-name:var(--font-geist-mono)]">
-              <li>Update your env variables</li>
+              <li>{`Update your env variables`}</li>
               <li>
-                Get started by editing{" "}
+                {`Get started by editing `}
                 <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-                  lib/agent/prompts.ts
+                  {`lib/agent/prompts.ts`}
                 </code>
-                .
+                {`.`}
               </li>
-              <li>Update your webhook URL in the A1Base dashboard. Use Ngrok to test locally.</li>
+              <li>{`Update your webhook URL in the A1Base dashboard. Use Ngrok to test locally.`}</li>
             </ol>
           </div>
         </div>
@@ -72,7 +71,7 @@ export default function Home() {
               width={20}
               height={20}
             />
-            Deploy on Vercel
+            {`Deploy on Vercel`}
           </a>
           <a
             className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
@@ -80,7 +79,7 @@ export default function Home() {
             target="_blank"
             rel="noopener noreferrer"
           >
-            Read A1Base docs
+            {`Read A1Base docs`}
           </a>
         </div>
       </main>
@@ -98,7 +97,7 @@ export default function Home() {
             width={16}
             height={16}
           />
-          Learn
+          {`Learn`}
         </a>
         <a
           className="flex items-center gap-2 hover:underline hover:underline-offset-4"
@@ -113,7 +112,7 @@ export default function Home() {
             width={16}
             height={16}
           />
-          Examples
+          {`Examples`}
         </a>
         <a
           className="flex items-center gap-2 hover:underline hover:underline-offset-4"
@@ -128,7 +127,7 @@ export default function Home() {
             width={16}
             height={16}
           />
-          Go to a1base.com →
+          {`Go to a1base.com →`}
         </a>
       </footer>
     </div>
