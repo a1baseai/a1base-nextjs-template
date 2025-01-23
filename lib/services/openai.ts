@@ -7,6 +7,9 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 })
 
+// Add type for OpenAI chat roles
+type ChatRole = "system" | "user" | "assistant" | "function"
+
 /**
  * ============= OPENAI CALL TO TRIAGE THE MESSAGE INTENT ================
  * This function returns one of the following responseTypes:
@@ -119,7 +122,7 @@ export async function generateAgentIntroduction(incomingMessage: string, userNam
  */
 export async function generateAgentResponse(threadMessages: ThreadMessage[], userPrompt?: string): Promise<string> {
   const messages = threadMessages.map((msg) => ({
-    role: msg.sender_number === process.env.A1BASE_AGENT_NUMBER! ? "assistant" : "user",
+    role: (msg.sender_number === process.env.A1BASE_AGENT_NUMBER! ? "assistant" : "user") as ChatRole,
     content: msg.content,
   }));
 
@@ -134,12 +137,12 @@ export async function generateAgentResponse(threadMessages: ThreadMessage[], use
 
   // Build the conversation to pass to OpenAI
   const conversation = [
-    { role: "system", content: getSystemPrompt(userName) },
+    { role: "system" as ChatRole, content: getSystemPrompt(userName) },
   ];
 
   // If there's a user-level prompt from basicWorkflowsPrompt, add it as a user message
   if (userPrompt) {
-    conversation.push({ role: "user", content: userPrompt });
+    conversation.push({ role: "user" as ChatRole, content: userPrompt });
   }
 
   // Then add the actual chat messages

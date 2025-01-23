@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
-import { A1BaseClient } from "a1base-node";
+import { A1BaseAPI } from "a1base-node";
 
-const client = new A1BaseClient({
-  apiKey: process.env.A1BASE_API_KEY!,
-  apiSecret: process.env.A1BASE_API_SECRET!,
-});
+const client = new A1BaseAPI({
+    credentials: {
+      apiKey: process.env.A1BASE_API_KEY!,
+      apiSecret: process.env.A1BASE_API_SECRET!,
+    }
+  });
 
 export async function POST(request: Request) {
   try {

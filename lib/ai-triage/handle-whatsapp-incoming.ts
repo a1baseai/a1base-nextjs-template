@@ -1,19 +1,10 @@
-import { A1BaseAPI, WhatsAppIncomingData } from "a1base-node";
-import { generateAgentResponse } from "../services/openai";
+import { WhatsAppIncomingData } from "a1base-node";
+import { MessageRecord } from "@/types/chat";
 import { triageMessage } from "./triage-logic";
 
-// Initialize A1Base client
-const client = new A1BaseAPI({
-  credentials: {
-    apiKey: process.env.A1BASE_API_KEY!,
-    apiSecret: process.env.A1BASE_API_SECRET!,
-  }
-});
-
 // IN-MEMORY STORAGE FOR DEMO
-// (Note: This will reset on server restart)
-// Please implement a more permanent data store for any projects
 const messagesByThread = new Map();
+const MAX_CONTEXT_MESSAGES = 10;
 
 function saveMessage(
   threadId: string,
@@ -25,8 +16,23 @@ function saveMessage(
     timestamp: string;
   }
 ) {
-  const threadMessages = messagesByThread.get(threadId) || [];
+  let threadMessages = messagesByThread.get(threadId) || [];
+  
+  // Add new message
   threadMessages.push(message);
+  
+  // Keep only last 10 messages for context
+  if (threadMessages.length > MAX_CONTEXT_MESSAGES) {
+    threadMessages = threadMessages.slice(-MAX_CONTEXT_MESSAGES);
+  }
+  
+  // Format messages - only include user messages
+  const normalizedAgentNumber = process.env.A1BASE_AGENT_NUMBER?.replace(/\+/g, '');
+  threadMessages = threadMessages.filter((msg: MessageRecord) => {
+    const msgNumber = msg.sender_number.replace(/\+/g, '');
+    return msgNumber !== normalizedAgentNumber;
+  });
+
   messagesByThread.set(threadId, threadMessages);
 }
 
@@ -73,4 +79,4 @@ export async function handleWhatsAppIncoming({
     timestamp,
     messagesByThread,
   });
-}
+} 

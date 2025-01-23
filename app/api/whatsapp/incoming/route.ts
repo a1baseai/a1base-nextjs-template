@@ -1,4 +1,4 @@
-import { handleWhatsAppIncoming } from "@/lib/ai-triage/handle-incoming";
+import { handleWhatsAppIncoming } from "@/lib/ai-triage/handle-whatsapp-incoming";
 import { WhatsAppIncomingData } from "a1base-node";
 import { NextResponse } from "next/server";
 
