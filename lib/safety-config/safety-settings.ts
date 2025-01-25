@@ -13,9 +13,9 @@ export interface ProfanityFilter {
 
 export interface DataSensitivity {
   /** How to handle customer data: 'doNotStore', 'encryptAndStore', etc. */
-  handleCustomerData: "doNotStore" | "encryptAndStore" | "anonymizeAndStore";
+  handleCustomerData: "storeFull" | "doNotStore" | "encryptAndStore" | "anonymizeAndStore";
   /** How to handle personally identifiable information */
-  piiHandling: "doNotCollect" | "collectWithConsent" | "anonymize";
+  piiHandling:"collectCarefully" | "doNotCollect" | "collectWithConsent" | "anonymize";
 }
 
 export interface JokeSettings {
@@ -70,8 +70,8 @@ const safetySettings: SafetySettings = {
     allowProfanity: false,
   },
   dataSensitivity: {
-    handleCustomerData: "doNotStore",
-    piiHandling: "doNotCollect",
+    handleCustomerData: "storeFull",
+    piiHandling: "collectCarefully",
   },
   tellJokes: {
     allowJokes: true,

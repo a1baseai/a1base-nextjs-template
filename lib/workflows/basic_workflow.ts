@@ -23,6 +23,9 @@ import {
 import { ThreadMessage } from "@/types/chat";
 import { basicWorkflowsPrompt } from "./basic_workflows_prompt";
 
+// Configuration
+const SPLIT_PARAGRAPHS = false; // Set to false to send messages without splitting
+
 // Initialize A1Base client
 const client = new A1BaseAPI({
   credentials: {
@@ -30,8 +33,6 @@ const client = new A1BaseAPI({
     apiSecret: process.env.A1BASE_API_SECRET!,
   }
 });
-
-
 
 // ====== BASIC SEND AND VERIFICATION WORKFLOW =======
 // Functions for sending messages and verifying agent identity
@@ -53,21 +54,41 @@ export async function verifyAgentIdentity(
     
     // Generate response message for identity verification
     const response = await generateAgentIntroduction(message);
+    const messages = SPLIT_PARAGRAPHS ? response.split('\n').filter(msg => msg.trim()) : [response];
+    
+    // Send each message line individually
+    for (const msg of messages) {
+      const messageData = {
+        content: msg,
+        from: process.env.A1BASE_AGENT_NUMBER!,
+        service: "whatsapp" as const,
+      };
 
-    // Prepare message data with response and ID card link
-    const messageData = {
-      content: `${response}\n\nHere's my A1Base identity card for verification:`,
+      if (thread_type === "group" && thread_id) {
+        await client.sendGroupMessage(process.env.A1BASE_ACCOUNT_ID!, {
+          ...messageData,
+          thread_id,
+        });
+      } else if (thread_type === "individual" && sender_number) {
+        await client.sendIndividualMessage(process.env.A1BASE_ACCOUNT_ID!, {
+          ...messageData,
+          to: sender_number,
+        });
+      }
+    }
+
+    // Send ID card link as final message
+    const idCardMessage = {
+      content: "Here's my A1Base identity card for verification:",
       from: process.env.A1BASE_AGENT_NUMBER!,
       service: "whatsapp" as const,
     };
 
-    // Send initial message using A1Base client
     if (thread_type === "group" && thread_id) {
       await client.sendGroupMessage(process.env.A1BASE_ACCOUNT_ID!, {
-        ...messageData,
+        ...idCardMessage,
         thread_id,
       });
-      // Send identity card link
       await client.sendGroupMessage(process.env.A1BASE_ACCOUNT_ID!, {
         content: agentIdCard,
         from: process.env.A1BASE_AGENT_NUMBER!,
@@ -76,10 +97,9 @@ export async function verifyAgentIdentity(
       });
     } else if (thread_type === "individual" && sender_number) {
       await client.sendIndividualMessage(process.env.A1BASE_ACCOUNT_ID!, {
-        ...messageData,
+        ...idCardMessage,
         to: sender_number,
       });
-      // Send identity card link
       await client.sendIndividualMessage(process.env.A1BASE_ACCOUNT_ID!, {
         content: agentIdCard,
         from: process.env.A1BASE_AGENT_NUMBER!,
@@ -110,27 +130,29 @@ export async function DefaultReplyToMessage(
   try {
     // Use the 'simple_response' prompt
     const response = await generateAgentResponse(threadMessages, basicWorkflowsPrompt.simple_response.user);
+    const messages = SPLIT_PARAGRAPHS ? response.split('\n').filter(msg => msg.trim()) : [response];
 
-    // Prepare message data
-    const messageData = {
-      content: response,
-      from: process.env.A1BASE_AGENT_NUMBER!,
-      service: "whatsapp" as const,
-    };
+    // Send each message line individually
+    for (const msg of messages) {
+      const messageData = {
+        content: msg,
+        from: process.env.A1BASE_AGENT_NUMBER!,
+        service: "whatsapp" as const,
+      };
 
-    // Send message using A1Base client
-    if (thread_type === "group" && thread_id) {
-      await client.sendGroupMessage(process.env.A1BASE_ACCOUNT_ID!, {
-        ...messageData,
-        thread_id,
-      });
-    } else if (thread_type === "individual" && sender_number) {
-      await client.sendIndividualMessage(process.env.A1BASE_ACCOUNT_ID!, {
-        ...messageData,
-        to: sender_number,
-      });
-    } else {
-      throw new Error("Invalid message type or missing required parameters");
+      if (thread_type === "group" && thread_id) {
+        await client.sendGroupMessage(process.env.A1BASE_ACCOUNT_ID!, {
+          ...messageData,
+          thread_id,
+        });
+      } else if (thread_type === "individual" && sender_number) {
+        await client.sendIndividualMessage(process.env.A1BASE_ACCOUNT_ID!, {
+          ...messageData,
+          to: sender_number,
+        });
+      } else {
+        throw new Error("Invalid message type or missing required parameters");
+      }
     }
   } catch (error) {
     console.error("[Basic Workflow] Error:", error);
@@ -226,23 +248,31 @@ export async function SendEmailFromAgent(
       }
     });
 
-    // Send confirmation message to user
-    const confirmationMessage = {
-      content: `Email sent successfully!\nSubject: ${emailData.emailContent.subject}\nTo: ${emailData.recipientEmail}`,
-      from: process.env.A1BASE_AGENT_NUMBER!,
-      service: "whatsapp" as const
-    };
+    // Send confirmation messages
+    const confirmationMessages = [
+      "Email sent successfully!",
+      `Subject: ${emailData.emailContent.subject}`,
+      `To: ${emailData.recipientEmail}`
+    ];
 
-    if (thread_type === "group" && thread_id) {
-      await client.sendGroupMessage(process.env.A1BASE_ACCOUNT_ID!, {
-        ...confirmationMessage,
-        thread_id
-      });
-    } else if (thread_type === "individual" && sender_number) {
-      await client.sendIndividualMessage(process.env.A1BASE_ACCOUNT_ID!, {
-        ...confirmationMessage,
-        to: sender_number
-      });
+    for (const msg of confirmationMessages) {
+      const messageData = {
+        content: msg,
+        from: process.env.A1BASE_AGENT_NUMBER!,
+        service: "whatsapp" as const
+      };
+
+      if (thread_type === "group" && thread_id) {
+        await client.sendGroupMessage(process.env.A1BASE_ACCOUNT_ID!, {
+          ...messageData,
+          thread_id
+        });
+      } else if (thread_type === "individual" && sender_number) {
+        await client.sendIndividualMessage(process.env.A1BASE_ACCOUNT_ID!, {
+          ...messageData,
+          to: sender_number
+        });
+      }
     }
 
     return response;
@@ -304,26 +334,29 @@ export async function ConfirmTaskCompletion(
         basicWorkflowsPrompt.task_confirmation.user
     );
 
-    // Prepare message data
-    const messageData = {
-      content: confirmationMessage,
-      from: process.env.A1BASE_AGENT_NUMBER!,
-      service: "whatsapp" as const,
-    };
+    const messages = SPLIT_PARAGRAPHS ? confirmationMessage.split('\n').filter(msg => msg.trim()) : [confirmationMessage];
 
-    // Send message using A1Base client
-    if (thread_type === "group" && thread_id) {
-      await client.sendGroupMessage(process.env.A1BASE_ACCOUNT_ID!, {
-        ...messageData,
-        thread_id,
-      });
-    } else if (thread_type === "individual" && sender_number) {
-      await client.sendIndividualMessage(process.env.A1BASE_ACCOUNT_ID!, {
-        ...messageData,
-        to: sender_number,
-      });
-    } else {
-      throw new Error("Invalid message type or missing required parameters");
+    // Send each message line individually
+    for (const msg of messages) {
+      const messageData = {
+        content: msg,
+        from: process.env.A1BASE_AGENT_NUMBER!,
+        service: "whatsapp" as const,
+      };
+
+      if (thread_type === "group" && thread_id) {
+        await client.sendGroupMessage(process.env.A1BASE_ACCOUNT_ID!, {
+          ...messageData,
+          thread_id,
+        });
+      } else if (thread_type === "individual" && sender_number) {
+        await client.sendIndividualMessage(process.env.A1BASE_ACCOUNT_ID!, {
+          ...messageData,
+          to: sender_number,
+        });
+      } else {
+        throw new Error("Invalid message type or missing required parameters");
+      }
     }
   } catch (error) {
     console.error("[ConfirmTaskCompletion] Error:", error);
@@ -349,4 +382,3 @@ export async function ConfirmTaskCompletion(
     }
   }
 }
-
