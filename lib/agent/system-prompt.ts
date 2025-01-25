@@ -5,17 +5,17 @@
   system prompt that defines how the agent interacts with users. The file exports a getSystemPrompt function
   that generates the complete prompt by:
 
-  1. Loading safety configurations from safety-settings.json
-  2. Loading agent personality settings from agent-profile-settings.json  
+  1. Loading safety configurations from safety-settings.ts
+  2. Loading agent personality settings from agent-profile-settings.ts
   3. Combining them into a structured prompt with safety guidelines and agent profile information
 
   This is a critical file for customizing the agent's personality, tone, and behavioral boundaries.
-  Modify the imported JSON configuration files to adjust the agent's behavior for your use case.
+  Modify the imported TypeScript configuration files to adjust the agent's behavior for your use case.
 */
 
-import safetySettings from "../safety-config/safety-settings.json";
-import agentProfileSettings from "../agent-profile/agent-profile-settings.json";
-import agentBaseInformation from "../agent-profile/agent-base-information.json";
+import safetySettings from "../safety-config/safety-settings";
+import agentProfileSettings from "../agent-profile/agent-profile-settings";
+import { getFormattedInformation } from "../agent-profile/agent-base-information";
 
 function getSafetyPrompt(settings: typeof safetySettings): string {
   // Create a readable list of any custom safety prompts
@@ -83,11 +83,9 @@ Tone: ${tone}
 `;
 }
 
-function getAgentBaseInformationSnippet(
-  information: typeof agentBaseInformation
-): string {
+function getAgentBaseInformationSnippet(): string {
   return `
-${information}
+${getFormattedInformation()}
 `;
 }
 
@@ -97,7 +95,7 @@ ${getAgentProfileSnippet(agentProfileSettings)}
 </YOUR PROFILE>
 
 <AGENT BASE INFORMATION>
-${getAgentBaseInformationSnippet(agentBaseInformation)}
+${getAgentBaseInformationSnippet()}
 </AGENT BASE INFORMATION>
 
 <SAFETY>
