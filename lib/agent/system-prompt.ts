@@ -15,6 +15,7 @@
 
 import safetySettings from "../safety-config/safety-settings.json";
 import agentProfileSettings from "../agent-profile/agent-profile-settings.json";
+import agentBaseInformation from "../agent-profile/agent-base-information.json";
 
 function getSafetyPrompt(settings: typeof safetySettings): string {
   // Create a readable list of any custom safety prompts
@@ -82,12 +83,26 @@ Tone: ${tone}
 `;
 }
 
+function getAgentBaseInformationSnippet(
+  information: typeof agentBaseInformation
+): string {
+  return `
+${information}
+`;
+}
+
 export const getSystemPrompt = (userName: string) => `
 <YOUR PROFILE>
 ${getAgentProfileSnippet(agentProfileSettings)}
 </YOUR PROFILE>
 
+<AGENT BASE INFORMATION>
+${getAgentBaseInformationSnippet(agentBaseInformation)}
+</AGENT BASE INFORMATION>
+
 <SAFETY>
 ${getSafetyPrompt(safetySettings)}
 </SAFETY>
+
+
 `;
