@@ -63,7 +63,6 @@ Return valid JSON with only that single key "responseType" and value as one of t
   });
 
   const content = completion.choices[0]?.message?.content || "";
-  console.log('&&&&&&&&&&&&&&&&s')
   console.log(content)
   // Parse response and validate response type
   try {
