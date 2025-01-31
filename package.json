@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.48.1",
     "a1base-node": "^0.0.42",
     "next": "^15.1.3",
     "openai": "^4.77.0",
