@@ -19,14 +19,46 @@ export class SupabaseAdapter {
    */
   async init(): Promise<void> {
     try {
-      const { error } = await this.supabase.from(USERS_TABLE).select('id').limit(1)
-      if (error && error.code !== 'PGRST116') { // Ignore "no rows returned" error
-        throw error
+      const { error: userTableError } = await this.supabase
+        .from(USERS_TABLE)
+        .select('id')
+        .limit(1);
+
+      if (userTableError && userTableError.code !== 'PGRST116') {
+        // Table does not exist, create it
+        await this.createUsersTable();
       }
-      this.isInitialized = true
+
+      const { error: threadsTableError } = await this.supabase
+        .from(THREADS_TABLE)
+        .select('id')
+        .limit(1);
+
+      if (threadsTableError && threadsTableError.code !== 'PGRST116') {
+        // Table does not exist, create it
+        await this.createThreadsTable();
+      }
+
+      this.isInitialized = true;
     } catch (error) {
-      console.error('Failed to initialize SupabaseAdapter:', error)
-      throw error
+      console.error('Failed to initialize SupabaseAdapter:', error);
+      throw error;
+    }
+  }
+
+  private async createUsersTable(): Promise<void> {
+    const { error } = await this.supabase.rpc('create_users_table');
+    if (error) {
+      console.error('Error creating users table:', error);
+      throw error;
+    }
+  }
+
+  private async createThreadsTable(): Promise<void> {
+    const { error } = await this.supabase.rpc('create_threads_table');
+    if (error) {
+      console.error('Error creating threads table:', error);
+      throw error;
     }
   }
 
