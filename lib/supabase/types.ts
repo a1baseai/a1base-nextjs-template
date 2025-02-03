@@ -15,10 +15,10 @@ export interface Database {
     Tables: {
       users: {
         Row: {
-          id: string
-          created_at: string
+          id: string  // uuid stored as string
+          created_at: string  // timestamptz stored as ISO string
           name: string | null
-          phone_number: number | null
+          phone_number: number | null  // numeric stored as number
         }
         Insert: {
           id?: string
@@ -35,10 +35,10 @@ export interface Database {
       }
       threads: {
         Row: {
-          id: string
-          created_at: string
-          messages: Json | null
-          participants: Json | null
+          id: string  // uuid stored as string
+          created_at: string  // timestamptz stored as ISO string
+          messages: Json | null  // jsonb stored as Json type
+          participants: Json | null  // jsonb stored as Json type
         }
         Insert: {
           id?: string
