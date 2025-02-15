@@ -1,3 +1,4 @@
+// Start of Selection
 "use client";
 
 import { useChatRuntime } from "@assistant-ui/react-ai-sdk";
@@ -19,6 +20,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import Link from "next/link";
 
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
@@ -50,7 +52,7 @@ const ButtonWithTooltip: FC<{
 const TopLabel: FC = () => {
   return (
     <div className="flex h-full w-full items-center gap-2 px-3 text-sm font-semibold">
-      <span>Rose &amp; Pasha's House</span>
+      <span>A1Base Customer Success</span>
     </div>
   );
 };
@@ -62,8 +64,8 @@ const LeftSidebar: FC = () => {
       <div>
         <div className="w-full relative">
           <Image
-            src="https://a1base-public.s3.us-east-1.amazonaws.com/profile-moving/20250213_1255_Startup+Workplace+Smile_simple_compose_01jm0hgd5afymrz6ewd1c0nbra.gif"
-            alt="Startup Workplace Smile"
+            src="https://a1base-public.s3.us-east-1.amazonaws.com/profile-moving/20250215_1417_Confident+Startup+Smile_simple_compose_01jm5v0x50f2kaarp5nd556cbw.gif"
+            alt="Customer Success Professional"
             layout="responsive"
             width={3840}
             height={2160}
@@ -82,15 +84,14 @@ const LeftSidebar: FC = () => {
         </div>
         <div className="mt-4 text-sm">
           <h2 className="text-2xl font-medium">
-            <span className="text-black font-bold">Mike</span>
-            <span className="text-gray-500 text-base"> - AI Sales Agent</span>
+            <span className="text-black font-bold">Amy</span>
+            <span className="text-gray-500 text-base"> - Customer Success Manager</span>
           </h2>
           <div className="my-2 flex items-center">
             <div className="h-px flex-grow bg-border" />
           </div>
           <p className="text-gray-500 text-sm mt-2">
-            Mike learns from every call, adapts to your business needs, and
-            elevates your customer relationships around the clock.
+            I help developers understand and implement A1Base's API for giving AI agents real-world communication capabilities. Let me guide you through setting up verified phone numbers, email addresses, and integrating with AI models.
           </p>
           <div className="mt-4 flex gap-2 ">
             <ButtonWithTooltip
@@ -140,7 +141,19 @@ const LeftBarSheet: FC = () => {
 
 // Optional global header
 const Header: FC = () => {
-  return <></>;
+  return (
+    <header className="flex items-center justify-between p-4 border-b">
+      <Link href="/" className="flex items-center gap-2">
+        <img
+          src="/a1base-black.png"
+          alt="A1Base Logo"
+          width={80}
+          height={10}
+          className="py-1"
+        />
+      </Link>
+    </header>
+  );
 };
 
 // Chat top info area
@@ -150,14 +163,13 @@ const ChatTopInfo: FC = () => {
       <div className="flex items-center gap-6">
         <img
           src="/a1base-favicon.png"
-          alt="House Logo"
+          alt="A1Base Logo"
           className="h-20 w-20 object-cover rounded-lg"
         />
         <div>
-          <h1 className="text-xl font-bold">A1Base AI Sales Agent</h1>
+          <h1 className="text-xl font-bold">A1Base Customer Success</h1>
           <p className="text-sm text-gray-500 mt-1">
-            I can help you analyze market data and provide detailed insights about
-            investment opportunities.
+            I can help you implement A1Base's API and set up AI agents with real-world communication capabilities.
           </p>
         </div>
       </div>
@@ -165,37 +177,50 @@ const ChatTopInfo: FC = () => {
   );
 };
 
-// New RightSidebar component with two groups of workflows in a grammatical action style.
+// New RightSidebar component with two groups of workflows in a grammatical action style,
+// and a grid of 9 small GIF images (3 columns x 3 rows) placed above "🚀 Active Implementations".
 const RightSidebar: FC = () => {
+  // Define the array of GIF URLs
+  const gifUrls = [
+    "https://a1base-public.s3.us-east-1.amazonaws.com/profile-moving/20250210_1742_Corporate+Serene+Smile_simple_compose_01jkq9gs6rea3v4n7w461rwye2.gif",
+    "https://a1base-public.s3.us-east-1.amazonaws.com/profile-moving/20250213_1254_Confident+Startup+Professional_simple_compose_01jm0heqkvez2a2xbpsdh003z8.gif",
+    "https://a1base-public.s3.us-east-1.amazonaws.com/profile-moving/20250213_1255_Startup+Workplace+Smile_simple_compose_01jm0hgd5afymrz6ewd1c0nbra.gif",
+    "https://a1base-public.s3.us-east-1.amazonaws.com/profile-moving/20250213_1256_Confident+Startup+Glance_simple_compose_01jm0hj6cfedn8m2gr8ynrwbgs.gif",
+    "https://a1base-public.s3.us-east-1.amazonaws.com/profile-moving/20250213_1300_Confident+Leader%27s+Smile_simple_compose_01jm0hsnkeftbs5cqkbg77h4sh.gif",
+    "https://a1base-public.s3.us-east-1.amazonaws.com/profile-moving/20250213_1301_Friendly+Startup+Vibes_simple_compose_01jm0hw1vde4cbcts0rzdtz0h0.gif",
+  ];
+  // Use the 6 GIFs directly without extending
+  const extendedGifUrls = gifUrls;
+
   // Define two groups: one for immediate tasks and one for suggested projects.
   const workflowGroups = [
     {
-      title: "🚀 Active Workflows",
+      title: "🚀 Active Implementations",
       tasks: [
         {
-          action: "Schedule a cleaner for this Sunday.",
-          time: "08/11/2024",
+          action: "Set up WhatsApp integration",
+          time: "In progress",
         },
       ],
     },
     {
-      title: "💡 Listed Workflows",
+      title: "💡 Available Services",
       tasks: [
         {
-          action: "Book a cleaner for the weekend",
-          time: "This weekend",
+          action: "Configure AI agent phone number",
+          time: "Setup guide",
         },
         {
-          action: "Schedule home maintenance tasks",
-          time: "Anytime",
+          action: "Enable email capabilities",
+          time: "Documentation",
         },
         {
-          action: "Track utility bills and usage",
-          time: "Monthly",
+          action: "WhatsApp integration setup",
+          time: "Tutorial",
         },
         {
-          action: "Manage cleaning schedules",
-          time: "Weekly",
+          action: "API key management",
+          time: "Security guide",
         },
       ],
     },
@@ -205,6 +230,20 @@ const RightSidebar: FC = () => {
     <aside className="w-80 shrink-0 bg-gray-100 overflow-auto">
       <div className="flex h-full flex-col">
         <div className="p-4 border-b space-y-4">
+          <h2 className="text-lg font-semibold mb-3">✨ Your AI Workforce</h2>
+          {/* Grid of 9 small GIF images in 3 columns and 3 rows */}
+          <div className="grid grid-cols-3 gap-2">
+            {extendedGifUrls.map((url, idx) => (
+              <Image
+                key={idx}
+                src={url}
+                alt={`GIF thumbnail ${idx + 1}`}
+                width={80}
+                height={80}
+                className="rounded-sm object-cover"
+              />
+            ))}
+          </div>
           {workflowGroups.map((group) => (
             <div key={group.title}>
               <h2 className="text-lg font-semibold">{group.title}</h2>
@@ -258,3 +297,4 @@ const DayLayout = () => {
 };
 
 export default DayLayout;
+// End of Selectio
