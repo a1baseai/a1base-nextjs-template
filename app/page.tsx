@@ -1,5 +1,5 @@
 import Image from "next/image";
-
+import Link from "next/link";
 export default function Home() {
   return (
     <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
@@ -16,17 +16,25 @@ export default function Home() {
           {`Template A1 Agent that can communicate across WhatsApp, Email, Slack, Teams, and SMS.`}
         </p>
 
-        <a
-          href={`https://wa.me/${process.env.A1BASE_AGENT_NUMBER?.replace(
-            "+",
-            ""
-          )}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="rounded-lg px-6 py-3 bg-[#25D366] hover:bg-[#128C7E] text-white flex items-center gap-2 transition-colors"
-        >
-          {`Chat with your agent on WhatApp`}
-        </a>
+        <div className="flex gap-4">
+          <a
+            href={`https://wa.me/${process.env.A1BASE_AGENT_NUMBER?.replace(
+              "+",
+              ""
+            )}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-lg px-6 py-3 bg-[#25D366] hover:bg-[#128C7E] text-white flex items-center gap-2 transition-colors"
+          >
+            {`Chat with your agent on WhatApp`}
+          </a>
+          <Link
+            href="/chat"
+            className="rounded-lg px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2 transition-colors"
+          >
+            {`Chat with your agent on Web`}
+          </Link>
+        </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 w-full max-w-4xl">
           <div className="p-6 rounded-xl bg-white dark:bg-black/20 border border-black/[.08] dark:border-white/[.08] shadow-lg">
