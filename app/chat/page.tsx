@@ -7,12 +7,7 @@ import { Thread } from "@/components/assistant-ui/thread";
 import { ThreadList } from "@/components/assistant-ui/thread-list";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import {
-  MenuIcon,
-  PhoneIcon,
-  MessageSquareIcon,
-  Mail,
-} from "lucide-react";
+import { MenuIcon, PhoneIcon, MessageSquareIcon, Mail } from "lucide-react";
 
 import {
   Tooltip,
@@ -21,11 +16,11 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import Link from "next/link";
-
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
 import { cn } from "@/lib/utils";
 import { FC } from "react";
+import agentProfileSettings from "@/lib/agent-profile/agent-profile-settings";
 
 // A small helper for tooltip usage
 const ButtonWithTooltip: FC<{
@@ -52,7 +47,7 @@ const ButtonWithTooltip: FC<{
 const TopLabel: FC = () => {
   return (
     <div className="flex h-full w-full items-center gap-2 px-3 text-sm font-semibold">
-      <span>A1Base Customer Success</span>
+      <span>{agentProfileSettings.companyName}</span>
     </div>
   );
 };
@@ -84,14 +79,17 @@ const LeftSidebar: FC = () => {
         </div>
         <div className="mt-4 text-sm">
           <h2 className="text-2xl font-medium">
-            <span className="text-black font-bold">Amy</span>
-            <span className="text-gray-500 text-base"> - Customer Success Manager</span>
+            <span className="text-black font-bold">{agentProfileSettings.name}</span>
+            <span className="text-gray-500 text-base">
+              {" "}
+              - {agentProfileSettings.role}
+            </span>
           </h2>
           <div className="my-2 flex items-center">
             <div className="h-px flex-grow bg-border" />
           </div>
           <p className="text-gray-500 text-sm mt-2">
-            I help developers understand and implement A1Base's API for giving AI agents real-world communication capabilities. Let me guide you through setting up verified phone numbers, email addresses, and integrating with AI models.
+            {agentProfileSettings.botPurpose[0]}
           </p>
           <div className="mt-4 flex gap-2 ">
             <ButtonWithTooltip
@@ -167,9 +165,9 @@ const ChatTopInfo: FC = () => {
           className="h-20 w-20 object-cover rounded-lg"
         />
         <div>
-          <h1 className="text-xl font-bold">A1Base Customer Success</h1>
+          <h1 className="text-xl font-bold">{agentProfileSettings.companyName}</h1>
           <p className="text-sm text-gray-500 mt-1">
-            I can help you implement A1Base's API and set up AI agents with real-world communication capabilities.
+            {agentProfileSettings.companyDescription}
           </p>
         </div>
       </div>
