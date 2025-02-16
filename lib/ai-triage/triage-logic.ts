@@ -61,20 +61,25 @@ export async function triageMessage({
   try {
     let threadMessages: MessageRecord[] = [];
     
-    // Try to get messages from Supabase first
-    const adapter = await getInitializedAdapter();
-    
-    if (adapter) {
-      console.log("[triageMessage] Using Supabase for message history");
-      const thread = await adapter.getThread(thread_id);
-      if (thread?.messages) {
-        // Get last 10 messages from the thread
-        threadMessages = thread.messages.slice(-10);
-        console.log(threadMessages)
-      }
-    } else {
-      console.log("[triageMessage] Using in-memory storage for message history");
+    // Skip Supabase for web-ui service
+    if (service === 'web-ui') {
       threadMessages = messagesByThread.get(thread_id) || [];
+    } else {
+      // Try to get messages from Supabase first
+      const adapter = await getInitializedAdapter();
+      
+      if (adapter) {
+        console.log("[triageMessage] Using Supabase for message history");
+        const thread = await adapter.getThread(thread_id);
+        if (thread?.messages) {
+          // Get last 10 messages from the thread
+          threadMessages = thread.messages.slice(-10);
+          console.log(threadMessages)
+        }
+      } else {
+        console.log("[triageMessage] Using in-memory storage for message history");
+        threadMessages = messagesByThread.get(thread_id) || [];
+      }
     }
     
     // Convert to ThreadMessage format
