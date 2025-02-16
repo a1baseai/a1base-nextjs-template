@@ -45,13 +45,12 @@ export async function verifyAgentIdentity(
   thread_type: "individual" | "group",
   thread_id?: string,
   sender_number?: string
-) {
+): Promise<string[]> {
   console.log("Workflow Start [verifyAgentIdentity]");
 
   const agentIdCard = 'https://www.a1base.com/identity-and-trust/8661d846-d43d-4ee7-a095-0dcc97764b97'
 
   try {
-    
     // Generate response message for identity verification
     const response = await generateAgentIntroduction(message);
     const messages = SPLIT_PARAGRAPHS ? response.split('\n').filter(msg => msg.trim()) : [response];
@@ -109,12 +108,13 @@ export async function verifyAgentIdentity(
     } else {
       throw new Error("Invalid message type or missing required parameters");
     }
+
+    return [...messages, "Here's my A1Base identity card for verification:", agentIdCard];
   } catch (error) {
     console.error("[verifyAgentIdentity] Error:", error);
     throw error;
   }
 }
-
 
 export async function DefaultReplyToMessage(
   threadMessages: ThreadMessage[],

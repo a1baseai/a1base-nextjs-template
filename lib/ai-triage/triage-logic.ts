@@ -30,6 +30,14 @@ type TriageParams = {
   thread_type: string;
   timestamp: string;
   messagesByThread: Map<string, MessageRecord[]>;
+  service: string;
+};
+
+type TriageResult = {
+  type: 'identity' | 'email' | 'default' | 'default-webchat';
+  success: boolean;
+  message?: string;
+  data?: any;
 };
 
 // ======================== MAIN TRIAGE LOGIC ========================
@@ -46,7 +54,8 @@ export async function triageMessage({
   sender_number,
   thread_type,
   messagesByThread,
-}: TriageParams) {
+  service,
+}: TriageParams): Promise<TriageResult> {
   console.log("[triageMessage] Starting message triage");
 
   try {
@@ -87,15 +96,19 @@ export async function triageMessage({
       case 'sendIdentityCard':
         console.log('Running Identity Verification Workflow')
       
-        await verifyAgentIdentity(
+        const identityMessages = await verifyAgentIdentity(
           threadMessages[threadMessages.length - 1].content,
           thread_type as "individual" | "group",
           thread_id,
           sender_number
-        )
-        
+        );
 
-      break;
+        return {
+          type: 'identity',
+          success: true,
+          message: identityMessages.join('\n'),
+          data: identityMessages
+        };
 
       case 'handleEmailAction':
         console.log('Running Email Workflow')
@@ -120,38 +133,48 @@ export async function triageMessage({
           thread_id,
           sender_number
         );
-        break;
 
-      // case 'taskActionConfirmation':
-      //   console.log('Running Task Confirmation Workflow')
-      //   // Confirm completion of a specific task
-      //   await ConfirmTaskCompletion(
-      //     messages,
-      //     thread_type as "individual" | "group",
-      //     thread_id,
-      //     sender_number
-      //   );
-      //   break;
-        
-      // case 'followUpResponse':
-      //   console.log('Running Follow Up Response')
-      //   // Triage to ask a follow up question
-        
-      //   break;
-        
+        return {
+          type: 'email',
+          success: true,
+          message: 'Email sent successfully',
+          data: emailDraft
+        };
+
       case 'simpleResponse':
       default:
         console.log('Running Default Response')
         // Use the default workflow
-        await DefaultReplyToMessage(
+        const response = await DefaultReplyToMessage(
           messages,
           thread_type as "individual" | "group",
           thread_id,
           sender_number
         );
+
+        // Return different response type for web UI
+        if (service === 'web-ui') {
+          return {
+            type: 'default-webchat',
+            success: true,
+            message: 'Default response sent',
+            data: response
+          };
+        }
+
+        return {
+          type: 'default', 
+          success: true,
+          message: 'Default response sent',
+          data: response
+        };
     }
   } catch (error) {
     console.error("[Triage] Error:", error);
-    throw error;
+    return {
+      type: 'default',
+      success: false,
+      message: error instanceof Error ? error.message : 'Unknown error occurred'
+    };
   }
 }
