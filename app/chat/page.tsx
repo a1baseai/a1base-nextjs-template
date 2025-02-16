@@ -273,6 +273,12 @@ const DayLayout = () => {
     api: "/api/chat",
   });
 
+  //TODO:
+  //  Intercept the chat with our AI Triage Logic
+  //  If the choice is to respond, then respond in web chat
+  //  Otherwise we need a way to the output here
+
+
   return (
     <AssistantRuntimeProvider runtime={runtime}>
       <div className="flex h-screen flex-col">

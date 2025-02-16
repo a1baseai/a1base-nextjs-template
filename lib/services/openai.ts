@@ -26,7 +26,6 @@ export async function triageMessageIntent(threadMessages: ThreadMessage[]): Prom
   "followUpResponse" | 
   "handleEmailAction" | 
   "taskActionConfirmation"
-  
 }> {
   // Convert thread messages to OpenAI chat format
   const conversationContext = threadMessages.map((msg) => ({
@@ -34,6 +33,14 @@ export async function triageMessageIntent(threadMessages: ThreadMessage[]): Prom
     content: msg.content,
   }));
 
+  // Heuristic check: if the latest message clearly asks for identity or contains an email address, return early
+  const latestMessage = threadMessages[threadMessages.length - 1]?.content.toLowerCase() || '';
+  if (latestMessage.includes("who are you") || latestMessage.includes("what are you")) {
+    return { responseType: "sendIdentityCard" };
+  }
+  if (/\b[\w.-]+@[\w.-]+\.\w+\b/.test(latestMessage)) {
+    return { responseType: "handleEmailAction" };
+  }
 
   const triagePrompt = `
 Based on the conversation, analyze the user's intent and respond with exactly one of these JSON responses:
@@ -53,9 +60,9 @@ Rules:
 Return valid JSON with only that single key "responseType" and value as one of the three allowed strings.
 `;
 
-  // Get completion from OpenAI
+  // Use a faster model for triage to reduce latency
   const completion = await openai.chat.completions.create({
-    model: "gpt-4",
+    model: "gpt-3.5-turbo",
     messages: [
       { role: "system", content: triagePrompt },
       ...conversationContext,
@@ -63,7 +70,7 @@ Return valid JSON with only that single key "responseType" and value as one of t
   });
 
   const content = completion.choices[0]?.message?.content || "";
-  console.log(content)
+  console.log(content);
   // Parse response and validate response type
   try {
     const parsed = JSON.parse(content);

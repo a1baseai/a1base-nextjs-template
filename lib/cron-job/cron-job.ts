@@ -3,7 +3,7 @@
  * It provides a template for running scheduled tasks via cron jobs.
  */
 export async function runCronJob() {
-  console.log('🕒 Starting cron job execution...');
+  console.log("🕒 Starting cron job execution...");
 
   try {
     // Add your cron job logic here
@@ -14,9 +14,9 @@ export async function runCronJob() {
     // - Update cached information
     // - Run maintenance tasks
 
-    console.log('✅ Cron job completed successfully');
+    console.log("✅ Cron job completed successfully");
   } catch (error) {
-    console.error('❌ Cron job failed:', error);
+    console.error("❌ Cron job failed:", error);
     throw error;
   }
 }
