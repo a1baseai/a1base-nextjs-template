@@ -18,32 +18,7 @@ import {
   handleMessageError
 } from "./message-utils";
 
-type MessageRecord = {
-  message_id: string;
-  content: string;
-  sender_number: string;
-  sender_name: string;
-  timestamp: string;
-};
-
-type TriageParams = {
-  thread_id: string;
-  message_id: string;
-  content: string;
-  sender_name: string;
-  sender_number: string;
-  thread_type: string;
-  timestamp: string;
-  messagesByThread: Map<string, MessageRecord[]>;
-  service: string;
-};
-
-type TriageResult = {
-  type: 'identity' | 'email' | 'default' | 'default-webchat';
-  success: boolean;
-  message?: string;
-  data?: any;
-};
+import { MessageRecord, TriageParams, TriageResult } from "./types";
 
 // ======================== MAIN TRIAGE LOGIC ========================
 // Processes incoming messages and routes them to appropriate workflows

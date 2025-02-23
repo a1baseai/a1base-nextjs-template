@@ -7,8 +7,7 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 })
 
-// Add type for OpenAI chat roles
-type ChatRole = "system" | "user" | "assistant" | "function"
+import { ChatRole, EmailGenerationResult, MessageTriageResponse } from "./types";
 
 /**
  * ============= OPENAI CALL TO TRIAGE THE MESSAGE INTENT ================
@@ -19,14 +18,7 @@ type ChatRole = "system" | "user" | "assistant" | "function"
  *  - taskActionConfirmation: Confirm with user before proceeding with requested task (i.e before sending an email)
  * =======================================================================
  */
-export async function triageMessageIntent(threadMessages: ThreadMessage[]): Promise<{ 
-  responseType: 
-  "sendIdentityCard"|
-  "simpleResponse" |
-  "followUpResponse" | 
-  "handleEmailAction" | 
-  "taskActionConfirmation"
-}> {
+export async function triageMessageIntent(threadMessages: ThreadMessage[]): Promise<MessageTriageResponse>{
   // Convert thread messages to OpenAI chat format
   const conversationContext = threadMessages.map((msg) => ({
     role: msg.sender_number === process.env.A1BASE_AGENT_NUMBER! ? "assistant" as const : "user" as const,
@@ -175,14 +167,7 @@ export async function generateAgentResponse(threadMessages: ThreadMessage[], use
  * Generate an email (subject/body) from a series of thread messages.
  * If userPrompt is provided, it will be added as an extra instruction.
  */
-export async function generateEmailFromThread(threadMessages: ThreadMessage[], userPrompt?: string): Promise<{
-  recipientEmail: string;
-  hasRecipient: boolean;
-  emailContent: {
-    subject: string;
-    body: string;
-  } | null;
-}> {
+export async function generateEmailFromThread(threadMessages: ThreadMessage[], userPrompt?: string): Promise<EmailGenerationResult>{
 
   console.log("OPENAI CALL TO MAKE EMAIL")
   // Extract email from last message

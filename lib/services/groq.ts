@@ -7,19 +7,12 @@ const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
 });
 
-type ChatRole = "system" | "user" | "assistant" | "function"
+import { ChatRole, EmailGenerationResult, MessageTriageResponse } from "./types";
 
 /**
  * Triage the message intent to determine appropriate response type
  */
-export async function triageMessageIntent(threadMessages: ThreadMessage[]): Promise<{ 
-  responseType: 
-  "sendIdentityCard"|
-  "simpleResponse" |
-  "followUpResponse" | 
-  "handleEmailAction" | 
-  "taskActionConfirmation"
-}> {
+export async function triageMessageIntent(threadMessages: ThreadMessage[]): Promise<MessageTriageResponse>{
   const conversationContext = threadMessages.map((msg) => ({
     role: msg.sender_number === process.env.A1BASE_AGENT_NUMBER! ? "assistant" as const : "user" as const,
     content: msg.content,
@@ -143,14 +136,7 @@ export async function generateAgentResponse(threadMessages: ThreadMessage[], use
 /**
  * Generate an email from thread messages
  */
-export async function generateEmailFromThread(threadMessages: ThreadMessage[], userPrompt?: string): Promise<{
-  recipientEmail: string;
-  hasRecipient: boolean;
-  emailContent: {
-    subject: string;
-    body: string;
-  } | null;
-}> {
+export async function generateEmailFromThread(threadMessages: ThreadMessage[], userPrompt?: string): Promise<EmailGenerationResult>{
   const relevantMessages = threadMessages.slice(-3).map((msg) => ({
     role: msg.sender_number === process.env.A1BASE_AGENT_NUMBER! ? 
       "assistant" as const : 
