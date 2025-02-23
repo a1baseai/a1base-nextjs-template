@@ -76,7 +76,7 @@ async function saveMessage(
       }
 
       // Get existing thread
-      let thread = await adapter.getThread(threadId);
+      const thread = await adapter.getThread(threadId);
 
       // Format the new message
       const newMessage = {
@@ -137,7 +137,7 @@ async function saveMessage(
         const newThreadId = await adapter.createThread(
           threadId,
           [newMessage],
-          participants
+          participants.map(number => ({ number }))
         );
         if (!newThreadId) throw new Error("Failed to create new thread");
       }

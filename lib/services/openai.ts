@@ -18,7 +18,7 @@ type ChatRole = "system" | "user" | "assistant" | "function";
  *  - handleEmailAction: Draft email and await user approval for sending
  *  - taskActionConfirmation: Confirm with user before proceeding with requested task (i.e before sending an email)
  * =======================================================================
- */
+ */   
 export async function triageMessageIntent(
   threadMessages: ThreadMessage[]
 ): Promise<{
@@ -117,7 +117,7 @@ export async function generateAgentIntroduction(
   const conversation = [
     {
       role: "system" as const,
-      content: getSystemPrompt(userName),
+      content: getSystemPrompt(),
     },
     {
       role: "user" as const,
@@ -161,7 +161,7 @@ export async function generateAgentResponse(
 
   // Build the conversation to pass to OpenAI
   const conversation = [
-    { role: "system" as ChatRole, content: getSystemPrompt(userName) },
+    { role: "system" as ChatRole, content: getSystemPrompt() },
   ];
 
   // If there's a user-level prompt from basicWorkflowsPrompt, add it as a user message
@@ -174,22 +174,10 @@ export async function generateAgentResponse(
 
   const completion = await openai.chat.completions.create({
     model: "gpt-4",
-    messages: conversation,
+    messages: conversation as OpenAI.Chat.ChatCompletionMessageParam[],
   });
 
-  const content =
-    completion.choices[0]?.message?.content ||
-    "Sorry, I couldn't generate a response";
-
-  // Try parsing as JSON to extract just the "message"
-  try {
-    const data = JSON.parse(content);
-    return data.message || "No message found.";
-  } catch (error) {
-    // If not valid JSON, just return the entire text
-    console.error("Error parsing JSON response:", error);
-    return content;
-  }
+  return completion.choices[0]?.message?.content || "Sorry, I couldn't generate a response";
 }
 
 /**

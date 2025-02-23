@@ -51,8 +51,8 @@ type TriageResult = {
 // ===================================================================
 export async function triageMessage({
   thread_id,
-  content,
-  sender_name,
+  // content,
+  // sender_name,
   sender_number,
   thread_type,
   messagesByThread,
@@ -152,6 +152,7 @@ export async function triageMessage({
       case "simpleResponse":
       default:
         console.log("Running Default Response");
+        
         // Use the default workflow
         const response = await DefaultReplyToMessage(
           messages,
@@ -159,6 +160,8 @@ export async function triageMessage({
           thread_id,
           sender_number
         );
+
+        console.log("Response:", response);
 
         // Return different response type for web UI
         if (service === "web-ui") {
