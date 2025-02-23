@@ -53,7 +53,7 @@ Return valid JSON with only that single key "responseType" and value as one of t
     messages: [
       { role: "system", content: triagePrompt },
       ...conversationContext,
-    ],
+    ] as { role: string; content: string }[],
     model: "llama-3.3-70b-versatile",
   });
 
@@ -96,7 +96,7 @@ export async function generateAgentIntroduction(incomingMessage: string, userNam
     return "Hey there!";
   }
 
-  const conversation = [
+  const conversation: { role: string; content: string }[] = [
     {
       role: "system" as const,
       content: getSystemPrompt(userName)
