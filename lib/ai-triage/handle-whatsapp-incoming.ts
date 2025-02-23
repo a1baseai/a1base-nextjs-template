@@ -1,5 +1,5 @@
 import { WhatsAppIncomingData } from "a1base-node";
-import { MessageRecord } from "@/types/chat";
+import type { MessageRecord } from "./types";
 import { triageMessage } from "./triage-logic";
 import { initializeDatabase, getInitializedAdapter } from "../supabase/config";
 
@@ -13,7 +13,11 @@ const MAX_CONTEXT_MESSAGES = 10;
 async function userCheck(
   phoneNumber: string,
   name: string,
-  adapter: any
+  adapter: {
+    getUserByPhone: (phone: number) => Promise<{ name: string } | null>;
+    createUser: (name: string, phone: number) => Promise<string | null>;
+    updateUser: (phone: number, data: { name: string }) => Promise<boolean>;
+  }
 ): Promise<void> {
   try {
     // Convert phone number to numeric format (remove '+' and any spaces)
@@ -70,7 +74,7 @@ async function saveMessage(
       }
 
       // Get existing thread
-      let thread = await adapter.getThread(threadId);
+      const thread = await adapter.getThread(threadId);
 
       // Format the new message
       const newMessage = {
@@ -131,7 +135,13 @@ async function saveMessage(
         const newThreadId = await adapter.createThread(
           threadId,
           [newMessage],
-          participants
+          participants.map(p => ({
+            id: p,
+            name: p === process.env.A1BASE_AGENT_NUMBER?.replace(/\+/g, "") ? 
+              process.env.A1BASE_AGENT_NAME || "A1 Agent" : 
+              "Unknown User",
+            phone_number: p
+          }))
         );
         if (!newThreadId) throw new Error("Failed to create new thread");
       }

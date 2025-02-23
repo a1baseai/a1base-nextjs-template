@@ -95,8 +95,18 @@ Connect with us:
 ];
 
 /**
- * Formats the information sections into a single string, with higher priority
- * sections appearing first and with more emphasis.
+ * Formats agent information sections into a structured prompt string.
+ * 
+ * This function processes the base information sections by:
+ * 1. Sorting sections by priority (highest first)
+ * 2. Converting each section into a formatted block
+ * 3. Combining blocks with appropriate spacing
+ * 
+ * The resulting string is used in the system prompt to give the agent
+ * its core knowledge and context about the company, capabilities,
+ * and common use cases.
+ * 
+ * @returns Formatted string containing all information sections
  */
 export function getFormattedInformation(): string {
   const sortedSections = [...baseInformation].sort(

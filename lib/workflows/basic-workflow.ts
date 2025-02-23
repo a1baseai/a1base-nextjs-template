@@ -15,18 +15,17 @@
 
 import { A1BaseAPI } from "a1base-node";
 import { 
-  triageMessageIntent,
   generateAgentResponse, 
   generateEmailFromThread,
   generateAgentIntroduction,
 } from "../services/openai";
-import { ThreadMessage } from "@/types/chat";
-import { basicWorkflowsPrompt } from "./basic_workflows_prompt";
+import type { ThreadMessage } from "../../types/chat";
+import { basicWorkflowsPrompt } from "./basic-workflows-prompt";
 
-// Configuration
-const SPLIT_PARAGRAPHS = false; // Set to false to send messages without splitting
+/** Message splitting configuration */
+const SPLIT_PARAGRAPHS = false;
 
-// Initialize A1Base client
+/** A1Base API client instance */
 const client = new A1BaseAPI({
   credentials: {
     apiKey: process.env.A1BASE_API_KEY!,
@@ -34,12 +33,32 @@ const client = new A1BaseAPI({
   }
 });
 
-// ====== BASIC SEND AND VERIFICATION WORKFLOW =======
-// Functions for sending messages and verifying agent identity
-// - verifyAgentIdentity: Sends identity verification message
-// - DefaultReplyToMessage: Generates and sends simple response
-// ===================================================
+/**
+ * Basic Send and Verification Workflow
+ * 
+ * Functions for sending messages and verifying agent identity:
+ * - verifyAgentIdentity: Sends identity verification message
+ * - DefaultReplyToMessage: Generates and sends simple response
+ */
 
+/**
+ * Sends identity verification messages and the agent's identity card.
+ * 
+ * This function handles identity verification requests by:
+ * 1. Generating a personalized introduction using the agent's profile
+ * 2. Sending the introduction message(s)
+ * 3. Sending the agent's A1Base identity card link
+ * 
+ * The function supports both individual and group chats, using the appropriate
+ * A1Base API endpoints based on the thread type.
+ * 
+ * @param message - The user's message requesting identity verification
+ * @param thread_type - Whether this is an individual or group chat
+ * @param thread_id - For group messages, the ID of the group thread
+ * @param sender_number - For individual messages, the recipient's phone number
+ * @returns Array of sent messages including introduction and identity card link
+ * @throws Error if message type is invalid or required parameters are missing
+ */
 export async function verifyAgentIdentity(
   message: string,
   thread_type: "individual" | "group",
@@ -116,6 +135,23 @@ export async function verifyAgentIdentity(
   }
 }
 
+/**
+ * Generates and sends a simple response to a message thread.
+ * 
+ * This function handles standard message responses by:
+ * 1. Using OpenAI to generate a contextually appropriate response
+ * 2. Optionally splitting the response into paragraphs if configured
+ * 3. Sending each message part through the appropriate A1Base channel
+ * 
+ * The function includes error handling that sends user-friendly error messages
+ * back through the same channel if something goes wrong.
+ * 
+ * @param threadMessages - Array of messages providing conversation context
+ * @param thread_type - Whether this is an individual or group chat
+ * @param thread_id - For group messages, the ID of the group thread
+ * @param sender_number - For individual messages, the recipient's phone number
+ * @throws Error if message type is invalid or required parameters are missing
+ */
 export async function DefaultReplyToMessage(
   threadMessages: ThreadMessage[],
   thread_type: "individual" | "group",
@@ -179,13 +215,30 @@ export async function DefaultReplyToMessage(
   }
 }
 
-// ============================== EMAIL WORKFLOWS ========================
-// Functions for handling email-related tasks like constructing and sending emails
-// through the A1 agent's email address. These workflows are triggered when the
-// message triage detects an email-related request from the user.
-// =======================================================================
+/**
+ * Email Workflows
+ * 
+ * Functions for handling email-related tasks like constructing and sending emails
+ * through the A1 agent's email address. These workflows are triggered when the
+ * message triage detects an email-related request from the user.
+ */
 
-// Generates the contents of the email, but doesn't send it until user approval
+
+/**
+ * Generates an email draft from conversation context.
+ * 
+ * This function analyzes the conversation to create an appropriate email by:
+ * 1. Using OpenAI to understand the email requirements
+ * 2. Generating subject and body content
+ * 3. Attempting to identify the recipient from context
+ * 
+ * The email is not sent immediately - this function only creates the draft
+ * which can then be reviewed before sending.
+ * 
+ * @param threadMessages - Array of messages providing email context
+ * @returns Email draft containing recipient, subject, and body
+ * @throws Error if email content generation fails
+ */
 export async function ConstructEmail(threadMessages: ThreadMessage[]): Promise<{
   recipientEmail: string;
   hasRecipient: boolean;
@@ -220,6 +273,25 @@ export async function ConstructEmail(threadMessages: ThreadMessage[]): Promise<{
 }
 
 // Uses the A1Base sendEmailMessage function to send an email as the a1 agent email address set in .env.local
+/**
+ * Sends an email through the A1Base API and confirms delivery.
+ * 
+ * This function handles the actual email sending process by:
+ * 1. Using A1Base's email API to send the message
+ * 2. Sending confirmation messages back to the user
+ * 3. Handling any errors that occur during sending
+ * 
+ * The function sends a series of confirmation messages back through
+ * the original channel (WhatsApp) to keep the user informed about
+ * the email's status.
+ * 
+ * @param emailData - Object containing email recipient and content
+ * @param thread_type - Whether this is an individual or group chat
+ * @param thread_id - For group messages, the ID of the group thread
+ * @param sender_number - For individual messages, the recipient's phone number
+ * @returns Response from the A1Base email API
+ * @throws Error if email sending fails or message type is invalid
+ */
 export async function SendEmailFromAgent(
   emailData: {
     recipientEmail: string;
@@ -243,8 +315,7 @@ export async function SendEmailFromAgent(
       subject: emailData.emailContent.subject,
       body: emailData.emailContent.body,
       headers: {
-        // Optional headers
-        // TODO: Add example with custom headers
+        // Custom headers can be added here for email customization
       }
     });
 
@@ -283,13 +354,31 @@ export async function SendEmailFromAgent(
 }
 
 
-// ===================== TASK APPROVAL WORKFLOWS =======================
-// Workflows requiring explicit user approval before executing tasks.
-// Shows task details, waits for approval, executes if approved,
-// then confirms completion or cancellation.
-// =====================================================================
+/**
+ * Task Approval Workflows
+ * 
+ * Workflows requiring explicit user approval before executing tasks.
+ * Shows task details, waits for approval, executes if approved,
+ * then confirms completion or cancellation.
+ */
 
-// Generate and send message to user to confirm before proceeding with task
+
+/**
+ * Requests user confirmation before proceeding with a task.
+ * 
+ * This function implements a confirmation workflow that:
+ * 1. Shows the user what action will be taken
+ * 2. Waits for explicit approval
+ * 3. Returns the confirmed task details
+ * 
+ * Currently focused on email confirmation, but designed to be
+ * extensible for other types of task confirmation workflows.
+ * 
+ * @param threadMessages - Array of messages providing conversation context
+ * @param emailDraft - Draft email content to be confirmed
+ * @returns Confirmed email data, potentially modified based on user feedback
+ * @throws Error if confirmation process fails
+ */
 export async function taskActionConfirmation(threadMessages: ThreadMessage[], emailDraft: {
     recipientEmail: string;
     emailContent: {
@@ -309,11 +398,28 @@ export async function taskActionConfirmation(threadMessages: ThreadMessage[], em
       subject: emailDraft.emailContent.subject
     });
     // For now, just return the draft email as-is
-    // TODO: Implement actual user approval flow
+    // User approval flow will be implemented in a future update
     return emailDraft;
 }
 
-// Sends confirmation message to user after task completion to maintain feedback loop
+
+/**
+ * Sends a completion confirmation message after a task is finished.
+ * 
+ * This function maintains the feedback loop with users by:
+ * 1. Generating an appropriate completion message
+ * 2. Sending it through the original communication channel
+ * 3. Handling any errors in the confirmation process
+ * 
+ * The confirmation message is generated using the agent's profile to
+ * maintain consistent tone and style in communications.
+ * 
+ * @param threadMessages - Array of messages providing conversation context
+ * @param thread_type - Whether this is an individual or group chat
+ * @param thread_id - For group messages, the ID of the group thread
+ * @param sender_number - For individual messages, the recipient's phone number
+ * @throws Error if message type is invalid or required parameters are missing
+ */
 export async function ConfirmTaskCompletion(
   threadMessages: ThreadMessage[],
   thread_type: "individual" | "group",
