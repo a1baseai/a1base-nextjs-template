@@ -29,6 +29,12 @@ import type { MessageRecord, TriageParams, TriageResult } from "./types";
  * @returns A TriageResult object indicating the outcome of the triage operation
  * @throws Will throw an error if message processing fails
  */
+/**
+ * Main message triage function.
+ * Note: content and sender_name parameters are prefixed with underscore
+ * since they are required by the TriageParams interface but not used
+ * in the current implementation. They may be used in future updates.
+ */
 export async function triageMessage({
   thread_id,
   content: _content,
