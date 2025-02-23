@@ -66,7 +66,7 @@ Return valid JSON with only that single key "responseType" and value as one of t
     messages: [
       { role: "system", content: triagePrompt },
       ...conversationContext,
-    ],
+    ] as OpenAI.Chat.ChatCompletionMessageParam[],
   });
 
   const content = completion.choices[0]?.message?.content || "";
@@ -110,7 +110,7 @@ export async function generateAgentIntroduction(incomingMessage: string, userNam
     return "Hey there!";
   }
 
-  const conversation = [
+  const conversation: OpenAI.Chat.ChatCompletionMessageParam[] = [
     {
       role: "system" as const,
       content: getSystemPrompt(userName)
@@ -123,7 +123,7 @@ export async function generateAgentIntroduction(incomingMessage: string, userNam
 
   const completion = await openai.chat.completions.create({
     model: "gpt-4",
-    messages: conversation,
+    messages: conversation as OpenAI.Chat.ChatCompletionMessageParam[],
   });
 
   return completion.choices[0]?.message?.content || "Hello!";
