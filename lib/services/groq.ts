@@ -9,6 +9,15 @@ const groq = new Groq({
 
 import type { EmailGenerationResult, MessageTriageResponse } from "../services/types";
 
+type ChatRole = "system" | "user" | "assistant" | "function";
+type GroqResponse = {
+  choices: Array<{
+    message: {
+      content: string;
+    };
+  }>;
+};
+
 /**
  * Analyzes message intent using Groq's LLaMA model to determine appropriate response workflow.
  * 
@@ -48,14 +57,6 @@ Rules:
 
 Return valid JSON with only that single key "responseType" and value as one of the allowed strings.
 `;
-
-  type GroqResponse = {
-    choices: Array<{
-      message: {
-        content: string;
-      };
-    }>;
-  };
 
   const completion = await groq.chat.completions.create({
     messages: [
@@ -116,9 +117,9 @@ export async function generateAgentIntroduction(incomingMessage: string, userNam
   ];
 
   const completion = await groq.chat.completions.create({
-    messages: conversation,
+    messages: conversation as Array<{ role: string; content: string }>,
     model: "llama-3.3-70b-versatile",
-  });
+  }) as GroqResponse;
 
   return completion.choices[0]?.message?.content || "Hello!";
 }
@@ -143,7 +144,7 @@ export async function generateAgentIntroduction(incomingMessage: string, userNam
  */
 export async function generateAgentResponse(threadMessages: ThreadMessage[], userPrompt?: string): Promise<string> {
   const messages = threadMessages.map((msg) => ({
-    role: (msg.sender_number === process.env.A1BASE_AGENT_NUMBER! ? "assistant" : "user") as ChatRole,
+    role: msg.sender_number === process.env.A1BASE_AGENT_NUMBER! ? "assistant" as const : "user" as const,
     content: msg.content,
   }));
 
@@ -220,9 +221,9 @@ export async function generateEmailFromThread(threadMessages: ThreadMessage[], u
   conversation.push(...relevantMessages);
 
   const completion = await groq.chat.completions.create({
-    messages: conversation,
+    messages: conversation as Array<{ role: string; content: string }>,
     model: "llama-3.3-70b-versatile",
-  });
+  }) as GroqResponse;
 
   const response = completion.choices[0].message?.content;
 
