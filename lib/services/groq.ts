@@ -147,9 +147,9 @@ export async function generateAgentResponse(threadMessages: ThreadMessage[], use
     return "Hey there!";
   }
 
-  const conversation: { role: string; content: string }[] = [
-    { role: "system" as ChatRole, content: getSystemPrompt(userName) },
-  ];
+  const conversation = [
+    { role: "system", content: getSystemPrompt(userName) },
+  ] as const;
 
   if (userPrompt) {
     conversation.push({ role: "user" as ChatRole, content: userPrompt });
@@ -167,7 +167,7 @@ export async function generateAgentResponse(threadMessages: ThreadMessage[], use
   try {
     const data = JSON.parse(content);
     return data.message || "No message found.";
-  } catch (error) {
+  } catch {
     return content;
   }
 }

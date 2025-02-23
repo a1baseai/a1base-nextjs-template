@@ -150,9 +150,9 @@ export async function generateAgentIntroduction(incomingMessage: string, userNam
  */
 export async function generateAgentResponse(threadMessages: ThreadMessage[], userPrompt?: string): Promise<string> {
   const messages = threadMessages.map((msg) => ({
-    role: (msg.sender_number === process.env.A1BASE_AGENT_NUMBER! ? "assistant" : "user") as ChatRole,
+    role: msg.sender_number === process.env.A1BASE_AGENT_NUMBER! ? "assistant" : "user",
     content: msg.content,
-  }));
+  } as const));
 
   // Extract the latest user's name (not the agent)
   const userName = [...threadMessages]
@@ -165,16 +165,19 @@ export async function generateAgentResponse(threadMessages: ThreadMessage[], use
 
   // Build the conversation to pass to OpenAI
   const conversation: OpenAI.Chat.ChatCompletionMessageParam[] = [
-    { role: "system" as ChatRole, content: getSystemPrompt(userName) },
+    { role: "system", content: getSystemPrompt(userName) },
   ];
 
   // If there's a user-level prompt from basicWorkflowsPrompt, add it as a user message
   if (userPrompt) {
-    conversation.push({ role: "user" as ChatRole, content: userPrompt });
+    conversation.push({ role: "user", content: userPrompt });
   }
 
   // Then add the actual chat messages
-  conversation.push(...messages);
+  conversation.push(...messages.map(msg => ({
+    role: msg.role,
+    content: msg.content
+  })));
 
   const completion = await openai.chat.completions.create({
     model: "gpt-4",
@@ -187,7 +190,7 @@ export async function generateAgentResponse(threadMessages: ThreadMessage[], use
   try {
     const data = JSON.parse(content);
     return data.message || "No message found.";
-  } catch (error) {
+  } catch {
     // If not valid JSON, just return the entire text
     return content;
   }
@@ -213,11 +216,6 @@ export async function generateAgentResponse(threadMessages: ThreadMessage[], use
  */
 export async function generateEmailFromThread(threadMessages: ThreadMessage[], userPrompt?: string): Promise<EmailGenerationResult>{
 
-  console.log("OPENAI CALL TO MAKE EMAIL")
-  // Extract email from last message
-  const lastMessage = threadMessages[threadMessages.length - 1];
-  let recipientEmail = "";  // Define this variable
-  
   // Grab conversation context
   const relevantMessages = threadMessages.slice(-3).map((msg) => ({
     role: msg.sender_number === process.env.A1BASE_AGENT_NUMBER! ? 
