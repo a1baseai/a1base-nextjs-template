@@ -18,11 +18,11 @@ type GrokResponse = {
 };
 
 /**
- * Analyzes message intent using Groq's LLaMA model to determine appropriate response workflow.
+ * Analyzes message intent using Grok's LLaMA model to determine appropriate response workflow.
  * 
  * This function uses LLaMA 3.3 70B to analyze the conversation context and determine
  * the most appropriate way to handle the user's message. It follows the same response
- * patterns as the OpenAI implementation but uses Groq's API for potentially faster
+ * patterns as the OpenAI implementation but uses Grok's API for potentially faster
  * or more cost-effective processing.
  * 
  * Response types:
@@ -33,7 +33,7 @@ type GrokResponse = {
  * 
  * @param threadMessages - Array of messages providing conversation context
  * @returns MessageTriageResponse indicating how to handle the message
- * @throws May throw errors from Groq API calls
+ * @throws May throw errors from Grok API calls
  */
 export async function triageMessageIntent(threadMessages: ThreadMessage[]): Promise<MessageTriageResponse>{
   const conversationContext = threadMessages.map((msg) => ({
@@ -57,13 +57,13 @@ Rules:
 Return valid JSON with only that single key "responseType" and value as one of the allowed strings.
 `;
 
-  const completion = await groq.chat.completions.create({
+  const completion = await grok.chat.completions.create({
     messages: [
       { role: "system", content: triagePrompt },
       ...conversationContext,
     ],
     model: "llama-3.3-70b-versatile",
-  }) as GroqResponse;
+  }) as GrokResponse;
 
   const content = completion.choices[0]?.message?.content || "";
   console.log(content)
@@ -88,7 +88,7 @@ Return valid JSON with only that single key "responseType" and value as one of t
 }
 
 /**
- * Generates a personalized introduction message using Groq's LLaMA model.
+ * Generates a personalized introduction message using Grok's LLaMA model.
  * 
  * Uses LLaMA 3.3 70B to create a contextually appropriate introduction based on
  * the agent's profile settings and the user's initial message. The introduction
@@ -97,7 +97,7 @@ Return valid JSON with only that single key "responseType" and value as one of t
  * @param incomingMessage - The user's initial message to respond to
  * @param userName - Optional name of the user for personalization
  * @returns A personalized introduction message string
- * @throws May throw errors from Groq API calls
+ * @throws May throw errors from Grok API calls
  */
 export async function generateAgentIntroduction(incomingMessage: string, userName?: string): Promise<string> {
   if (!userName) {
@@ -115,13 +115,13 @@ export async function generateAgentIntroduction(incomingMessage: string, userNam
     }
   ];
 
-  const completion = await groq.chat.completions.create({
+  const completion = await grok.chat.completions.create({
     messages: conversation.map(msg => ({
       role: msg.role as "system" | "user" | "assistant",
       content: msg.content
     })),
     model: "llama-3.3-70b-versatile",
-  }) as GroqResponse;
+  }) as GrokResponse;
 
   return completion.choices[0]?.message?.content || "Hello!";
 }
@@ -142,7 +142,7 @@ export async function generateAgentIntroduction(incomingMessage: string, userNam
  * @param threadMessages - Array of messages in the conversation
  * @param userPrompt - Optional additional instructions for response generation
  * @returns Generated response string
- * @throws May throw errors from Groq API calls
+ * @throws May throw errors from Grok API calls
  */
 export async function generateAgentResponse(threadMessages: ThreadMessage[], userPrompt?: string): Promise<string> {
   const messages = threadMessages.map((msg) => ({
@@ -168,13 +168,13 @@ export async function generateAgentResponse(threadMessages: ThreadMessage[], use
 
   conversation.push(...messages);
 
-  const completion = await groq.chat.completions.create({
+  const completion = await grok.chat.completions.create({
     messages: conversation.map(msg => ({
       role: msg.role as "system" | "user" | "assistant",
       content: msg.content
     })),
     model: "llama-3.3-70b-versatile",
-  }) as GroqResponse;
+  }) as GrokResponse;
 
   const content = completion.choices[0]?.message?.content || "Sorry, I couldn't generate a response";
 
@@ -202,7 +202,7 @@ export async function generateAgentResponse(threadMessages: ThreadMessage[], use
  * @param threadMessages - Array of messages providing email context
  * @param userPrompt - Optional additional instructions for email generation
  * @returns EmailGenerationResult containing subject, body, and recipient info
- * @throws May throw errors from Groq API calls
+ * @throws May throw errors from Grok API calls
  */
 export async function generateEmailFromThread(threadMessages: ThreadMessage[], userPrompt?: string): Promise<EmailGenerationResult>{
   const relevantMessages = threadMessages.slice(-3).map((msg) => ({
@@ -225,13 +225,13 @@ export async function generateEmailFromThread(threadMessages: ThreadMessage[], u
 
   conversation.push(...relevantMessages);
 
-  const completion = await groq.chat.completions.create({
+  const completion = await grok.chat.completions.create({
     messages: conversation.map(msg => ({
       role: msg.role as "system" | "user" | "assistant",
       content: msg.content
     })),
     model: "llama-3.3-70b-versatile",
-  }) as GroqResponse;
+  }) as GrokResponse;
 
   const response = completion.choices[0].message?.content;
 
