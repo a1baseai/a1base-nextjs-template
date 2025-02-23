@@ -10,13 +10,21 @@ const openai = new OpenAI({
 import { ChatRole, EmailGenerationResult, MessageTriageResponse } from "../services/types";
 
 /**
- * ============= OPENAI CALL TO TRIAGE THE MESSAGE INTENT ================
- * This function returns one of the following responseTypes:
- *  - simpleResponse: Provide a simple response
- *  - followUpResponse: Follow up on the message to gather additional information
- *  - handleEmailAction: Draft email and await user approval for sending
- *  - taskActionConfirmation: Confirm with user before proceeding with requested task (i.e before sending an email)
- * =======================================================================
+ * Analyzes message intent using OpenAI to determine appropriate response workflow.
+ * 
+ * This function uses GPT-3.5-turbo to analyze the conversation context and determine
+ * the most appropriate way to handle the user's message. It performs quick heuristic
+ * checks for common patterns before using AI for more complex analysis.
+ * 
+ * Response types:
+ * - sendIdentityCard: User is asking about the agent's identity
+ * - simpleResponse: Basic message requiring a direct response
+ * - handleEmailAction: User wants to draft/send an email
+ * - taskActionConfirmation: User is confirming a previous task
+ * 
+ * @param threadMessages - Array of messages providing conversation context
+ * @returns MessageTriageResponse indicating how to handle the message
+ * @throws May throw errors from OpenAI API calls
  */
 export async function triageMessageIntent(threadMessages: ThreadMessage[]): Promise<MessageTriageResponse>{
   // Convert thread messages to OpenAI chat format
@@ -86,8 +94,16 @@ Return valid JSON with only that single key "responseType" and value as one of t
 }
 
 /**
- * Generate an introduction message for the AI agent when first joining a conversation.
- * Uses the agent profile settings to craft a contextual introduction.
+ * Generates a personalized introduction message for the AI agent.
+ * 
+ * Uses GPT-4 to create a contextually appropriate introduction based on the agent's
+ * profile settings and the user's initial message. The introduction is tailored to
+ * match the agent's configured personality and communication style.
+ * 
+ * @param incomingMessage - The user's initial message to respond to
+ * @param userName - Optional name of the user for personalization
+ * @returns A personalized introduction message string
+ * @throws May throw errors from OpenAI API calls
  */
 export async function generateAgentIntroduction(incomingMessage: string, userName?: string): Promise<string> {
   if (!userName) {
@@ -115,8 +131,22 @@ export async function generateAgentIntroduction(incomingMessage: string, userNam
 
 
 /**
- * Generate a response to a WhatsApp thread of messages.
- * If userPrompt is provided, it will be passed as a user-level instruction in addition to the system prompt.
+ * Generates a contextual response to a thread of messages using GPT-4.
+ * 
+ * This function combines the agent's system prompt with conversation history to
+ * generate appropriate responses. It handles both direct responses and responses
+ * that require additional context from a user-provided prompt.
+ * 
+ * The function:
+ * 1. Maps messages to OpenAI chat format
+ * 2. Extracts user context for personalization
+ * 3. Combines system prompt with conversation history
+ * 4. Handles both raw text and JSON-formatted responses
+ * 
+ * @param threadMessages - Array of messages in the conversation
+ * @param userPrompt - Optional additional instructions for response generation
+ * @returns Generated response string
+ * @throws May throw errors from OpenAI API calls
  */
 export async function generateAgentResponse(threadMessages: ThreadMessage[], userPrompt?: string): Promise<string> {
   const messages = threadMessages.map((msg) => ({
@@ -164,8 +194,22 @@ export async function generateAgentResponse(threadMessages: ThreadMessage[], use
 }
 
 /**
- * Generate an email (subject/body) from a series of thread messages.
- * If userPrompt is provided, it will be added as an extra instruction.
+ * Generates an email draft from conversation context using GPT-4.
+ * 
+ * This function analyzes recent messages to understand the email requirements and
+ * generates appropriate subject and body content. It uses specialized prompts from
+ * basicWorkflowsPrompt to ensure the email matches the agent's communication style.
+ * 
+ * The function:
+ * 1. Extracts relevant context from recent messages
+ * 2. Uses email-specific system prompts
+ * 3. Generates and formats email content
+ * 4. Handles recipient extraction separately
+ * 
+ * @param threadMessages - Array of messages providing email context
+ * @param userPrompt - Optional additional instructions for email generation
+ * @returns EmailGenerationResult containing subject, body, and recipient info
+ * @throws May throw errors from OpenAI API calls
  */
 export async function generateEmailFromThread(threadMessages: ThreadMessage[], userPrompt?: string): Promise<EmailGenerationResult>{
 
