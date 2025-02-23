@@ -160,5 +160,7 @@ ${getAgentBaseInformationSnippet()}
 ${getSafetyPrompt(safetySettings)}
 </SAFETY>
 
-
+<USER CONTEXT>
+Name: ${userName}
+</USER CONTEXT>
 `;
