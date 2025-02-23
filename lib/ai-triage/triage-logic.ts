@@ -20,13 +20,23 @@ import {
 
 import { MessageRecord, TriageParams, TriageResult } from "./types";
 
-// ======================== MAIN TRIAGE LOGIC ========================
-// Processes incoming messages and routes them to appropriate workflows
-// in basic-workflow.ts. Currently triages for:
-// - Simple response to one off message
-// - Sharing A1 Agent Identity card
-// - Drafting and sending an email
-// ===================================================================
+/**
+ * Main message triage logic that processes incoming messages and routes them to appropriate workflows.
+ * 
+ * This function serves as the central routing mechanism for all incoming messages, determining
+ * how they should be processed based on their content and context. It handles:
+ * 
+ * - Simple responses to one-off messages
+ * - Sharing the A1 Agent Identity card when requested
+ * - Drafting and sending emails based on user requests
+ * 
+ * The function first retrieves message history from either Supabase or in-memory storage,
+ * then uses AI to determine the appropriate workflow for handling the message.
+ * 
+ * @param params - Parameters containing message details and thread context
+ * @returns A TriageResult object indicating the outcome of the triage operation
+ * @throws Will throw an error if message processing fails
+ */
 export async function triageMessage({
   thread_id,
   content,

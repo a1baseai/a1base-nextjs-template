@@ -10,7 +10,15 @@ const client = new A1BaseAPI({
 });
 
 /**
- * Converts message records to ThreadMessage format
+ * Converts raw message records to the standardized ThreadMessage format.
+ * 
+ * This function takes individual message records and combines them with thread context
+ * to create properly formatted ThreadMessage objects that can be used throughout the system.
+ * 
+ * @param threadMessages - Array of raw message records containing basic message data
+ * @param thread_id - Unique identifier for the thread these messages belong to
+ * @param thread_type - Type of thread (e.g., "individual" or "group")
+ * @returns Array of properly formatted ThreadMessage objects
  */
 export function convertToThreadMessages(
   threadMessages: {
@@ -35,7 +43,17 @@ export function convertToThreadMessages(
 }
 
 /**
- * Sends a message through WhatsApp using A1Base API
+ * Sends a message through WhatsApp using the A1Base API.
+ * 
+ * This function handles the complexities of sending messages to both individual users
+ * and group chats through WhatsApp. It automatically formats the message data and
+ * routes it to the appropriate A1Base API endpoint based on the thread type.
+ * 
+ * @param content - The message content to send
+ * @param thread_type - Whether this is an individual or group message
+ * @param thread_id - For group messages, the ID of the group thread
+ * @param sender_number - For individual messages, the recipient's phone number
+ * @throws Error if message type is invalid or required parameters are missing
  */
 export async function sendWhatsAppMessage(
   content: string,
@@ -65,7 +83,17 @@ export async function sendWhatsAppMessage(
 }
 
 /**
- * Handles errors by sending an error message to the user
+ * Handles errors by sending an appropriate error message to the user.
+ * 
+ * This function provides a consistent way to handle errors across the application
+ * by logging the error and sending a user-friendly error message back through
+ * the same channel the original message came from.
+ * 
+ * @param error - The error that occurred
+ * @param errorMessage - User-friendly error message to send
+ * @param thread_type - Whether this is an individual or group message
+ * @param thread_id - For group messages, the ID of the group thread
+ * @param sender_number - For individual messages, the recipient's phone number
  */
 export async function handleMessageError(
   error: unknown,
