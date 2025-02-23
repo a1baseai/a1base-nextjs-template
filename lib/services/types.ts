@@ -1,5 +1,3 @@
-import { ThreadMessage } from "../../types/chat";
-
 /** Valid roles for chat messages */
 export type ChatRole = "system" | "user" | "assistant" | "function";
 

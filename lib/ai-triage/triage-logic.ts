@@ -39,8 +39,8 @@ import type { MessageRecord, TriageParams, TriageResult } from "./types";
  */
 export async function triageMessage({
   thread_id,
-  content,
-  sender_name,
+  _content,
+  _sender_name,
   sender_number,
   thread_type,
   messagesByThread,

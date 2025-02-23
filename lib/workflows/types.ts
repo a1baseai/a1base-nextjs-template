@@ -1,5 +1,3 @@
-import { ThreadMessage } from "../../types/chat";
-
 /**
  * Configuration for workflow behavior
  */
@@ -31,5 +29,5 @@ export interface TaskConfirmation {
   /** Optional message about the confirmation */
   message?: string;
   /** Any additional data */
-  data?: any;
+  data?: Record<string, unknown>;
 }

@@ -1,5 +1,3 @@
-import { ThreadMessage } from "../../types/chat";
-
 /**
  * Represents a message record in the thread history
  */
@@ -37,5 +35,5 @@ export interface TriageResult {
   /** Optional message describing the result */
   message?: string;
   /** Additional data associated with the result */
-  data?: any;
+  data?: Record<string, unknown>;
 }
