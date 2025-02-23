@@ -147,7 +147,7 @@ export async function generateAgentResponse(threadMessages: ThreadMessage[], use
     return "Hey there!";
   }
 
-  const conversation = [
+  const conversation: { role: string; content: string }[] = [
     { role: "system" as ChatRole, content: getSystemPrompt(userName) },
   ];
 
@@ -158,7 +158,7 @@ export async function generateAgentResponse(threadMessages: ThreadMessage[], use
   conversation.push(...messages);
 
   const completion = await groq.chat.completions.create({
-    messages: conversation,
+    messages: conversation as { role: string; content: string }[],
     model: "llama-3.3-70b-versatile",
   });
 
@@ -198,7 +198,7 @@ export async function generateEmailFromThread(threadMessages: ThreadMessage[], u
     content: msg.content,
   }));
 
-  const conversation = [
+  const conversation: { role: string; content: string }[] = [
     { 
       role: "system",
       content: basicWorkflowsPrompt.email_generation.user 
