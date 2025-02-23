@@ -1,5 +1,5 @@
-import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@supabase/supabase-js'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { Database } from './types'
 import { USERS_TABLE, THREADS_TABLE } from './config'
 
@@ -213,4 +213,4 @@ export class SupabaseAdapter {
       return false
     }
   }
-}  
+}    
