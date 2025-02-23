@@ -400,7 +400,7 @@ export async function taskActionConfirmation(threadMessages: ThreadMessage[], em
       subject: emailDraft.emailContent.subject
     });
     // For now, just return the draft email as-is
-    // TODO: Implement actual user approval flow
+    // User approval flow will be implemented in a future update
     return emailDraft;
 }
 
