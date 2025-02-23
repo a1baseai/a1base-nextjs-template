@@ -1,4 +1,4 @@
-import { ThreadMessage } from "../../types/chat";
+import type { ThreadMessage } from "../../types/chat";
 import { getInitializedAdapter } from "../supabase/config";
 import { 
   DefaultReplyToMessage,

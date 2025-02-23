@@ -1,4 +1,4 @@
-import { ThreadMessage } from '../../types/chat'
+import type { ThreadMessage } from '../../types/chat'
 import OpenAI from 'openai'
 import { getSystemPrompt } from '../agent/system-prompt'
 import { basicWorkflowsPrompt } from '../workflows/basic-workflows-prompt'
