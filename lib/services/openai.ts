@@ -164,7 +164,7 @@ export async function generateAgentResponse(threadMessages: ThreadMessage[], use
   }
 
   // Build the conversation to pass to OpenAI
-  const conversation = [
+  const conversation: OpenAI.Chat.ChatCompletionMessageParam[] = [
     { role: "system" as ChatRole, content: getSystemPrompt(userName) },
   ];
 
@@ -178,7 +178,7 @@ export async function generateAgentResponse(threadMessages: ThreadMessage[], use
 
   const completion = await openai.chat.completions.create({
     model: "gpt-4",
-    messages: conversation,
+    messages: conversation as OpenAI.Chat.ChatCompletionMessageParam[],
   });
 
   const content = completion.choices[0]?.message?.content || "Sorry, I couldn't generate a response";
