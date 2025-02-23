@@ -34,11 +34,13 @@ const client = new A1BaseAPI({
   }
 });
 
-// ====== BASIC SEND AND VERIFICATION WORKFLOW =======
-// Functions for sending messages and verifying agent identity
-// - verifyAgentIdentity: Sends identity verification message
-// - DefaultReplyToMessage: Generates and sends simple response
-// ===================================================
+/**
+ * Basic Send and Verification Workflow
+ * 
+ * Functions for sending messages and verifying agent identity:
+ * - verifyAgentIdentity: Sends identity verification message
+ * - DefaultReplyToMessage: Generates and sends simple response
+ */
 
 /**
  * Sends identity verification messages and the agent's identity card.
@@ -214,11 +216,13 @@ export async function DefaultReplyToMessage(
   }
 }
 
-// ============================== EMAIL WORKFLOWS ========================
-// Functions for handling email-related tasks like constructing and sending emails
-// through the A1 agent's email address. These workflows are triggered when the
-// message triage detects an email-related request from the user.
-// =======================================================================
+/**
+ * Email Workflows
+ * 
+ * Functions for handling email-related tasks like constructing and sending emails
+ * through the A1 agent's email address. These workflows are triggered when the
+ * message triage detects an email-related request from the user.
+ */
 
 // Generates the contents of the email, but doesn't send it until user approval
 /**
@@ -352,11 +356,13 @@ export async function SendEmailFromAgent(
 }
 
 
-// ===================== TASK APPROVAL WORKFLOWS =======================
-// Workflows requiring explicit user approval before executing tasks.
-// Shows task details, waits for approval, executes if approved,
-// then confirms completion or cancellation.
-// =====================================================================
+/**
+ * Task Approval Workflows
+ * 
+ * Workflows requiring explicit user approval before executing tasks.
+ * Shows task details, waits for approval, executes if approved,
+ * then confirms completion or cancellation.
+ */
 
 // Generate and send message to user to confirm before proceeding with task
 /**
