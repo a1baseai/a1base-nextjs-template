@@ -47,7 +47,10 @@ export async function generatePerplexityResponse(threadMessages: ThreadMessage[]
 
   const completion = await perplexity.chat.completions.create({
     model: "sonar-pro", // or another model as needed
-    messages: conversation,
+    messages: conversation.map(msg => ({
+      role: msg.role,
+      content: msg.content
+    })),
   });
 
   return completion.choices[0]?.message?.content || "Sorry, I couldn't generate a response";
