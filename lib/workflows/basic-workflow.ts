@@ -316,8 +316,7 @@ export async function SendEmailFromAgent(
       subject: emailData.emailContent.subject,
       body: emailData.emailContent.body,
       headers: {
-        // Optional headers
-        // TODO: Add example with custom headers
+        // Custom headers can be added here for email customization
       }
     });
 
