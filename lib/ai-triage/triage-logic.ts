@@ -13,7 +13,7 @@ import { convertToThreadMessages } from "./message-utils";
 import type { MessageRecord, TriageParams, TriageResult } from "./types";
 
 /**
- * Main message triage logic that processes incoming messages and routes them to appropriate workflows.
+ * Main message triage function.
  * 
  * This function serves as the central routing mechanism for all incoming messages, determining
  * how they should be processed based on their content and context. It handles:
@@ -25,15 +25,13 @@ import type { MessageRecord, TriageParams, TriageResult } from "./types";
  * The function first retrieves message history from either Supabase or in-memory storage,
  * then uses AI to determine the appropriate workflow for handling the message.
  * 
- * @param params - Parameters containing message details and thread context
- * @returns A TriageResult object indicating the outcome of the triage operation
- * @throws Will throw an error if message processing fails
- */
-/**
- * Main message triage function.
  * Note: content and sender_name parameters are prefixed with underscore
  * since they are required by the TriageParams interface but not used
  * in the current implementation. They may be used in future updates.
+ * 
+ * @param params - Parameters containing message details and thread context
+ * @returns A TriageResult object indicating the outcome of the triage operation
+ * @throws Will throw an error if message processing fails
  */
 export async function triageMessage({
   thread_id,

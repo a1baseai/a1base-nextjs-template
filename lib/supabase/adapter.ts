@@ -222,4 +222,4 @@ export class SupabaseAdapter {
       return false
     }
   }
-}        
+} 
