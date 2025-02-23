@@ -89,7 +89,7 @@ ${getFormattedInformation()}
 `;
 }
 
-export const getSystemPrompt = (userName: string) => `
+export const getSystemPrompt = () => `  
 <YOUR PROFILE>
 ${getAgentProfileSnippet(agentProfileSettings)}
 </YOUR PROFILE>

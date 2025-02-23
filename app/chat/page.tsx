@@ -7,7 +7,7 @@ import { Thread } from "@/components/assistant-ui/thread";
 import { ThreadList } from "@/components/assistant-ui/thread-list";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import { MenuIcon, PhoneIcon, MessageSquareIcon, Mail } from "lucide-react";
+import { PhoneIcon, MessageSquareIcon, Mail } from "lucide-react";
 
 import {
   Tooltip,
@@ -16,9 +16,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import Link from "next/link";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
-import { cn } from "@/lib/utils";
 import { FC } from "react";
 import agentProfileSettings from "@/lib/agent-profile/agent-profile-settings";
 
@@ -44,13 +42,13 @@ const ButtonWithTooltip: FC<{
 };
 
 // The top-left brand / label area
-const TopLabel: FC = () => {
-  return (
-    <div className="flex h-full w-full items-center gap-2 px-3 text-sm font-semibold">
-      <span>{agentProfileSettings.companyName}</span>
-    </div>
-  );
-};
+// const TopLabel: FC = () => {
+//   return (
+//     <div className="flex h-full w-full items-center gap-2 px-3 text-sm font-semibold">
+//       <span>{agentProfileSettings.companyName}</span>
+//     </div>
+//   );
+// };
 
 // Left sidebar content
 const LeftSidebar: FC = () => {
@@ -79,7 +77,9 @@ const LeftSidebar: FC = () => {
         </div>
         <div className="mt-4 text-sm">
           <h2 className="text-2xl font-medium">
-            <span className="text-black font-bold">{agentProfileSettings.name}</span>
+            <span className="text-black font-bold">
+              {agentProfileSettings.name}
+            </span>
             <span className="text-gray-500 text-base">
               {" "}
               - {agentProfileSettings.role}
@@ -118,36 +118,37 @@ const LeftSidebar: FC = () => {
 };
 
 // Mobile-friendly left sidebar sheet
-const LeftBarSheet: FC = () => {
-  return (
-    <Sheet>
-      <SheetTrigger asChild>
-        <Button variant="outline" size="icon" className="shrink-0 md:hidden">
-          <MenuIcon className="size-4" />
-          <span className="sr-only">Toggle navigation menu</span>
-        </Button>
-      </SheetTrigger>
-      <SheetContent side="left" className="p-0">
-        <div className="mt-6 flex flex-col gap-1 h-full">
-          <TopLabel />
-          <LeftSidebar />
-        </div>
-      </SheetContent>
-    </Sheet>
-  );
-};
+// const LeftBarSheet: FC = () => {
+//   return (
+//     <Sheet>
+//       <SheetTrigger asChild>
+//         <Button variant="outline" size="icon" className="shrink-0 md:hidden">
+//           <MenuIcon className="size-4" />
+//           <span className="sr-only">Toggle navigation menu</span>
+//         </Button>
+//       </SheetTrigger>
+//       <SheetContent side="left" className="p-0">
+//         <div className="mt-6 flex flex-col gap-1 h-full">
+//           <TopLabel />
+//           <LeftSidebar />
+//         </div>
+//       </SheetContent>
+//     </Sheet>
+//   );
+// };
 
 // Optional global header
 const Header: FC = () => {
   return (
     <header className="flex items-center justify-between p-4 border-b">
       <Link href="/" className="flex items-center gap-2">
-        <img
+        <Image
           src="/a1base-black.png"
           alt="A1Base Logo"
           width={80}
           height={10}
           className="py-1"
+
         />
       </Link>
     </header>
@@ -159,13 +160,17 @@ const ChatTopInfo: FC = () => {
   return (
     <div className="m-4 bg-gray-100 p-4 rounded-lg">
       <div className="flex items-center gap-6">
-        <img
+        <Image
           src="/a1base-favicon.png"
           alt="A1Base Logo"
-          className="h-20 w-20 object-cover rounded-lg"
+          width={80}
+          height={80}
+          className="object-cover rounded-lg"
         />
         <div>
-          <h1 className="text-xl font-bold">{agentProfileSettings.companyName}</h1>
+          <h1 className="text-xl font-bold">
+            {agentProfileSettings.companyName}
+          </h1>
           <p className="text-sm text-gray-500 mt-1">
             {agentProfileSettings.companyDescription}
           </p>
@@ -239,6 +244,7 @@ const RightSidebar: FC = () => {
                 width={80}
                 height={80}
                 className="rounded-sm object-cover"
+                unoptimized
               />
             ))}
           </div>
@@ -277,7 +283,6 @@ const DayLayout = () => {
   //  Intercept the chat with our AI Triage Logic
   //  If the choice is to respond, then respond in web chat
   //  Otherwise we need a way to the output here
-
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>

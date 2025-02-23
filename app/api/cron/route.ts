@@ -73,12 +73,19 @@ export async function POST(request: Request) {
   }
 
   try {
-    // Placeholder for your cron job logic
-    // Examples:
-    // await generateDailyAgentReport();
-    // await cleanupCompletedConversations();
-    // await refreshAgentCredentials();
-    // await sendFollowUpMessages();
+    // Log the request object to understand what data is available in cron job requests
+    // Example request object properties:
+    // - request.url: The full URL of the request
+    // - request.method: The HTTP method (POST)
+    // - request.headers: Headers including authorization
+    // - request.body: Request body if any data was sent
+    // This helps debug what information A1Base sends during cron job execution
+    console.log('Cron job request:', {
+      url: request.url,
+      method: request.method,
+      headers: Object.fromEntries(request.headers),
+      // Body needs to be parsed separately if needed
+    });
 
     return new NextResponse("Cron job completed successfully", { status: 200 });
   } catch (error) {

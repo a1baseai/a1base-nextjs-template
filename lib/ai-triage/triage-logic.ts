@@ -1,17 +1,13 @@
 import { ThreadMessage } from "@/types/chat";
 import { getInitializedAdapter } from "../supabase/config";
-import { 
+import {
   DefaultReplyToMessage,
-  SendEmailFromAgent, 
+  SendEmailFromAgent,
   ConfirmTaskCompletion,
   ConstructEmail,
-  taskActionConfirmation,
-  verifyAgentIdentity
+  verifyAgentIdentity,
 } from "../workflows/basic_workflow";
-import { 
-  generateAgentResponse,
-  triageMessageIntent 
-} from "../services/openai";
+import { triageMessageIntent } from "../services/openai";
 
 type MessageRecord = {
   message_id: string;
@@ -34,10 +30,16 @@ type TriageParams = {
 };
 
 type TriageResult = {
-  type: 'identity' | 'email' | 'default' | 'default-webchat';
+  type: "identity" | "email" | "default" | "default-webchat";
   success: boolean;
   message?: string;
-  data?: any;
+  data?: string[] | {
+    recipientEmail: string;
+    emailContent: {
+      subject: string;
+      body: string;
+    };
+  };
 };
 
 // ======================== MAIN TRIAGE LOGIC ========================
@@ -60,47 +62,48 @@ export async function triageMessage({
 
   try {
     let threadMessages: MessageRecord[] = [];
-    
+
     // Skip Supabase for web-ui service
-    if (service === 'web-ui') {
+    if (service === "web-ui") {
       threadMessages = messagesByThread.get(thread_id) || [];
     } else {
       // Try to get messages from Supabase first
       const adapter = await getInitializedAdapter();
-      
+
       if (adapter) {
         console.log("[triageMessage] Using Supabase for message history");
         const thread = await adapter.getThread(thread_id);
         if (thread?.messages) {
           // Get last 10 messages from the thread
           threadMessages = thread.messages.slice(-10);
-          console.log(threadMessages)
+          console.log(threadMessages);
         }
       } else {
-        console.log("[triageMessage] Using in-memory storage for message history");
+        console.log(
+          "[triageMessage] Using in-memory storage for message history"
+        );
         threadMessages = messagesByThread.get(thread_id) || [];
       }
     }
-    
+
     // Convert to ThreadMessage format
-    const messages: ThreadMessage[] = threadMessages.map(msg => ({
+    const messages: ThreadMessage[] = threadMessages.map((msg) => ({
       content: msg.content,
       sender_number: msg.sender_number,
       sender_name: msg.sender_name,
       thread_id,
       thread_type,
       timestamp: msg.timestamp,
-      message_id: msg.message_id
+      message_id: msg.message_id,
     }));
 
-    
     const triage = await triageMessageIntent(messages);
     // Based on the triage result, choose the appropriate workflow
-    
+
     switch (triage.responseType) {
-      case 'sendIdentityCard':
-        console.log('Running Identity Verification Workflow')
-      
+      case "sendIdentityCard":
+        console.log("Running Identity Verification Workflow");
+
         const identityMessages = await verifyAgentIdentity(
           threadMessages[threadMessages.length - 1].content,
           thread_type as "individual" | "group",
@@ -109,46 +112,46 @@ export async function triageMessage({
         );
 
         return {
-          type: 'identity',
+          type: "identity",
           success: true,
-          message: identityMessages.join('\n'),
-          data: identityMessages
+          message: identityMessages.join("\n"),
+          data: identityMessages,
         };
 
-      case 'handleEmailAction':
-        console.log('Running Email Workflow')
+      case "handleEmailAction":
+        console.log("Running Email Workflow");
         // Triage to send an email using the agent's email address
-        
-        const emailDraft = await ConstructEmail(threadMessages)
-              
+
+        const emailDraft = await ConstructEmail(threadMessages);
+
         // Get user confirmation and send email
         // const confirmedEmail = await taskActionConfirmation(threadMessages, emailDraft);
-       
+
         await SendEmailFromAgent(
-          emailDraft, 
-          thread_type as "individual" | "group", 
-          thread_id, 
+          emailDraft,
+          thread_type as "individual" | "group",
+          thread_id,
           sender_number
         );
 
         // Send confirmation message back to user
         await ConfirmTaskCompletion(
           messages,
-          thread_type as "individual" | "group", 
+          thread_type as "individual" | "group",
           thread_id,
           sender_number
         );
 
         return {
-          type: 'email',
+          type: "email",
           success: true,
-          message: 'Email sent successfully',
-          data: emailDraft
+          message: "Email sent successfully",
+          data: emailDraft,
         };
 
-      case 'simpleResponse':
+      case "simpleResponse":
       default:
-        console.log('Running Default Response')
+        console.log("Running Default Response");
         // Use the default workflow
         const response = await DefaultReplyToMessage(
           messages,
@@ -158,28 +161,27 @@ export async function triageMessage({
         );
 
         // Return different response type for web UI
-        if (service === 'web-ui') {
+        if (service === "web-ui") {
           return {
-            type: 'default-webchat',
+            type: "default-webchat",
             success: true,
-            message: 'Default response sent',
-            data: response
+            message: "Default response sent"
           };
         }
 
         return {
-          type: 'default', 
+          type: "default",
           success: true,
-          message: 'Default response sent',
-          data: response
+          message: "Default response sent"
         };
     }
   } catch (error) {
     console.error("[Triage] Error:", error);
     return {
-      type: 'default',
+      type: "default",
       success: false,
-      message: error instanceof Error ? error.message : 'Unknown error occurred'
+      message:
+        error instanceof Error ? error.message : "Unknown error occurred",
     };
   }
 }

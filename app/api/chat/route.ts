@@ -9,17 +9,17 @@ export const maxDuration = 30;
 
 export async function POST(req: Request) {
   const { messages } = await req.json();
-  const systemMessage = { role: "system", content: getSystemPrompt("Default User") };
+  const systemMessage = { role: "system", content: getSystemPrompt() };
   const modifiedMessages = [systemMessage, ...messages];
 
-  console.log(
-    "Messages:",
-    messages.map((msg: any) => ({
-      role: msg.role,
-      content: msg.content[0]?.text || msg.content,
-      timestamp: new Date().toISOString(),
-    }))
-  );
+  // console.log(
+  //   "Messages:",
+  //   messages.map((msg: any) => ({
+  //     role: msg.role,
+  //     content: msg.content[0]?.text || msg.content,
+  //     timestamp: new Date().toISOString(),
+  //   }))
+  // );
 
   // Set up dummy values for web chat where thread_id and other parameters are not available
   const dummyThreadId = "webchat";

@@ -1,22 +1,21 @@
 /**
- * Workflow functions for handling WhatsApp messages and coordinating responses 
+ * Workflow functions for handling WhatsApp messages and coordinating responses
  * through the A1Base API.
- * 
+ *
  * Key workflow functions:
  * - verifyAgentIdentity: Sends identity verification message
- * - DefaultReplyToMessage: Generates and sends simple response  
+ * - DefaultReplyToMessage: Generates and sends simple response
  * - ConstructEmail: Creates email draft from thread messages
  * - SendEmailFromAgent: Sends composed email via agent
  * - ConfirmTaskCompletion: Confirms task completion with user
- * 
+ *
  * Uses OpenAI for generating contextual responses.
  * Handles both individual and group message threads.
  */
 
 import { A1BaseAPI } from "a1base-node";
-import { 
-  triageMessageIntent,
-  generateAgentResponse, 
+import {
+  generateAgentResponse,
   generateEmailFromThread,
   generateAgentIntroduction,
 } from "../services/openai";
@@ -31,7 +30,7 @@ const client = new A1BaseAPI({
   credentials: {
     apiKey: process.env.A1BASE_API_KEY!,
     apiSecret: process.env.A1BASE_API_SECRET!,
-  }
+  },
 });
 
 // ====== BASIC SEND AND VERIFICATION WORKFLOW =======
@@ -48,13 +47,16 @@ export async function verifyAgentIdentity(
 ): Promise<string[]> {
   console.log("Workflow Start [verifyAgentIdentity]");
 
-  const agentIdCard = 'https://www.a1base.com/identity-and-trust/8661d846-d43d-4ee7-a095-0dcc97764b97'
+  const agentIdCard =
+    "https://www.a1base.com/identity-and-trust/8661d846-d43d-4ee7-a095-0dcc97764b97";
 
   try {
     // Generate response message for identity verification
     const response = await generateAgentIntroduction(message);
-    const messages = SPLIT_PARAGRAPHS ? response.split('\n').filter(msg => msg.trim()) : [response];
-    
+    const messages = SPLIT_PARAGRAPHS
+      ? response.split("\n").filter((msg) => msg.trim())
+      : [response];
+
     // Send each message line individually
     for (const msg of messages) {
       const messageData = {
@@ -109,7 +111,11 @@ export async function verifyAgentIdentity(
       throw new Error("Invalid message type or missing required parameters");
     }
 
-    return [...messages, "Here's my A1Base identity card for verification:", agentIdCard];
+    return [
+      ...messages,
+      "Here's my A1Base identity card for verification:",
+      agentIdCard,
+    ];
   } catch (error) {
     console.error("[verifyAgentIdentity] Error:", error);
     throw error;
@@ -124,13 +130,18 @@ export async function DefaultReplyToMessage(
 ) {
   console.log("Workflow Start [DefaultReplyToMessage]", {
     sender_number,
-    message_count: threadMessages.length
+    message_count: threadMessages.length,
   });
 
   try {
     // Use the 'simple_response' prompt
-    const response = await generateAgentResponse(threadMessages, basicWorkflowsPrompt.simple_response.user);
-    const messages = SPLIT_PARAGRAPHS ? response.split('\n').filter(msg => msg.trim()) : [response];
+    const response = await generateAgentResponse(
+      threadMessages,
+      basicWorkflowsPrompt.simple_response.user
+    );
+    const messages = SPLIT_PARAGRAPHS
+      ? response.split("\n").filter((msg) => msg.trim())
+      : [response];
 
     // Send each message line individually
     for (const msg of messages) {
@@ -194,29 +205,28 @@ export async function ConstructEmail(threadMessages: ThreadMessage[]): Promise<{
     body: string;
   };
 }> {
-    console.log("Workflow Start [ConstructEmail]", {
-      message_count: threadMessages.length
-    });
-    // Generate email contents
-    const emailData = await generateEmailFromThread(
-      threadMessages,
-      basicWorkflowsPrompt.email_generation.user
-    );
-        
-    console.log('=== Email Data ====')
-    console.log(emailData)
-    if (!emailData.emailContent) {
-        throw new Error("Email content could not be generated.");
-    }
-    return {
-        recipientEmail: emailData.recipientEmail,
-        hasRecipient: emailData.hasRecipient,
-        emailContent: {
-          subject: emailData.emailContent.subject,
-          body: emailData.emailContent.body
-        }
-        
-    };
+  console.log("Workflow Start [ConstructEmail]", {
+    message_count: threadMessages.length,
+  });
+  // Generate email contents
+  const emailData = await generateEmailFromThread(
+    threadMessages,
+    basicWorkflowsPrompt.email_generation.user
+  );
+
+  console.log("=== Email Data ====");
+  console.log(emailData);
+  if (!emailData.emailContent) {
+    throw new Error("Email content could not be generated.");
+  }
+  return {
+    recipientEmail: emailData.recipientEmail,
+    hasRecipient: emailData.hasRecipient,
+    emailContent: {
+      subject: emailData.emailContent.subject,
+      body: emailData.emailContent.body,
+    },
+  };
 }
 
 // Uses the A1Base sendEmailMessage function to send an email as the a1 agent email address set in .env.local
@@ -234,54 +244,56 @@ export async function SendEmailFromAgent(
 ) {
   console.log("Workflow Start: [SendEmailFromAgent]", {
     recipient: emailData.recipientEmail,
-    subject: emailData.emailContent.subject    
+    subject: emailData.emailContent.subject,
   });
   try {
-    const response = await client.sendEmailMessage(process.env.A1BASE_ACCOUNT_ID!, {
-      sender_address: process.env.A1BASE_AGENT_EMAIL!,
-      recipient_address: emailData.recipientEmail,
-      subject: emailData.emailContent.subject,
-      body: emailData.emailContent.body,
-      headers: {
-        // Optional headers
-        // TODO: Add example with custom headers
+    const response = await client.sendEmailMessage(
+      process.env.A1BASE_ACCOUNT_ID!,
+      {
+        sender_address: process.env.A1BASE_AGENT_EMAIL!,
+        recipient_address: emailData.recipientEmail,
+        subject: emailData.emailContent.subject,
+        body: emailData.emailContent.body,
+        headers: {
+          // Optional headers
+          // TODO: Add example with custom headers
+        },
       }
-    });
+    );
 
     // Send confirmation messages
     const confirmationMessages = [
       "Email sent successfully!",
       `Subject: ${emailData.emailContent.subject}`,
-      `To: ${emailData.recipientEmail}`
+      `To: ${emailData.recipientEmail}`,
     ];
 
     for (const msg of confirmationMessages) {
       const messageData = {
         content: msg,
         from: process.env.A1BASE_AGENT_NUMBER!,
-        service: "whatsapp" as const
+        service: "whatsapp" as const,
       };
 
       if (thread_type === "group" && thread_id) {
         await client.sendGroupMessage(process.env.A1BASE_ACCOUNT_ID!, {
           ...messageData,
-          thread_id
+          thread_id,
         });
       } else if (thread_type === "individual" && sender_number) {
         await client.sendIndividualMessage(process.env.A1BASE_ACCOUNT_ID!, {
           ...messageData,
-          to: sender_number
+          to: sender_number,
         });
       }
     }
 
     return response;
   } catch (error) {
-    console.error('[SendEmailFromAgent] Error:', error);
+    console.error("[SendEmailFromAgent] Error:", error);
     throw error;
   }
 }
-
 
 // ===================== TASK APPROVAL WORKFLOWS =======================
 // Workflows requiring explicit user approval before executing tasks.
@@ -290,27 +302,30 @@ export async function SendEmailFromAgent(
 // =====================================================================
 
 // Generate and send message to user to confirm before proceeding with task
-export async function taskActionConfirmation(threadMessages: ThreadMessage[], emailDraft: {
+export async function taskActionConfirmation(
+  threadMessages: ThreadMessage[],
+  emailDraft: {
     recipientEmail: string;
     emailContent: {
       subject: string;
       body: string;
     };
-}): Promise<{
-    recipientEmail: string;
-    emailContent: {
-      subject: string;
-      body: string;
-    };
+  }
+): Promise<{
+  recipientEmail: string;
+  emailContent: {
+    subject: string;
+    body: string;
+  };
 }> {
-    console.log("starting [taskActionConfirmation] workflow", {
-      message_count: threadMessages.length,
-      recipient: emailDraft.recipientEmail,
-      subject: emailDraft.emailContent.subject
-    });
-    // For now, just return the draft email as-is
-    // TODO: Implement actual user approval flow
-    return emailDraft;
+  console.log("starting [taskActionConfirmation] workflow", {
+    message_count: threadMessages.length,
+    recipient: emailDraft.recipientEmail,
+    subject: emailDraft.emailContent.subject,
+  });
+  // For now, just return the draft email as-is
+  // TODO: Implement actual user approval flow
+  return emailDraft;
 }
 
 // Sends confirmation message to user after task completion to maintain feedback loop
@@ -324,17 +339,18 @@ export async function ConfirmTaskCompletion(
     thread_type,
     thread_id,
     sender_number,
-    message_count: threadMessages.length
+    message_count: threadMessages.length,
   });
 
   try {
-    
     const confirmationMessage = await generateAgentResponse(
-        threadMessages,
-        basicWorkflowsPrompt.task_confirmation.user
+      threadMessages,
+      basicWorkflowsPrompt.task_confirmation.user
     );
 
-    const messages = SPLIT_PARAGRAPHS ? confirmationMessage.split('\n').filter(msg => msg.trim()) : [confirmationMessage];
+    const messages = SPLIT_PARAGRAPHS
+      ? confirmationMessage.split("\n").filter((msg) => msg.trim())
+      : [confirmationMessage];
 
     // Send each message line individually
     for (const msg of messages) {

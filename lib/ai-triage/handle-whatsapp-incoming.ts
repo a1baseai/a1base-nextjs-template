@@ -7,19 +7,25 @@ import { initializeDatabase, getInitializedAdapter } from "../supabase/config";
 const messagesByThread = new Map();
 const MAX_CONTEXT_MESSAGES = 10;
 
+interface DatabaseAdapterInterface {
+  createUser: (name: string, phoneNumber: number) => Promise<string | null>;
+  updateUser: (phoneNumber: number, updates: { name?: string }) => Promise<boolean>;
+  getUserByPhone: (phoneNumber: number) => Promise<{ name: string } | null>;
+}
+
 /**
  * Check if user exists in the database and update their information if needed
  */
 async function userCheck(
   phoneNumber: string,
   name: string,
-  adapter: any
+  adapter: DatabaseAdapterInterface
 ): Promise<void> {
   try {
     // Convert phone number to numeric format (remove '+' and any spaces)
     const numericPhone = parseInt(phoneNumber.replace(/\D/g, ""));
 
-    // Check if user exists
+  // Check if user exists
     const existingUser = await adapter.getUserByPhone(numericPhone);
 
     if (!existingUser) {

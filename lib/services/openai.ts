@@ -1,14 +1,14 @@
-import { ThreadMessage } from '@/types/chat'
-import OpenAI from 'openai'
-import { getSystemPrompt } from '../agent/system-prompt'
-import { basicWorkflowsPrompt } from '../workflows/basic_workflows_prompt'
+import { ThreadMessage } from "@/types/chat";
+import OpenAI from "openai";
+import { getSystemPrompt } from "../agent/system-prompt";
+import { basicWorkflowsPrompt } from "../workflows/basic_workflows_prompt";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
-})
+});
 
 // Add type for OpenAI chat roles
-type ChatRole = "system" | "user" | "assistant" | "function"
+type ChatRole = "system" | "user" | "assistant" | "function";
 
 /**
  * ============= OPENAI CALL TO TRIAGE THE MESSAGE INTENT ================
@@ -19,23 +19,32 @@ type ChatRole = "system" | "user" | "assistant" | "function"
  *  - taskActionConfirmation: Confirm with user before proceeding with requested task (i.e before sending an email)
  * =======================================================================
  */
-export async function triageMessageIntent(threadMessages: ThreadMessage[]): Promise<{ 
-  responseType: 
-  "sendIdentityCard"|
-  "simpleResponse" |
-  "followUpResponse" | 
-  "handleEmailAction" | 
-  "taskActionConfirmation"
+export async function triageMessageIntent(
+  threadMessages: ThreadMessage[]
+): Promise<{
+  responseType:
+    | "sendIdentityCard"
+    | "simpleResponse"
+    | "followUpResponse"
+    | "handleEmailAction"
+    | "taskActionConfirmation";
 }> {
   // Convert thread messages to OpenAI chat format
   const conversationContext = threadMessages.map((msg) => ({
-    role: msg.sender_number === process.env.A1BASE_AGENT_NUMBER! ? "assistant" as const : "user" as const,
+    role:
+      msg.sender_number === process.env.A1BASE_AGENT_NUMBER!
+        ? ("assistant" as const)
+        : ("user" as const),
     content: msg.content,
   }));
 
   // Heuristic check: if the latest message clearly asks for identity or contains an email address, return early
-  const latestMessage = threadMessages[threadMessages.length - 1]?.content.toLowerCase() || '';
-  if (latestMessage.includes("who are you") || latestMessage.includes("what are you")) {
+  const latestMessage =
+    threadMessages[threadMessages.length - 1]?.content.toLowerCase() || "";
+  if (
+    latestMessage.includes("who are you") ||
+    latestMessage.includes("what are you")
+  ) {
     return { responseType: "sendIdentityCard" };
   }
   if (/\b[\w.-]+@[\w.-]+\.\w+\b/.test(latestMessage)) {
@@ -78,7 +87,7 @@ Return valid JSON with only that single key "responseType" and value as one of t
       "sendIdentityCard",
       "simpleResponse",
       // "followUpResponse",
-      "handleEmailAction", 
+      "handleEmailAction",
       "taskActionConfirmation",
     ];
 
@@ -97,7 +106,10 @@ Return valid JSON with only that single key "responseType" and value as one of t
  * Generate an introduction message for the AI agent when first joining a conversation.
  * Uses the agent profile settings to craft a contextual introduction.
  */
-export async function generateAgentIntroduction(incomingMessage: string, userName?: string): Promise<string> {
+export async function generateAgentIntroduction(
+  incomingMessage: string,
+  userName?: string
+): Promise<string> {
   if (!userName) {
     return "Hey there!";
   }
@@ -105,12 +117,12 @@ export async function generateAgentIntroduction(incomingMessage: string, userNam
   const conversation = [
     {
       role: "system" as const,
-      content: getSystemPrompt(userName)
+      content: getSystemPrompt(userName),
     },
     {
-      role: "user" as const, 
-      content: incomingMessage
-    }
+      role: "user" as const,
+      content: incomingMessage,
+    },
   ];
 
   const completion = await openai.chat.completions.create({
@@ -121,21 +133,27 @@ export async function generateAgentIntroduction(incomingMessage: string, userNam
   return completion.choices[0]?.message?.content || "Hello!";
 }
 
-
 /**
  * Generate a response to a WhatsApp thread of messages.
  * If userPrompt is provided, it will be passed as a user-level instruction in addition to the system prompt.
  */
-export async function generateAgentResponse(threadMessages: ThreadMessage[], userPrompt?: string): Promise<string> {
+export async function generateAgentResponse(
+  threadMessages: ThreadMessage[],
+  userPrompt?: string
+): Promise<string> {
   const messages = threadMessages.map((msg) => ({
-    role: (msg.sender_number === process.env.A1BASE_AGENT_NUMBER! ? "assistant" : "user") as ChatRole,
+    role: (msg.sender_number === process.env.A1BASE_AGENT_NUMBER!
+      ? "assistant"
+      : "user") as ChatRole,
     content: msg.content,
   }));
 
   // Extract the latest user's name (not the agent)
   const userName = [...threadMessages]
     .reverse()
-    .find((msg) => msg.sender_number !== process.env.A1BASE_AGENT_NUMBER!)?.sender_name;
+    .find(
+      (msg) => msg.sender_number !== process.env.A1BASE_AGENT_NUMBER!
+    )?.sender_name;
 
   if (!userName) {
     return "Hey there!";
@@ -159,7 +177,9 @@ export async function generateAgentResponse(threadMessages: ThreadMessage[], use
     messages: conversation,
   });
 
-  const content = completion.choices[0]?.message?.content || "Sorry, I couldn't generate a response";
+  const content =
+    completion.choices[0]?.message?.content ||
+    "Sorry, I couldn't generate a response";
 
   // Try parsing as JSON to extract just the "message"
   try {
@@ -167,6 +187,7 @@ export async function generateAgentResponse(threadMessages: ThreadMessage[], use
     return data.message || "No message found.";
   } catch (error) {
     // If not valid JSON, just return the entire text
+    console.error("Error parsing JSON response:", error);
     return content;
   }
 }
@@ -175,7 +196,10 @@ export async function generateAgentResponse(threadMessages: ThreadMessage[], use
  * Generate an email (subject/body) from a series of thread messages.
  * If userPrompt is provided, it will be added as an extra instruction.
  */
-export async function generateEmailFromThread(threadMessages: ThreadMessage[], userPrompt?: string): Promise<{
+export async function generateEmailFromThread(
+  threadMessages: ThreadMessage[],
+  userPrompt?: string
+): Promise<{
   recipientEmail: string;
   hasRecipient: boolean;
   emailContent: {
@@ -183,33 +207,28 @@ export async function generateEmailFromThread(threadMessages: ThreadMessage[], u
     body: string;
   } | null;
 }> {
-
-  console.log("OPENAI CALL TO MAKE EMAIL")
-  // Extract email from last message
-  const lastMessage = threadMessages[threadMessages.length - 1];
-  let recipientEmail = "";  // Define this variable
-  
   // Grab conversation context
   const relevantMessages = threadMessages.slice(-3).map((msg) => ({
-    role: msg.sender_number === process.env.A1BASE_AGENT_NUMBER! ? 
-      "assistant" as const : 
-      "user" as const,
+    role:
+      msg.sender_number === process.env.A1BASE_AGENT_NUMBER!
+        ? ("assistant" as const)
+        : ("user" as const),
     content: msg.content,
   }));
 
   // Build conversation
   const conversation: OpenAI.Chat.ChatCompletionMessageParam[] = [
-    { 
+    {
       role: "system",
-      content: basicWorkflowsPrompt.email_generation.user 
-    }
+      content: basicWorkflowsPrompt.email_generation.user,
+    },
   ];
-  
+
   // If there's a user-level prompt, add it
   if (userPrompt) {
     conversation.push({ role: "user", content: userPrompt });
   }
-  
+
   // Add the last few relevant messages
   conversation.push(...relevantMessages);
 
@@ -220,14 +239,14 @@ export async function generateEmailFromThread(threadMessages: ThreadMessage[], u
   });
 
   const response = completion.choices[0].message?.content;
-  console.log('OPENAI RESPONSE')
-  console.log(response)
+  console.log("OPENAI RESPONSE");
+  console.log(response);
 
   if (!response) {
     return {
       recipientEmail: "",
       hasRecipient: false,
-      emailContent: null
+      emailContent: null,
     };
   }
 
@@ -236,11 +255,11 @@ export async function generateEmailFromThread(threadMessages: ThreadMessage[], u
   const bodyMatch = response.match(/BODY:\s*([\s\S]*)/);
 
   return {
-    recipientEmail: "",  // This will be handled by the OpenAI call later
+    recipientEmail: "", // This will be handled by the OpenAI call later
     hasRecipient: false, // This should be false by default since we're not handling recipient extraction here
     emailContent: {
       subject: subjectMatch?.[1]?.trim() || "No subject",
       body: bodyMatch?.[1]?.trim() || "No body content",
-    }
+    },
   };
 }
