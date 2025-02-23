@@ -53,9 +53,9 @@ Return valid JSON with only that single key "responseType" and value as one of t
     messages: [
       { role: "system", content: triagePrompt },
       ...conversationContext,
-    ] as { role: string; content: string }[],
+    ],
     model: "llama-3.3-70b-versatile",
-  });
+  } as any);
 
   const content = completion.choices[0]?.message?.content || "";
   console.log(content)
@@ -147,9 +147,9 @@ export async function generateAgentResponse(threadMessages: ThreadMessage[], use
     return "Hey there!";
   }
 
-  const conversation = [
+  const conversation: { role: string; content: string }[] = [
     { role: "system", content: getSystemPrompt(userName) },
-  ] as const;
+  ];
 
   if (userPrompt) {
     conversation.push({ role: "user" as ChatRole, content: userPrompt });
@@ -158,9 +158,9 @@ export async function generateAgentResponse(threadMessages: ThreadMessage[], use
   conversation.push(...messages);
 
   const completion = await groq.chat.completions.create({
-    messages: conversation as { role: string; content: string }[],
+    messages: conversation,
     model: "llama-3.3-70b-versatile",
-  });
+  } as any);
 
   const content = completion.choices[0]?.message?.content || "Sorry, I couldn't generate a response";
 
