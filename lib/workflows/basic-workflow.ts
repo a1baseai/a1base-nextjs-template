@@ -23,10 +23,10 @@ import {
 import type { ThreadMessage } from "../../types/chat";
 import { basicWorkflowsPrompt } from "./basic-workflows-prompt";
 
-// Configuration
-const SPLIT_PARAGRAPHS = false; // Set to false to send messages without splitting
+/** Message splitting configuration */
+const SPLIT_PARAGRAPHS = false;
 
-// Initialize A1Base client
+/** A1Base API client instance */
 const client = new A1BaseAPI({
   credentials: {
     apiKey: process.env.A1BASE_API_KEY!,
@@ -224,7 +224,7 @@ export async function DefaultReplyToMessage(
  * message triage detects an email-related request from the user.
  */
 
-// Generates the contents of the email, but doesn't send it until user approval
+
 /**
  * Generates an email draft from conversation context.
  * 
@@ -364,7 +364,7 @@ export async function SendEmailFromAgent(
  * then confirms completion or cancellation.
  */
 
-// Generate and send message to user to confirm before proceeding with task
+
 /**
  * Requests user confirmation before proceeding with a task.
  * 
@@ -404,7 +404,7 @@ export async function taskActionConfirmation(threadMessages: ThreadMessage[], em
     return emailDraft;
 }
 
-// Sends confirmation message to user after task completion to maintain feedback loop
+
 /**
  * Sends a completion confirmation message after a task is finished.
  * 
