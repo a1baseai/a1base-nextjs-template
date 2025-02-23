@@ -70,7 +70,7 @@ async function saveMessage(
       }
 
       // Get existing thread
-      let thread = await adapter.getThread(threadId);
+      const thread = await adapter.getThread(threadId);
 
       // Format the new message
       const newMessage = {
@@ -131,7 +131,13 @@ async function saveMessage(
         const newThreadId = await adapter.createThread(
           threadId,
           [newMessage],
-          participants
+          participants.map(p => ({
+            id: p,
+            name: p === process.env.A1BASE_AGENT_NUMBER?.replace(/\+/g, "") ? 
+              process.env.A1BASE_AGENT_NAME || "A1 Agent" : 
+              "Unknown User",
+            phone_number: p
+          }))
         );
         if (!newThreadId) throw new Error("Failed to create new thread");
       }

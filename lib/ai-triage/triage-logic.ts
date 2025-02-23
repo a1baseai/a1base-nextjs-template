@@ -39,8 +39,8 @@ import type { MessageRecord, TriageParams, TriageResult } from "./types";
  */
 export async function triageMessage({
   thread_id,
-  _content,
-  _sender_name,
+  content,
+  sender_name,
   sender_number,
   thread_type,
   messagesByThread,
@@ -94,7 +94,7 @@ export async function triageMessage({
           type: 'identity',
           success: true,
           message: identityMessages.join('\n'),
-          data: identityMessages
+          data: { messages: identityMessages }
         };
 
       case 'handleEmailAction':
@@ -145,7 +145,7 @@ export async function triageMessage({
             type: 'default-webchat',
             success: true,
             message: 'Default response sent',
-            data: response
+            data: { response }
           };
         }
 
@@ -153,7 +153,7 @@ export async function triageMessage({
           type: 'default', 
           success: true,
           message: 'Default response sent',
-          data: response
+          data: { response }
         };
     }
   } catch (error) {
