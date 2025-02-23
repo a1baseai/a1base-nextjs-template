@@ -1,5 +1,5 @@
 import Groq from "groq-sdk";
-import { ThreadMessage } from '@/types/chat'
+import { ThreadMessage } from '../../types/chat'
 import { getSystemPrompt } from '../agent/system-prompt'
 import { basicWorkflowsPrompt } from '../workflows/basic-workflows-prompt'
 
