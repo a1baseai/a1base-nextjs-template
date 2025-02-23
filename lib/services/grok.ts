@@ -1,15 +1,15 @@
-import Groq from "groq-sdk";
+import Grok from "grok-sdk";
 import type { ThreadMessage } from '../../types/chat'
 import { getSystemPrompt } from '../agent/system-prompt'
 import { basicWorkflowsPrompt } from '../workflows/basic-workflows-prompt'
 
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
+const grok = new Grok({
+  apiKey: process.env.GROK_API_KEY,
 });
 
 import type { EmailGenerationResult, MessageTriageResponse } from "../services/types";
 
-type GroqResponse = {
+type GrokResponse = {
   choices: Array<{
     message: {
       content: string;
