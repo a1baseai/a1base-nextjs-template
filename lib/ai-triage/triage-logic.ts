@@ -37,7 +37,9 @@ import type { MessageRecord, TriageParams, TriageResult } from "./types";
  */
 export async function triageMessage({
   thread_id,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   content: _content,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   sender_name: _sender_name,
   sender_number,
   thread_type,
