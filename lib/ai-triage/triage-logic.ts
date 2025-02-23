@@ -1,4 +1,4 @@
-import { ThreadMessage } from "@/types/chat";
+import { ThreadMessage } from "../../types/chat";
 import { getInitializedAdapter } from "../supabase/config";
 import { 
   DefaultReplyToMessage,
@@ -12,6 +12,11 @@ import {
   generateAgentResponse,
   triageMessageIntent 
 } from "../services/openai";
+import {
+  convertToThreadMessages,
+  sendWhatsAppMessage,
+  handleMessageError
+} from "./message-utils";
 
 type MessageRecord = {
   message_id: string;
@@ -83,15 +88,7 @@ export async function triageMessage({
     }
     
     // Convert to ThreadMessage format
-    const messages: ThreadMessage[] = threadMessages.map(msg => ({
-      content: msg.content,
-      sender_number: msg.sender_number,
-      sender_name: msg.sender_name,
-      thread_id,
-      thread_type,
-      timestamp: msg.timestamp,
-      message_id: msg.message_id
-    }));
+    const messages: ThreadMessage[] = convertToThreadMessages(threadMessages, thread_id, thread_type);
 
     
     const triage = await triageMessageIntent(messages);
