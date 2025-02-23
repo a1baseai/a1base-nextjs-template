@@ -13,7 +13,11 @@ const MAX_CONTEXT_MESSAGES = 10;
 async function userCheck(
   phoneNumber: string,
   name: string,
-  adapter: any
+  adapter: {
+    getUserByPhone: (phone: number) => Promise<{ name: string } | null>;
+    createUser: (name: string, phone: number) => Promise<string | null>;
+    updateUser: (phone: number, data: { name: string }) => Promise<boolean>;
+  }
 ): Promise<void> {
   try {
     // Convert phone number to numeric format (remove '+' and any spaces)
