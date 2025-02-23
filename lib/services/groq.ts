@@ -49,13 +49,21 @@ Rules:
 Return valid JSON with only that single key "responseType" and value as one of the allowed strings.
 `;
 
+  type GroqResponse = {
+    choices: Array<{
+      message: {
+        content: string;
+      };
+    }>;
+  };
+
   const completion = await groq.chat.completions.create({
     messages: [
       { role: "system", content: triagePrompt },
       ...conversationContext,
     ],
     model: "llama-3.3-70b-versatile",
-  } as { choices: { message: { content: string } }[] });
+  }) as GroqResponse;
 
   const content = completion.choices[0]?.message?.content || "";
   console.log(content)
@@ -160,7 +168,7 @@ export async function generateAgentResponse(threadMessages: ThreadMessage[], use
   const completion = await groq.chat.completions.create({
     messages: conversation,
     model: "llama-3.3-70b-versatile",
-  } as { choices: { message: { content: string } }[] });
+  }) as GroqResponse;
 
   const content = completion.choices[0]?.message?.content || "Sorry, I couldn't generate a response";
 
