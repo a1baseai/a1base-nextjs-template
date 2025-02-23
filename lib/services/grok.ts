@@ -1,4 +1,4 @@
-import Grok from "grok-sdk";
+import Grok from "groq-sdk";
 import type { ThreadMessage } from '../../types/chat'
 import { getSystemPrompt } from '../agent/system-prompt'
 import { basicWorkflowsPrompt } from '../workflows/basic-workflows-prompt'
