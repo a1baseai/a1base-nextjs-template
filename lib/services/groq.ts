@@ -169,7 +169,10 @@ export async function generateAgentResponse(threadMessages: ThreadMessage[], use
   conversation.push(...messages);
 
   const completion = await groq.chat.completions.create({
-    messages: conversation,
+    messages: conversation.map(msg => ({
+      role: msg.role as "system" | "user" | "assistant",
+      content: msg.content
+    })),
     model: "llama-3.3-70b-versatile",
   }) as GroqResponse;
 
