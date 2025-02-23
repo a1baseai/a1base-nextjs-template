@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import type { ThreadMessage } from '../../types/chat'
 import { Database } from './types'
 import { USERS_TABLE, THREADS_TABLE } from './config'
 
@@ -135,7 +136,15 @@ export class SupabaseAdapter {
    * Thread Operations 
    */
 
-  async createThread(threadId: string, messages: any[], participants: any[]): Promise<string | null> {
+  async createThread(
+    threadId: string, 
+    messages: ThreadMessage[], 
+    participants: Array<{ 
+      id: string; 
+      name: string; 
+      phone_number: string 
+    }>
+  ): Promise<string | null> {
     this.ensureInitialized()
     try {
       const { data, error } = await this.supabase
@@ -176,7 +185,7 @@ export class SupabaseAdapter {
     }
   }
 
-  async updateThreadMessages(threadId: string, messages: any[]): Promise<boolean> {
+  async updateThreadMessages(threadId: string, messages: ThreadMessage[]): Promise<boolean> {
     this.ensureInitialized()
     try {
       const { error } = await this.supabase
@@ -195,7 +204,7 @@ export class SupabaseAdapter {
     }
   }
 
-  async updateThreadParticipants(threadId: string, participants: any[]): Promise<boolean> {
+  async updateThreadParticipants(threadId: string, participants: { id: string; name: string; phone_number: string }[]): Promise<boolean> {
     this.ensureInitialized()
     try {
       const { error } = await this.supabase
@@ -213,4 +222,4 @@ export class SupabaseAdapter {
       return false
     }
   }
-}    
+}        

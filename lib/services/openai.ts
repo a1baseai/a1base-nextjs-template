@@ -7,7 +7,7 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 })
 
-import { ChatRole, EmailGenerationResult, MessageTriageResponse } from "../services/types";
+import type { EmailGenerationResult, MessageTriageResponse } from "../services/types";
 
 /**
  * Analyzes message intent using OpenAI to determine appropriate response workflow.
