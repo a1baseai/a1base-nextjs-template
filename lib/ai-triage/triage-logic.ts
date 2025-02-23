@@ -5,18 +5,10 @@ import {
   SendEmailFromAgent, 
   ConfirmTaskCompletion,
   ConstructEmail,
-  taskActionConfirmation,
   verifyAgentIdentity
 } from "../workflows/basic-workflow";
-import { 
-  generateAgentResponse,
-  triageMessageIntent 
-} from "../services/openai";
-import {
-  convertToThreadMessages,
-  sendWhatsAppMessage,
-  handleMessageError
-} from "./message-utils";
+import { triageMessageIntent } from "../services/openai";
+import { convertToThreadMessages } from "./message-utils";
 
 import type { MessageRecord, TriageParams, TriageResult } from "./types";
 
@@ -39,8 +31,8 @@ import type { MessageRecord, TriageParams, TriageResult } from "./types";
  */
 export async function triageMessage({
   thread_id,
-  content,
-  sender_name,
+  content: _content,
+  sender_name: _sender_name,
   sender_number,
   thread_type,
   messagesByThread,

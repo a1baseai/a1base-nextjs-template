@@ -9,7 +9,6 @@ const groq = new Groq({
 
 import type { EmailGenerationResult, MessageTriageResponse } from "../services/types";
 
-type ChatRole = "system" | "user" | "assistant" | "function";
 type GroqResponse = {
   choices: Array<{
     message: {
