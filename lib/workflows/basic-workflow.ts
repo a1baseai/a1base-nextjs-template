@@ -40,6 +40,24 @@ const client = new A1BaseAPI({
 // - DefaultReplyToMessage: Generates and sends simple response
 // ===================================================
 
+/**
+ * Sends identity verification messages and the agent's identity card.
+ * 
+ * This function handles identity verification requests by:
+ * 1. Generating a personalized introduction using the agent's profile
+ * 2. Sending the introduction message(s)
+ * 3. Sending the agent's A1Base identity card link
+ * 
+ * The function supports both individual and group chats, using the appropriate
+ * A1Base API endpoints based on the thread type.
+ * 
+ * @param message - The user's message requesting identity verification
+ * @param thread_type - Whether this is an individual or group chat
+ * @param thread_id - For group messages, the ID of the group thread
+ * @param sender_number - For individual messages, the recipient's phone number
+ * @returns Array of sent messages including introduction and identity card link
+ * @throws Error if message type is invalid or required parameters are missing
+ */
 export async function verifyAgentIdentity(
   message: string,
   thread_type: "individual" | "group",
@@ -116,6 +134,23 @@ export async function verifyAgentIdentity(
   }
 }
 
+/**
+ * Generates and sends a simple response to a message thread.
+ * 
+ * This function handles standard message responses by:
+ * 1. Using OpenAI to generate a contextually appropriate response
+ * 2. Optionally splitting the response into paragraphs if configured
+ * 3. Sending each message part through the appropriate A1Base channel
+ * 
+ * The function includes error handling that sends user-friendly error messages
+ * back through the same channel if something goes wrong.
+ * 
+ * @param threadMessages - Array of messages providing conversation context
+ * @param thread_type - Whether this is an individual or group chat
+ * @param thread_id - For group messages, the ID of the group thread
+ * @param sender_number - For individual messages, the recipient's phone number
+ * @throws Error if message type is invalid or required parameters are missing
+ */
 export async function DefaultReplyToMessage(
   threadMessages: ThreadMessage[],
   thread_type: "individual" | "group",
@@ -186,6 +221,21 @@ export async function DefaultReplyToMessage(
 // =======================================================================
 
 // Generates the contents of the email, but doesn't send it until user approval
+/**
+ * Generates an email draft from conversation context.
+ * 
+ * This function analyzes the conversation to create an appropriate email by:
+ * 1. Using OpenAI to understand the email requirements
+ * 2. Generating subject and body content
+ * 3. Attempting to identify the recipient from context
+ * 
+ * The email is not sent immediately - this function only creates the draft
+ * which can then be reviewed before sending.
+ * 
+ * @param threadMessages - Array of messages providing email context
+ * @returns Email draft containing recipient, subject, and body
+ * @throws Error if email content generation fails
+ */
 export async function ConstructEmail(threadMessages: ThreadMessage[]): Promise<{
   recipientEmail: string;
   hasRecipient: boolean;
