@@ -2,7 +2,8 @@
  * This file defines the core personality and behavioral characteristics of the AI agent.
  * It includes settings for the agent's identity, purpose, language style, and workflow preferences.
  *
- * Customize these settings to shape how your agent presents itself and interacts with users.
+ * These settings can be configured via environment variables using AGENT_PROFILE_SETTINGS.
+ * If no environment variable is provided, it falls back to default settings.
  */
 
 export interface LanguageStyle {
@@ -45,7 +46,7 @@ export interface AgentProfileSettings {
   companyDescription: string;
 }
 
-const agentProfileSettings: AgentProfileSettings = {
+const defaultAgentProfileSettings: AgentProfileSettings = {
   name: "Amy",
   role: "AI Customer Success Manager",
   isPersonified: true,
@@ -75,5 +76,13 @@ const agentProfileSettings: AgentProfileSettings = {
     agent: "Product Guide",
   },
 };
+
+// Parse environment variable if available, otherwise use default settings
+const agentProfileSettings: AgentProfileSettings = process.env.AGENT_PROFILE_SETTINGS
+  ? {
+      ...defaultAgentProfileSettings,
+      ...JSON.parse(process.env.AGENT_PROFILE_SETTINGS)
+    }
+  : defaultAgentProfileSettings;
 
 export default agentProfileSettings;

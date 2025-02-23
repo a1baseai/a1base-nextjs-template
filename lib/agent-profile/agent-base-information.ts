@@ -3,10 +3,8 @@
  * You can add multiple layers of information here to give your agent the context it needs
  * to be effective from day one.
  *
- * Structure your information in sections using the sections array below. Each section should have:
- * - title: A clear name for this block of information
- * - content: The actual information/context
- * - priority: Higher priority (1-10) information will be emphasized more in the agent's responses
+ * These settings can be configured via environment variables using AGENT_BASE_INFORMATION.
+ * If no environment variable is provided, it falls back to default settings.
  */
 
 interface InformationSection {
@@ -15,7 +13,7 @@ interface InformationSection {
   priority: number;
 }
 
-const baseInformation: InformationSection[] = [
+const defaultBaseInformation: InformationSection[] = [
   {
     title: "Company Overview",
     content: `A1Base is the human-facing communication, trust, and identity layer for AI agents. Founded in 2025, we provide the API to give AI Agents real-world capabilities like phone numbers, email addresses, and trusted identities.
@@ -93,6 +91,11 @@ Connect with us:
     priority: 5,
   }
 ];
+
+// Parse environment variable if available, otherwise use default settings
+const baseInformation: InformationSection[] = process.env.AGENT_BASE_INFORMATION
+  ? JSON.parse(process.env.AGENT_BASE_INFORMATION)
+  : defaultBaseInformation;
 
 /**
  * Formats the information sections into a single string, with higher priority
