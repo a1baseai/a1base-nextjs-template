@@ -33,13 +33,13 @@ export async function generatePerplexityResponse(threadMessages: ThreadMessage[]
   }
 
   // Build the conversation to pass to Perplexity
-  const conversation = [
-    { role: "system" as const, content: getSystemPrompt(userName) },
+  const conversation: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
+    { role: "system", content: getSystemPrompt(userName) },
   ];
 
   // If there's a user-level prompt, add it as a user message
   if (userPrompt) {
-    conversation.push({ role: "user" as const, content: userPrompt });
+    conversation.push({ role: "user", content: userPrompt });
   }
 
   // Then add the actual chat messages
