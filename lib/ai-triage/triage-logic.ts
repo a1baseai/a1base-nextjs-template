@@ -7,7 +7,7 @@ import {
   ConstructEmail,
   taskActionConfirmation,
   verifyAgentIdentity
-} from "../workflows/basic_workflow";
+} from "../workflows/basic-workflow";
 import { 
   generateAgentResponse,
   triageMessageIntent 
@@ -42,7 +42,7 @@ type TriageResult = {
 
 // ======================== MAIN TRIAGE LOGIC ========================
 // Processes incoming messages and routes them to appropriate workflows
-// in basic_workflow.ts. Currently triages for:
+// in basic-workflow.ts. Currently triages for:
 // - Simple response to one off message
 // - Sharing A1 Agent Identity card
 // - Drafting and sending an email

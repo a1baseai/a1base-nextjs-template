@@ -21,7 +21,7 @@ import {
   generateAgentIntroduction,
 } from "../services/openai";
 import { ThreadMessage } from "@/types/chat";
-import { basicWorkflowsPrompt } from "./basic_workflows_prompt";
+import { basicWorkflowsPrompt } from "./basic-workflows-prompt";
 
 // Configuration
 const SPLIT_PARAGRAPHS = false; // Set to false to send messages without splitting

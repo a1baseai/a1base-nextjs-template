@@ -1,7 +1,7 @@
 import Groq from "groq-sdk";
 import { ThreadMessage } from '@/types/chat'
 import { getSystemPrompt } from '../agent/system-prompt'
-import { basicWorkflowsPrompt } from '../workflows/basic_workflows_prompt'
+import { basicWorkflowsPrompt } from '../workflows/basic-workflows-prompt'
 
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
