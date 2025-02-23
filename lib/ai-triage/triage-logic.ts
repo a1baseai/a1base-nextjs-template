@@ -18,7 +18,7 @@ import {
   handleMessageError
 } from "./message-utils";
 
-import { MessageRecord, TriageParams, TriageResult } from "./types";
+import type { MessageRecord, TriageParams, TriageResult } from "../services/types";
 
 /**
  * Main message triage logic that processes incoming messages and routes them to appropriate workflows.

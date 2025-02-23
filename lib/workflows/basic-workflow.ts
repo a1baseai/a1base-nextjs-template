@@ -20,7 +20,7 @@ import {
   generateEmailFromThread,
   generateAgentIntroduction,
 } from "../services/openai";
-import { ThreadMessage } from "@/types/chat";
+import type { ThreadMessage } from "../../types/chat";
 import { basicWorkflowsPrompt } from "./basic-workflows-prompt";
 
 // Configuration
