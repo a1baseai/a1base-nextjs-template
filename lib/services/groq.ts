@@ -7,7 +7,7 @@ const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
 });
 
-import { ChatRole, EmailGenerationResult, MessageTriageResponse } from "./types";
+import { ChatRole, EmailGenerationResult, MessageTriageResponse } from "../services/types";
 
 /**
  * Triage the message intent to determine appropriate response type

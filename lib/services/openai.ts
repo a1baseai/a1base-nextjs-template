@@ -7,7 +7,7 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 })
 
-import { ChatRole, EmailGenerationResult, MessageTriageResponse } from "./types";
+import { ChatRole, EmailGenerationResult, MessageTriageResponse } from "../services/types";
 
 /**
  * ============= OPENAI CALL TO TRIAGE THE MESSAGE INTENT ================
