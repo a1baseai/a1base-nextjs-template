@@ -7,7 +7,7 @@ const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
 });
 
-import { ChatRole, EmailGenerationResult, MessageTriageResponse } from "../services/types";
+import type { EmailGenerationResult, MessageTriageResponse } from "../services/types";
 
 /**
  * Analyzes message intent using Groq's LLaMA model to determine appropriate response workflow.
@@ -53,9 +53,9 @@ Return valid JSON with only that single key "responseType" and value as one of t
     messages: [
       { role: "system", content: triagePrompt },
       ...conversationContext,
-    ] satisfies { role: string; content: string }[],
+    ],
     model: "llama-3.3-70b-versatile",
-  });
+  } as { choices: { message: { content: string } }[] });
 
   const content = completion.choices[0]?.message?.content || "";
   console.log(content)
@@ -158,9 +158,9 @@ export async function generateAgentResponse(threadMessages: ThreadMessage[], use
   conversation.push(...messages);
 
   const completion = await groq.chat.completions.create({
-    messages: conversation satisfies { role: string; content: string }[],
+    messages: conversation,
     model: "llama-3.3-70b-versatile",
-  });
+  } as { choices: { message: { content: string } }[] });
 
   const content = completion.choices[0]?.message?.content || "Sorry, I couldn't generate a response";
 
