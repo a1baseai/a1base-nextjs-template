@@ -158,7 +158,8 @@ export async function triageMessage({
           messages,
           thread_type as "individual" | "group",
           thread_id,
-          sender_number
+          sender_number,
+          service
         );
 
         console.log("Response:", response);
@@ -168,7 +169,7 @@ export async function triageMessage({
           return {
             type: "default-webchat",
             success: true,
-            message: "Default response sent"
+            message: response
           };
         }
 

@@ -49,3 +49,4 @@ next-env.d.ts
 docker-compose.override.yml
 Dockerfile.local
 .dockerignore
+docker-build.sh

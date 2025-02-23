@@ -126,11 +126,13 @@ export async function DefaultReplyToMessage(
   threadMessages: ThreadMessage[],
   thread_type: "individual" | "group",
   thread_id?: string,
-  sender_number?: string
+  sender_number?: string,
+  service?: string
 ) {
   console.log("Workflow Start [DefaultReplyToMessage]", {
     sender_number,
     message_count: threadMessages.length,
+    service,
   });
 
   try {
@@ -143,7 +145,12 @@ export async function DefaultReplyToMessage(
       ? response.split("\n").filter((msg) => msg.trim())
       : [response];
 
-    // Send each message line individually
+    // For web chat, just return the response without sending messages
+    if (service === "web-ui") {
+      return response;
+    }
+
+    // Send each message line individually for WhatsApp
     for (const msg of messages) {
       const messageData = {
         content: msg,
@@ -168,7 +175,12 @@ export async function DefaultReplyToMessage(
   } catch (error) {
     console.error("[Basic Workflow] Error:", error);
 
-    // Prepare error message
+    // Skip error message sending for web chat
+    if (service === "web-ui") {
+      return "Sorry, I encountered an error processing your message";
+    }
+
+    // Prepare error message for WhatsApp
     const errorMessageData = {
       content: "Sorry, I encountered an error processing your message",
       from: process.env.A1BASE_AGENT_NUMBER!,

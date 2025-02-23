@@ -17,17 +17,19 @@ export default function Home() {
         </p>
 
         <div className="flex gap-4">
-          <a
-            href={`https://wa.me/${process.env.A1BASE_AGENT_NUMBER?.replace(
-              "+",
-              ""
-            )}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="rounded-lg px-6 py-3 bg-[#25D366] hover:bg-[#128C7E] text-white flex items-center gap-2 transition-colors"
-          >
-            {`Chat with your agent on WhatApp`}
-          </a>
+          {process.env.A1BASE_AGENT_NUMBER && (
+            <a
+              href={`https://wa.me/${process.env.A1BASE_AGENT_NUMBER.replace(
+                "+",
+                ""
+              )}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-lg px-6 py-3 bg-[#25D366] hover:bg-[#128C7E] text-white flex items-center gap-2 transition-colors"
+            >
+              {`Chat with your agent on WhatApp`}
+            </a>
+          )}
           <Link
             href="/chat"
             className="rounded-lg px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2 transition-colors"
