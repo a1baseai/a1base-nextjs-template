@@ -116,7 +116,10 @@ export async function generateAgentIntroduction(incomingMessage: string, userNam
   ];
 
   const completion = await groq.chat.completions.create({
-    messages: conversation as Array<{ role: string; content: string }>,
+    messages: conversation.map(msg => ({
+      role: msg.role,
+      content: msg.content
+    })),
     model: "llama-3.3-70b-versatile",
   }) as GroqResponse;
 
@@ -220,7 +223,10 @@ export async function generateEmailFromThread(threadMessages: ThreadMessage[], u
   conversation.push(...relevantMessages);
 
   const completion = await groq.chat.completions.create({
-    messages: conversation as Array<{ role: string; content: string }>,
+    messages: conversation.map(msg => ({
+      role: msg.role,
+      content: msg.content
+    })),
     model: "llama-3.3-70b-versatile",
   }) as GroqResponse;
 
