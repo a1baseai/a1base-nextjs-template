@@ -270,6 +270,25 @@ export async function ConstructEmail(threadMessages: ThreadMessage[]): Promise<{
 }
 
 // Uses the A1Base sendEmailMessage function to send an email as the a1 agent email address set in .env.local
+/**
+ * Sends an email through the A1Base API and confirms delivery.
+ * 
+ * This function handles the actual email sending process by:
+ * 1. Using A1Base's email API to send the message
+ * 2. Sending confirmation messages back to the user
+ * 3. Handling any errors that occur during sending
+ * 
+ * The function sends a series of confirmation messages back through
+ * the original channel (WhatsApp) to keep the user informed about
+ * the email's status.
+ * 
+ * @param emailData - Object containing email recipient and content
+ * @param thread_type - Whether this is an individual or group chat
+ * @param thread_id - For group messages, the ID of the group thread
+ * @param sender_number - For individual messages, the recipient's phone number
+ * @returns Response from the A1Base email API
+ * @throws Error if email sending fails or message type is invalid
+ */
 export async function SendEmailFromAgent(
   emailData: {
     recipientEmail: string;
@@ -340,6 +359,22 @@ export async function SendEmailFromAgent(
 // =====================================================================
 
 // Generate and send message to user to confirm before proceeding with task
+/**
+ * Requests user confirmation before proceeding with a task.
+ * 
+ * This function implements a confirmation workflow that:
+ * 1. Shows the user what action will be taken
+ * 2. Waits for explicit approval
+ * 3. Returns the confirmed task details
+ * 
+ * Currently focused on email confirmation, but designed to be
+ * extensible for other types of task confirmation workflows.
+ * 
+ * @param threadMessages - Array of messages providing conversation context
+ * @param emailDraft - Draft email content to be confirmed
+ * @returns Confirmed email data, potentially modified based on user feedback
+ * @throws Error if confirmation process fails
+ */
 export async function taskActionConfirmation(threadMessages: ThreadMessage[], emailDraft: {
     recipientEmail: string;
     emailContent: {
@@ -364,6 +399,23 @@ export async function taskActionConfirmation(threadMessages: ThreadMessage[], em
 }
 
 // Sends confirmation message to user after task completion to maintain feedback loop
+/**
+ * Sends a completion confirmation message after a task is finished.
+ * 
+ * This function maintains the feedback loop with users by:
+ * 1. Generating an appropriate completion message
+ * 2. Sending it through the original communication channel
+ * 3. Handling any errors in the confirmation process
+ * 
+ * The confirmation message is generated using the agent's profile to
+ * maintain consistent tone and style in communications.
+ * 
+ * @param threadMessages - Array of messages providing conversation context
+ * @param thread_type - Whether this is an individual or group chat
+ * @param thread_id - For group messages, the ID of the group thread
+ * @param sender_number - For individual messages, the recipient's phone number
+ * @throws Error if message type is invalid or required parameters are missing
+ */
 export async function ConfirmTaskCompletion(
   threadMessages: ThreadMessage[],
   thread_type: "individual" | "group",
