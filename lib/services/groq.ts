@@ -117,7 +117,7 @@ export async function generateAgentIntroduction(incomingMessage: string, userNam
 
   const completion = await groq.chat.completions.create({
     messages: conversation.map(msg => ({
-      role: msg.role,
+      role: msg.role as "system" | "user" | "assistant",
       content: msg.content
     })),
     model: "llama-3.3-70b-versatile",
@@ -224,7 +224,7 @@ export async function generateEmailFromThread(threadMessages: ThreadMessage[], u
 
   const completion = await groq.chat.completions.create({
     messages: conversation.map(msg => ({
-      role: msg.role,
+      role: msg.role as "system" | "user" | "assistant",
       content: msg.content
     })),
     model: "llama-3.3-70b-versatile",
