@@ -1,5 +1,5 @@
 import { WhatsAppIncomingData } from "a1base-node";
-import { MessageRecord } from "@/types/chat";
+import type { MessageRecord } from "./types";
 import { triageMessage } from "./triage-logic";
 import { initializeDatabase, getInitializedAdapter } from "../supabase/config";
 
