@@ -10,7 +10,22 @@ const groq = new Groq({
 import { ChatRole, EmailGenerationResult, MessageTriageResponse } from "../services/types";
 
 /**
- * Triage the message intent to determine appropriate response type
+ * Analyzes message intent using Groq's LLaMA model to determine appropriate response workflow.
+ * 
+ * This function uses LLaMA 3.3 70B to analyze the conversation context and determine
+ * the most appropriate way to handle the user's message. It follows the same response
+ * patterns as the OpenAI implementation but uses Groq's API for potentially faster
+ * or more cost-effective processing.
+ * 
+ * Response types:
+ * - sendIdentityCard: User is asking about the agent's identity
+ * - simpleResponse: Basic message requiring a direct response
+ * - handleEmailAction: User wants to draft/send an email
+ * - taskActionConfirmation: User is confirming a previous task
+ * 
+ * @param threadMessages - Array of messages providing conversation context
+ * @returns MessageTriageResponse indicating how to handle the message
+ * @throws May throw errors from Groq API calls
  */
 export async function triageMessageIntent(threadMessages: ThreadMessage[]): Promise<MessageTriageResponse>{
   const conversationContext = threadMessages.map((msg) => ({
@@ -65,7 +80,16 @@ Return valid JSON with only that single key "responseType" and value as one of t
 }
 
 /**
- * Generate an introduction message for the AI agent
+ * Generates a personalized introduction message using Groq's LLaMA model.
+ * 
+ * Uses LLaMA 3.3 70B to create a contextually appropriate introduction based on
+ * the agent's profile settings and the user's initial message. The introduction
+ * is tailored to match the agent's configured personality and communication style.
+ * 
+ * @param incomingMessage - The user's initial message to respond to
+ * @param userName - Optional name of the user for personalization
+ * @returns A personalized introduction message string
+ * @throws May throw errors from Groq API calls
  */
 export async function generateAgentIntroduction(incomingMessage: string, userName?: string): Promise<string> {
   if (!userName) {
@@ -92,7 +116,22 @@ export async function generateAgentIntroduction(incomingMessage: string, userNam
 }
 
 /**
- * Generate a response to a thread of messages
+ * Generates a contextual response to a thread of messages using LLaMA.
+ * 
+ * This function combines the agent's system prompt with conversation history to
+ * generate appropriate responses. It handles both direct responses and responses
+ * that require additional context from a user-provided prompt.
+ * 
+ * The function:
+ * 1. Maps messages to chat format
+ * 2. Extracts user context for personalization
+ * 3. Combines system prompt with conversation history
+ * 4. Handles both raw text and JSON-formatted responses
+ * 
+ * @param threadMessages - Array of messages in the conversation
+ * @param userPrompt - Optional additional instructions for response generation
+ * @returns Generated response string
+ * @throws May throw errors from Groq API calls
  */
 export async function generateAgentResponse(threadMessages: ThreadMessage[], userPrompt?: string): Promise<string> {
   const messages = threadMessages.map((msg) => ({
@@ -134,7 +173,22 @@ export async function generateAgentResponse(threadMessages: ThreadMessage[], use
 }
 
 /**
- * Generate an email from thread messages
+ * Generates an email draft from conversation context using LLaMA.
+ * 
+ * This function analyzes recent messages to understand the email requirements and
+ * generates appropriate subject and body content. It uses specialized prompts from
+ * basicWorkflowsPrompt to ensure the email matches the agent's communication style.
+ * 
+ * The function:
+ * 1. Extracts relevant context from recent messages
+ * 2. Uses email-specific system prompts
+ * 3. Generates and formats email content
+ * 4. Handles recipient extraction separately
+ * 
+ * @param threadMessages - Array of messages providing email context
+ * @param userPrompt - Optional additional instructions for email generation
+ * @returns EmailGenerationResult containing subject, body, and recipient info
+ * @throws May throw errors from Groq API calls
  */
 export async function generateEmailFromThread(threadMessages: ThreadMessage[], userPrompt?: string): Promise<EmailGenerationResult>{
   const relevantMessages = threadMessages.slice(-3).map((msg) => ({
