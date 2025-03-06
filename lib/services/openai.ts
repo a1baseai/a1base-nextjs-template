@@ -1,7 +1,6 @@
 import { ThreadMessage } from "@/types/chat";
 import OpenAI from "openai";
 import { getSystemPrompt } from "../agent/system-prompt";
-import { basicWorkflowsPrompt } from "../workflows/basic_workflows_prompt";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -25,9 +24,6 @@ export async function triageMessageIntent(
   responseType:
     | "sendIdentityCard"
     | "simpleResponse"
-    | "followUpResponse"
-    | "handleEmailAction"
-    | "taskActionConfirmation";
 }> {
   // Convert thread messages to OpenAI chat format
   const conversationContext = threadMessages.map((msg) => ({
@@ -47,26 +43,17 @@ export async function triageMessageIntent(
   ) {
     return { responseType: "sendIdentityCard" };
   }
-  if (/\b[\w.-]+@[\w.-]+\.\w+\b/.test(latestMessage)) {
-    return { responseType: "handleEmailAction" };
-  }
 
   const triagePrompt = `
 Based on the conversation, analyze the user's intent and respond with exactly one of these JSON responses:
 {"responseType":"sendIdentityCard"}
 {"responseType":"simpleResponse"}
-// {"responseType":"followUpResponse"}
-{"responseType":"handleEmailAction"} 
-{"responseType":"taskActionConfirmation"}
 
 Rules:
-- If the user specifically requests an email to be written or sent, or includes an email address, select "handleEmailAction"
-// - If the user asks a question, or requires an email to be written but didn't a recipient address, select "followUpResponse"
-- If the user is providing a response to a previous message in the thread, select "taskActionConfirmation"
 - If the user is requesting some sort of identification i.e 'who are you', select "sendIdentityCard"
 - Otherwise, select "simpleResponse"
 
-Return valid JSON with only that single key "responseType" and value as one of the three allowed strings.
+Return valid JSON with only that single key "responseType" and value as one of the two allowed strings.
 `;
 
   // Use a faster model for triage to reduce latency
@@ -86,9 +73,6 @@ Return valid JSON with only that single key "responseType" and value as one of t
     const validTypes = [
       "sendIdentityCard",
       "simpleResponse",
-      // "followUpResponse",
-      "handleEmailAction",
-      "taskActionConfirmation",
     ];
 
     if (validTypes.includes(parsed.responseType)) {
@@ -178,76 +162,4 @@ export async function generateAgentResponse(
   });
 
   return completion.choices[0]?.message?.content || "Sorry, I couldn't generate a response";
-}
-
-/**
- * Generate an email (subject/body) from a series of thread messages.
- * If userPrompt is provided, it will be added as an extra instruction.
- */
-export async function generateEmailFromThread(
-  threadMessages: ThreadMessage[],
-  userPrompt?: string
-): Promise<{
-  recipientEmail: string;
-  hasRecipient: boolean;
-  emailContent: {
-    subject: string;
-    body: string;
-  } | null;
-}> {
-  // Grab conversation context
-  const relevantMessages = threadMessages.slice(-3).map((msg) => ({
-    role:
-      msg.sender_number === process.env.A1BASE_AGENT_NUMBER!
-        ? ("assistant" as const)
-        : ("user" as const),
-    content: msg.content,
-  }));
-
-  // Build conversation
-  const conversation: OpenAI.Chat.ChatCompletionMessageParam[] = [
-    {
-      role: "system",
-      content: basicWorkflowsPrompt.email_generation.user,
-    },
-  ];
-
-  // If there's a user-level prompt, add it
-  if (userPrompt) {
-    conversation.push({ role: "user", content: userPrompt });
-  }
-
-  // Add the last few relevant messages
-  conversation.push(...relevantMessages);
-
-  // Call OpenAI
-  const completion = await openai.chat.completions.create({
-    model: "gpt-4",
-    messages: conversation,
-  });
-
-  const response = completion.choices[0].message?.content;
-  console.log("OPENAI RESPONSE");
-  console.log(response);
-
-  if (!response) {
-    return {
-      recipientEmail: "",
-      hasRecipient: false,
-      emailContent: null,
-    };
-  }
-
-  // Parse out SUBJECT and BODY from the raw text
-  const subjectMatch = response.match(/SUBJECT:\s*(.*)/);
-  const bodyMatch = response.match(/BODY:\s*([\s\S]*)/);
-
-  return {
-    recipientEmail: "", // This will be handled by the OpenAI call later
-    hasRecipient: false, // This should be false by default since we're not handling recipient extraction here
-    emailContent: {
-      subject: subjectMatch?.[1]?.trim() || "No subject",
-      body: bodyMatch?.[1]?.trim() || "No body content",
-    },
-  };
 }

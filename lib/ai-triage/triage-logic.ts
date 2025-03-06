@@ -2,9 +2,6 @@ import { ThreadMessage } from "@/types/chat";
 import { getInitializedAdapter } from "../supabase/config";
 import {
   DefaultReplyToMessage,
-  SendEmailFromAgent,
-  ConfirmTaskCompletion,
-  ConstructEmail,
   verifyAgentIdentity,
 } from "../workflows/basic_workflow";
 import { triageMessageIntent } from "../services/openai";
@@ -15,12 +12,42 @@ type MessageRecord = {
   sender_number: string;
   sender_name: string;
   timestamp: string;
+  message_type?: string;
+  message_content?: {
+    text?: string;
+    data?: string;
+    latitude?: number;
+    longitude?: number;
+    name?: string;
+    address?: string;
+    quoted_message_content?: string;
+    quoted_message_sender?: string;
+    reaction?: string;
+    groupName?: string;
+    inviteCode?: string;
+    error?: string;
+  };
 };
 
 type TriageParams = {
   thread_id: string;
   message_id: string;
   content: string;
+  message_type: string;
+  message_content: {
+    text?: string;
+    data?: string;
+    latitude?: number;
+    longitude?: number;
+    name?: string;
+    address?: string;
+    quoted_message_content?: string;
+    quoted_message_sender?: string;
+    reaction?: string;
+    groupName?: string;
+    inviteCode?: string;
+    error?: string;
+  };
   sender_name: string;
   sender_number: string;
   thread_type: string;
@@ -30,16 +57,10 @@ type TriageParams = {
 };
 
 type TriageResult = {
-  type: "identity" | "email" | "default" | "default-webchat";
+  type: "identity" | "default";
   success: boolean;
   message?: string;
-  data?: string[] | {
-    recipientEmail: string;
-    emailContent: {
-      subject: string;
-      body: string;
-    };
-  };
+  data?: string[];
 };
 
 // ======================== MAIN TRIAGE LOGIC ========================
@@ -48,6 +69,12 @@ type TriageResult = {
 // - Simple response to one off message
 // - Sharing A1 Agent Identity card
 // - Drafting and sending an email
+//
+// To add new triage cases:
+// 1. Add new responseType to triageMessageIntent() in openai.ts
+// 2. Add corresponding workflow function in basic_workflow.ts
+// 3. Add new case in switch statement below
+// 4. Update TriageResult type if needed
 // ===================================================================
 export async function triageMessage({
   thread_id,
@@ -95,6 +122,10 @@ export async function triageMessage({
       thread_type,
       timestamp: msg.timestamp,
       message_id: msg.message_id,
+      message_type: (msg.message_type || 'text') as ThreadMessage['message_type'],
+      message_content: msg.message_content || {
+        text: msg.content
+      }
     }));
 
     const triage = await triageMessageIntent(messages);
@@ -118,42 +149,10 @@ export async function triageMessage({
           data: identityMessages,
         };
 
-      case "handleEmailAction":
-        console.log("Running Email Workflow");
-        // Triage to send an email using the agent's email address
-
-        const emailDraft = await ConstructEmail(threadMessages);
-
-        // Get user confirmation and send email
-        // const confirmedEmail = await taskActionConfirmation(threadMessages, emailDraft);
-
-        await SendEmailFromAgent(
-          emailDraft,
-          thread_type as "individual" | "group",
-          thread_id,
-          sender_number
-        );
-
-        // Send confirmation message back to user
-        await ConfirmTaskCompletion(
-          messages,
-          thread_type as "individual" | "group",
-          thread_id,
-          sender_number
-        );
-
-        return {
-          type: "email",
-          success: true,
-          message: "Email sent successfully",
-          data: emailDraft,
-        };
-
       case "simpleResponse":
       default:
         console.log("Running Default Response");
         
-        // Use the default workflow
         const response = await DefaultReplyToMessage(
           messages,
           thread_type as "individual" | "group",
@@ -164,10 +163,9 @@ export async function triageMessage({
 
         console.log("Response:", response);
 
-        // Return different response type for web UI
         if (service === "web-ui") {
           return {
-            type: "default-webchat",
+            type: "default",
             success: true,
             message: response
           };

@@ -16,7 +16,6 @@
 import { A1BaseAPI } from "a1base-node";
 import {
   generateAgentResponse,
-  generateEmailFromThread,
   generateAgentIntroduction,
 } from "../services/openai";
 import { ThreadMessage } from "@/types/chat";
@@ -202,211 +201,47 @@ export async function DefaultReplyToMessage(
   }
 }
 
-// ============================== EMAIL WORKFLOWS ========================
-// Functions for handling email-related tasks like constructing and sending emails
-// through the A1 agent's email address. These workflows are triggered when the
-// message triage detects an email-related request from the user.
-// =======================================================================
+// ====== CUSTOM WORKFLOW INTEGRATION GUIDE =======
+// To add new workflows that connect to your app's API/backend:
 
-// Generates the contents of the email, but doesn't send it until user approval
-export async function ConstructEmail(threadMessages: ThreadMessage[]): Promise<{
-  recipientEmail: string;
-  hasRecipient: boolean;
-  emailContent: {
-    subject: string;
-    body: string;
-  };
-}> {
-  console.log("Workflow Start [ConstructEmail]", {
-    message_count: threadMessages.length,
-  });
-  // Generate email contents
-  const emailData = await generateEmailFromThread(
-    threadMessages,
-    basicWorkflowsPrompt.email_generation.user
-  );
-
-  console.log("=== Email Data ====");
-  console.log(emailData);
-  if (!emailData.emailContent) {
-    throw new Error("Email content could not be generated.");
-  }
-  return {
-    recipientEmail: emailData.recipientEmail,
-    hasRecipient: emailData.hasRecipient,
-    emailContent: {
-      subject: emailData.emailContent.subject,
-      body: emailData.emailContent.body,
-    },
-  };
-}
-
-// Uses the A1Base sendEmailMessage function to send an email as the a1 agent email address set in .env.local
-export async function SendEmailFromAgent(
-  emailData: {
-    recipientEmail: string;
-    emailContent: {
-      subject: string;
-      body: string;
-    };
-  },
+// 1. Define new workflow functions following this pattern:
+//    - Accept relevant parameters (thread info, message content, etc)
+//    - Make API calls to your backend services
+//    - Format and send responses via A1Base client
+//    Example:
+/*
+export async function CustomApiWorkflow(
+  message: string,
   thread_type: "individual" | "group",
   thread_id?: string,
   sender_number?: string
-) {
-  console.log("Workflow Start: [SendEmailFromAgent]", {
-    recipient: emailData.recipientEmail,
-    subject: emailData.emailContent.subject,
-  });
-  try {
-    const response = await client.sendEmailMessage(
-      process.env.A1BASE_ACCOUNT_ID!,
-      {
-        sender_address: process.env.A1BASE_AGENT_EMAIL!,
-        recipient_address: emailData.recipientEmail,
-        subject: emailData.emailContent.subject,
-        body: emailData.emailContent.body,
-        headers: {
-          // Optional headers
-          // TODO: Add example with custom headers
-        },
-      }
-    );
-
-    // Send confirmation messages
-    const confirmationMessages = [
-      "Email sent successfully!",
-      `Subject: ${emailData.emailContent.subject}`,
-      `To: ${emailData.recipientEmail}`,
-    ];
-
-    for (const msg of confirmationMessages) {
-      const messageData = {
-        content: msg,
-        from: process.env.A1BASE_AGENT_NUMBER!,
-        service: "whatsapp" as const,
-      };
-
-      if (thread_type === "group" && thread_id) {
-        await client.sendGroupMessage(process.env.A1BASE_ACCOUNT_ID!, {
-          ...messageData,
-          thread_id,
-        });
-      } else if (thread_type === "individual" && sender_number) {
-        await client.sendIndividualMessage(process.env.A1BASE_ACCOUNT_ID!, {
-          ...messageData,
-          to: sender_number,
-        });
-      }
-    }
-
-    return response;
-  } catch (error) {
-    console.error("[SendEmailFromAgent] Error:", error);
-    throw error;
-  }
-}
-
-// ===================== TASK APPROVAL WORKFLOWS =======================
-// Workflows requiring explicit user approval before executing tasks.
-// Shows task details, waits for approval, executes if approved,
-// then confirms completion or cancellation.
-// =====================================================================
-
-// Generate and send message to user to confirm before proceeding with task
-export async function taskActionConfirmation(
-  threadMessages: ThreadMessage[],
-  emailDraft: {
-    recipientEmail: string;
-    emailContent: {
-      subject: string;
-      body: string;
-    };
-  }
-): Promise<{
-  recipientEmail: string;
-  emailContent: {
-    subject: string;
-    body: string;
+): Promise<string[]> {
+  // 1. Call your API endpoint
+  const apiResponse = await yourApiClient.makeRequest();
+  
+  // 2. Process the response
+  const formattedMessage = formatApiResponse(apiResponse);
+  
+  // 3. Send via A1Base using existing message patterns
+  const messageData = {
+    content: formattedMessage,
+    from: process.env.A1BASE_AGENT_NUMBER!,
+    service: "whatsapp" as const
   };
-}> {
-  console.log("starting [taskActionConfirmation] workflow", {
-    message_count: threadMessages.length,
-    recipient: emailDraft.recipientEmail,
-    subject: emailDraft.emailContent.subject,
-  });
-  // For now, just return the draft email as-is
-  // TODO: Implement actual user approval flow
-  return emailDraft;
-}
-
-// Sends confirmation message to user after task completion to maintain feedback loop
-export async function ConfirmTaskCompletion(
-  threadMessages: ThreadMessage[],
-  thread_type: "individual" | "group",
-  thread_id?: string,
-  sender_number?: string
-) {
-  console.log("starting [ConfirmTaskCompletion] workflow", {
-    thread_type,
-    thread_id,
-    sender_number,
-    message_count: threadMessages.length,
-  });
-
-  try {
-    const confirmationMessage = await generateAgentResponse(
-      threadMessages,
-      basicWorkflowsPrompt.task_confirmation.user
-    );
-
-    const messages = SPLIT_PARAGRAPHS
-      ? confirmationMessage.split("\n").filter((msg) => msg.trim())
-      : [confirmationMessage];
-
-    // Send each message line individually
-    for (const msg of messages) {
-      const messageData = {
-        content: msg,
-        from: process.env.A1BASE_AGENT_NUMBER!,
-        service: "whatsapp" as const,
-      };
-
-      if (thread_type === "group" && thread_id) {
-        await client.sendGroupMessage(process.env.A1BASE_ACCOUNT_ID!, {
-          ...messageData,
-          thread_id,
-        });
-      } else if (thread_type === "individual" && sender_number) {
-        await client.sendIndividualMessage(process.env.A1BASE_ACCOUNT_ID!, {
-          ...messageData,
-          to: sender_number,
-        });
-      } else {
-        throw new Error("Invalid message type or missing required parameters");
-      }
-    }
-  } catch (error) {
-    console.error("[ConfirmTaskCompletion] Error:", error);
-
-    // Prepare error message
-    const errorMessageData = {
-      content: "Sorry, I encountered an error confirming task completion",
-      from: process.env.A1BASE_AGENT_NUMBER!,
-      service: "whatsapp" as const,
-    };
-
-    // Send error message
-    if (thread_type === "group" && thread_id) {
-      await client.sendGroupMessage(process.env.A1BASE_ACCOUNT_ID!, {
-        ...errorMessageData,
-        thread_id,
-      });
-    } else if (thread_type === "individual" && sender_number) {
-      await client.sendIndividualMessage(process.env.A1BASE_ACCOUNT_ID!, {
-        ...errorMessageData,
-        to: sender_number,
-      });
-    }
+  
+  // 4. Use thread_type to determine send method
+  if (thread_type === "group") {
+    await client.sendGroupMessage(...);
+  } else {
+    await client.sendIndividualMessage(...);
   }
 }
+*/
+
+// 2. Add new intent types to triageMessageIntent() in openai.ts
+// 3. Update the triage logic switch statement to handle new workflow
+// 4. Add any new prompt templates to basic_workflows_prompt.js
+// 5. Consider adding error handling and retry logic for API calls
+// 6. Document the new workflow in the header comments
+
+// =============================================

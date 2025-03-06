@@ -1,7 +1,8 @@
-import { WhatsAppIncomingData } from "a1base-node";
+// import { WhatsAppIncomingData } from "a1base-node";
 import { MessageRecord } from "@/types/chat";
 import { triageMessage } from "./triage-logic";
 import { initializeDatabase, getInitializedAdapter } from "../supabase/config";
+import { ExtendedWhatsAppIncomingData } from "@/app/api/whatsapp/incoming/route";
 
 // IN-MEMORY STORAGE
 const messagesByThread = new Map();
@@ -61,6 +62,21 @@ async function saveMessage(
   message: {
     message_id: string;
     content: string;
+    message_type: string;
+    message_content: {
+      text?: string;
+      data?: string;
+      latitude?: number;
+      longitude?: number;
+      name?: string;
+      address?: string;
+      quoted_message_content?: string;
+      quoted_message_sender?: string;
+      reaction?: string;
+      groupName?: string;
+      inviteCode?: string;
+      error?: string;
+    };
     sender_number: string;
     sender_name: string;
     timestamp: string;
@@ -82,6 +98,8 @@ async function saveMessage(
       const newMessage = {
         message_id: message.message_id,
         content: message.content,
+        message_type: message.message_type,
+        message_content: message.message_content,
         sender_number: message.sender_number,
         sender_name: message.sender_name,
         timestamp: message.timestamp,
@@ -183,12 +201,14 @@ export async function handleWhatsAppIncoming({
   thread_id,
   message_id,
   content,
+  message_type,
+  message_content,
   sender_name,
   sender_number,
   thread_type,
   timestamp,
   service,
-}: WhatsAppIncomingData) {
+}: ExtendedWhatsAppIncomingData) {
   // Initialize database on first message
   await initializeDatabase();
 
@@ -196,6 +216,8 @@ export async function handleWhatsAppIncoming({
     thread_id,
     message_id,
     content,
+    message_type,
+    message_content,
     sender_number,
     sender_name,
     thread_type,
@@ -207,10 +229,12 @@ export async function handleWhatsAppIncoming({
     sender_name = process.env.A1BASE_AGENT_NAME || sender_name;
   }
 
-  // Store message
+  // Store message with new structure
   await saveMessage(thread_id, {
     message_id,
     content,
+    message_type,
+    message_content,
     sender_number,
     sender_name,
     timestamp,
@@ -225,6 +249,8 @@ export async function handleWhatsAppIncoming({
     thread_id,
     message_id,
     content,
+    message_type,
+    message_content,
     sender_name,
     sender_number,
     thread_type,

@@ -38,6 +38,10 @@ export async function POST(req: Request) {
   const dummyMessageRecord = {
     message_id: dummyMessageId,
     content: messageContent,
+    message_type: 'text',
+    message_content: {
+      text: messageContent
+    },
     sender_number: dummySenderNumber,
     sender_name: dummySenderName,
     timestamp: dummyTimestamp,
@@ -52,6 +56,10 @@ export async function POST(req: Request) {
       thread_id: dummyThreadId,
       message_id: dummyMessageId,
       content: messageContent,
+      message_type: 'text',
+      message_content: {
+        text: messageContent
+      },
       sender_name: dummySenderName,
       sender_number: dummySenderNumber,
       thread_type: dummyThreadType,
@@ -63,7 +71,7 @@ export async function POST(req: Request) {
     console.log("[POST] Triage Response:", triageResponse);
 
     return createAssistantStreamResponse(async (controller) => {
-      if (triageResponse.type === 'default-webchat') {
+      if (triageResponse.type === 'default') {
         // Stream the default chat response
         const result = streamText({
           model: openai("gpt-4"),
