@@ -129,6 +129,69 @@ Your agent will be available at `http://localhost:3000`
 - **Workflows**: Enhance `lib/workflows/basic_workflow.ts`
 - **Interface**: Modify `app/page.tsx`
 
+### 📬 Message Flow
+
+When a message arrives through the webhook, here's the complete flow through the codebase:
+
+1. **Webhook Entry Point** (`app/api/whatsapp/incoming/route.ts`)
+   - Receives incoming webhook POST request
+   - Validates and parses webhook payload
+   - Extracts message details (sender, content, thread info)
+   ```typescript:app/api/whatsapp/incoming/route.ts
+   startLine: 33
+   endLine: 76
+   ```
+
+2. **Message Handler** (`lib/ai-triage/handle-whatsapp-incoming.ts`)
+   - Manages message storage and user data
+   - Updates conversation history
+   - Triggers message triage
+   ```typescript:lib/ai-triage/handle-whatsapp-incoming.ts
+   startLine: 199
+   endLine: 260
+   ```
+
+3. **Message Triage** (`lib/ai-triage/triage-logic.ts`)
+   - Analyzes message intent using OpenAI
+   - Routes to appropriate workflow:
+     - Simple responses
+     - Identity verification
+     - Email handling
+     - [Add your own custom triage logic here]
+   ```typescript:lib/ai-triage/triage-logic.ts
+   startLine: 52
+   endLine: 191
+   ```
+
+4. **Workflow Execution** (`lib/workflows/basic_workflow.ts`)
+   - Handles different types of responses:
+     - Default replies
+     - Identity verification
+     - Email composition and sending
+     - [Add your own custom workflows here]
+   ```typescript:lib/workflows/basic_workflow.ts
+   startLine: 125
+   endLine: 203
+   ```
+
+5. **OpenAI Integration** (`lib/services/openai.ts`)
+   - Generates AI responses
+   - Analyzes message intent
+   - Creates email drafts
+   ```typescript:lib/services/openai.ts
+   startLine: 22
+   endLine: 53
+   ```
+
+Each component can be customized to modify the bot's behavior:
+- Adjust webhook handling in the entry point
+- Modify message storage and history management
+- Update triage logic and workflow routing
+- Customize individual workflow implementations
+- Fine-tune AI response generation
+
+The system uses environment variables for configuration and can be integrated with Supabase for persistent storage. Safety settings and agent profile configurations can be adjusted through their respective configuration files.
+
 ## 🔄 Scheduled Tasks
 
 The template includes a cron job system for automated tasks:
