@@ -138,8 +138,6 @@ When a message arrives through the webhook, here's the complete flow through the
    - Validates and parses webhook payload
    - Extracts message details (sender, content, thread info)
    ```typescript:app/api/whatsapp/incoming/route.ts
-   startLine: 33
-   endLine: 76
    ```
 
 2. **Message Handler** (`lib/ai-triage/handle-whatsapp-incoming.ts`)
@@ -147,8 +145,6 @@ When a message arrives through the webhook, here's the complete flow through the
    - Updates conversation history
    - Triggers message triage
    ```typescript:lib/ai-triage/handle-whatsapp-incoming.ts
-   startLine: 199
-   endLine: 260
    ```
 
 3. **Message Triage** (`lib/ai-triage/triage-logic.ts`)
@@ -159,8 +155,6 @@ When a message arrives through the webhook, here's the complete flow through the
      - Email handling
      - [Add your own custom triage logic here]
    ```typescript:lib/ai-triage/triage-logic.ts
-   startLine: 52
-   endLine: 191
    ```
 
 4. **Workflow Execution** (`lib/workflows/basic_workflow.ts`)
@@ -170,8 +164,6 @@ When a message arrives through the webhook, here's the complete flow through the
      - Email composition and sending
      - [Add your own custom workflows here]
    ```typescript:lib/workflows/basic_workflow.ts
-   startLine: 125
-   endLine: 203
    ```
 
 5. **OpenAI Integration** (`lib/services/openai.ts`)
@@ -179,8 +171,6 @@ When a message arrives through the webhook, here's the complete flow through the
    - Analyzes message intent
    - Creates email drafts
    ```typescript:lib/services/openai.ts
-   startLine: 22
-   endLine: 53
    ```
 
 Each component can be customized to modify the bot's behavior:
