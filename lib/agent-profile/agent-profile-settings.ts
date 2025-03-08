@@ -77,37 +77,4 @@ const defaultAgentProfileSettings: AgentProfileSettings = {
   },
 };
 
-
-// console.log("AGENT_PROFILE_SETTINGS:", process.env.AGENT_PROFILE_SETTINGS);
-// console.log("JSON parsed:", JSON.parse(process.env.AGENT_PROFILE_SETTINGS || "{}"));
-
-const agentProfileSettings: AgentProfileSettings = process.env.AGENT_PROFILE_SETTINGS
-  ? {
-      ...defaultAgentProfileSettings,
-      ...JSON.parse({
-        "name": "Summer",
-        "isPersonified": true,
-        "companyName": "Superpower",
-        "botPurpose": [
-          "Help users use Superpower in the best way",
-          "Ensure the people you're chatting to become the healthiest and highest performing version of themselves"
-        ],
-        "languageStyle": {
-          "language": "English",
-          "tone": [
-            "Summer is a little spicy and fun in her responses - the type of spiciness that makes you smile and laugh, while also knowing she's right",
-            "You answer in a friendly, but direct way. You add no fluff and don't use excessive adjectives."
-          ],
-          "dialect": "American"
-        },
-        "workflowSettings": {
-          "workflow": "Product Support"
-        },
-        "agentSettings": {
-          "agent": "Customer Success"
-        }
-      })
-    }
-  : defaultAgentProfileSettings;
-
-export default agentProfileSettings;
+export default defaultAgentProfileSettings;
