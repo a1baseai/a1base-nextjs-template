@@ -4,7 +4,8 @@ import { ArrowRight, Github, Download, MessageSquare, Share2, ChevronRight, Aler
 
 export default function Home() {
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 sm:p-20 font-[family-name:var(--font-geist-sans)]">
+    <>
+    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 sm:p-20 font-[font-family:var(--font-geist-sans)]">
       <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
         <Image
           className="dark:invert"
@@ -129,7 +130,7 @@ export default function Home() {
               <div className="ml-0 sm:ml-16">
                 <h2 className="text-2xl font-semibold">Update the name & personality of your AI agent</h2>
                 <p className="text-gray-600 dark:text-gray-300">
-                  Get your first AI agent running in minutes
+                  Customize your AI agent's identity and behavior
                 </p>
               </div>
             </div>
@@ -137,27 +138,16 @@ export default function Home() {
               <div className="p-6 rounded-xl bg-white dark:bg-black/20 border border-black/[.08] dark:border-white/[.08] shadow-lg">
                 <div className="flex flex-col gap-3">
                   <p className="text-sm text-gray-600 dark:text-gray-300">
-                    {`Get your first AI agent running in minutes:`}
+                    {`Personalize your AI agent by editing the profile settings:`}
                   </p>
                   <ul className="list-disc list-inside text-sm space-y-2">
-                    <li>{`Clone this repository`}</li>
-                    <li>{`Configure your .env file`}</li>
-                    <li>{`Run npm install && npm run dev`}</li>
-                    <li>{`Visit http://localhost:3000`}</li>
-                    <li>{`Set up webhooks using Ngrok for local testing`}</li>
+                    <li>{`Navigate to lib/agent-profile/agent-profile-settings.ts`}</li>
+                    <li>{`Update the agent's name, role, and company information`}</li>
+                    <li>{`Customize the bot's purpose and objectives`}</li>
+                    <li>{`Adjust language style, tone, and communication preferences`}</li>
+                    <li>{`Configure workflow and agent behavior settings`}</li>
                   </ul>
-                  <div className="mt-4 bg-slate-50 dark:bg-black/30 p-4 rounded-lg">
-                    <p className="text-sm font-medium mb-2">Quick command reference:</p>
-                    <pre className="bg-slate-900 text-white p-3 rounded-md text-sm overflow-x-auto">
-                      git clone https://github.com/a1base/a1framework.git my-ai-agent
-                      <br />
-                      cd my-ai-agent
-                      <br />
-                      npm install
-                      <br />
-                      npm run dev
-                    </pre>
-                  </div>
+
                 </div>
               </div>
             </div>
@@ -178,7 +168,7 @@ export default function Home() {
             </div>
             <div className="ml-0 sm:ml-16">
               <div className="p-6 rounded-xl bg-white dark:bg-black/20 border border-black/[.08] dark:border-white/[.08] shadow-lg">
-                <ol className="list-inside list-decimal text-sm space-y-3 font-[family-name:var(--font-geist-mono)]">
+                <ol className="list-inside list-decimal text-sm space-y-3 font-[font-family:var(--font-geist-mono)]">
                   <li>
                     {`Customize your agent by editing `}
                     <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
@@ -390,5 +380,6 @@ export default function Home() {
       </main>
 
     </div>
+    </>
   );
 }

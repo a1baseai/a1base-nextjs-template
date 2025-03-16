@@ -1,17 +1,13 @@
 /**
- * This file contains the base information and context that will be provided to the AI agent.
- * You can add multiple layers of information here to give your agent the context it needs
- * to be effective from day one.
- *
- * These settings can be configured via environment variables using AGENT_BASE_INFORMATION.
- * If no environment variable is provided, it falls back to default settings.
+ * Agent Base Information
+ * 
+ * Provides context about the company and its services to the AI agent.
+ * Contains information that helps the agent respond accurately to user queries.
+ * 
+ * Configuration: Set via AGENT_BASE_INFORMATION environment variable or falls back to defaults.
  */
 
-interface InformationSection {
-  title: string;
-  content: string;
-  priority: number;
-}
+import { InformationSection } from './types';
 
 const defaultBaseInformation: InformationSection[] = [
   {
@@ -98,8 +94,9 @@ const baseInformation: InformationSection[] = process.env.AGENT_BASE_INFORMATION
   : defaultBaseInformation;
 
 /**
- * Formats the information sections into a single string, with higher priority
- * sections appearing first and with more emphasis.
+ * Returns all base information as formatted text
+ * 
+ * @returns Formatted string with all information sections, ordered by priority
  */
 export function getFormattedInformation(): string {
   const sortedSections = [...baseInformation].sort(
