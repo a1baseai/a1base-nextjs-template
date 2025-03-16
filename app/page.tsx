@@ -1,133 +1,394 @@
 import Image from "next/image";
 import Link from "next/link";
+import { ArrowRight, Github, Download, MessageSquare, Share2, ChevronRight, AlertTriangle } from "lucide-react";
+
 export default function Home() {
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
+    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 sm:p-20 font-[family-name:var(--font-geist-sans)]">
       <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
         <Image
           className="dark:invert"
           src="/a1base-black.png"
-          alt="A1Base logo"
+          alt="A1Framework logo"
           width={180}
           height={38}
           priority
         />
-        <p className="text-lg text-center sm:text-left">
-          {`Template A1 Agent that can communicate across WhatsApp, Email, Slack, Teams, and SMS.`}
-        </p>
-
-        <div className="flex gap-4">
-          {process.env.A1BASE_AGENT_NUMBER && (
-            <a
-              href={`https://wa.me/${process.env.A1BASE_AGENT_NUMBER.replace(
-                "+",
-                ""
-              )}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="rounded-lg px-6 py-3 bg-[#25D366] hover:bg-[#128C7E] text-white flex items-center gap-2 transition-colors"
-            >
-              {`Chat with your agent on WhatApp`}
-            </a>
-          )}
-          <Link
-            href="/chat"
-            className="rounded-lg px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2 transition-colors"
-          >
-            {`Chat with your agent on Web`}
-          </Link>
+        <div>
+          <h1 className="text-3xl font-bold text-center sm:text-left">
+            {`Welcome to A1Framework`}
+          </h1>
+          <p className="text-lg text-center sm:text-left">
+            {`Quickly build a conversational AI Agent that people love to work with.`}
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 w-full max-w-4xl">
-          <div className="p-6 rounded-xl bg-white dark:bg-black/20 border border-black/[.08] dark:border-white/[.08] shadow-lg">
-            <h2 className="text-xl font-semibold mb-4">{`Create your A1Base Account`}</h2>
-            <div className="flex flex-col gap-3">
-              <p className="text-sm text-gray-600 dark:text-gray-300">
-                {`Build your own AI agent in minutes:`}
-              </p>
-              <ul className="list-disc list-inside text-sm space-y-2">
-                <li>{`Choose your agent's personality`}</li>
-                <li>{`Define custom behaviors`}</li>
-                <li>{`Set up communication channels`}</li>
-                <li>{`Deploy and start chatting`}</li>
-              </ul>
+        {/* Environment Setup Alert */}
+        {(!process.env.OPENAI_API_KEY || !process.env.A1BASE_API_KEY) && (
+          <div className="w-full max-w-4xl p-4 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-700">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+              <div>
+                <h3 className="font-semibold text-amber-800 dark:text-amber-300">Environment Setup Required</h3>
+                <p className="text-sm text-amber-700 dark:text-amber-400 mt-1">
+                  {!process.env.OPENAI_API_KEY && (
+                    <span className="block mb-1">• Please add your <code className="bg-amber-100 dark:bg-amber-800/40 px-1 py-0.5 rounded">OPENAI_API_KEY</code> to your .env file.</span>
+                  )}
+                  {!process.env.A1BASE_API_KEY && (
+                    <span className="block mb-1">• (Optional) A1BASE API keys are required for full functionality.</span>
+                  )}
+                  {!process.env.A1BASE_AGENT_NUMBER && (
+                    <span className="block mb-1">• (Optional) Configure your agent's phone number for WhatsApp integration.</span>
+                  )}
+                </p>
+                <div className="mt-2">
+                  <Link 
+                    href="/setup-guide" 
+                    className="text-sm text-amber-800 dark:text-amber-300 font-medium flex items-center gap-1 hover:underline"
+                  >
+                    View setup guide
+                    <ChevronRight className="h-4 w-4" />
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Timeline Container */}
+        <div className="relative w-full max-w-4xl">
+          {/* Timeline Line */}
+          <div className="absolute left-6 top-10 bottom-0 w-0.5 bg-gray-200 hidden sm:block"></div>
+
+          {/* Section 1: Try your AI Assistant */}
+          <div className="mb-16 relative">
+            <div className="flex flex-col mb-6">
+              <div className="absolute left-0 w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-xl z-10 hidden sm:flex">
+                1
+              </div>
+              <h2 className="text-2xl font-semibold ml-0 sm:ml-16">Try Your AI Assistant</h2>
+              <p className="ml-0 sm:ml-16 text-gray-600 dark:text-gray-300">Experience the demo or start building your own AI agent</p>
+            </div>
+            <div className="ml-0 sm:ml-16">
+              <div className="flex gap-4 flex-wrap justify-center sm:justify-start">
+                {process.env.A1BASE_AGENT_NUMBER && (
+                  <a
+                    href={`https://wa.me/${process.env.A1BASE_AGENT_NUMBER.replace(
+                      "+",
+                      ""
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-lg px-6 py-3 bg-gradient-to-r from-[#25D366] to-[#128C7E] hover:shadow-lg text-white flex items-center gap-2 transition-all transform hover:-translate-y-1"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M3 21l1.65-3.8a9 9 0 1 1 3.4 2.9L3 21" />
+                    </svg>
+                    {`Experience the Demo on WhatsApp`}
+                  </a>
+                )}
+                <Link
+                  href="/chat"
+                  className="rounded-lg px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-800 hover:shadow-lg text-white flex items-center gap-2 transition-all transform hover:-translate-y-1"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                  </svg>
+                  {`Try Your AI Assistant Now`}
+                </Link>
+              </div>
             </div>
           </div>
 
-          <div className="p-6 rounded-xl bg-white dark:bg-black/20 border border-black/[.08] dark:border-white/[.08] shadow-lg col-span-2">
-            <h2 className="text-xl font-semibold mb-4">{`Getting Started`}</h2>
-            <ol className="list-inside list-decimal text-sm space-y-3 font-[family-name:var(--font-geist-mono)]">
-              <li>{`Update your env variables`}</li>
-              <li>
-                {`Get started by editing `}
-                <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-                  {`lib/agent/prompts.ts`}
-                </code>
-                {`.`}
-              </li>
-              <li>{`Update your webhook URL in the A1Base dashboard. Use Ngrok to test locally.`}</li>
-            </ol>
+          {/* Section 2: Quick Start */}
+          <div className="mb-16 relative">
+            <div className="flex items-center mb-6">
+              <div className="absolute left-0 w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-xl z-10 hidden sm:flex">
+                2
+              </div>
+              <div className="ml-0 sm:ml-16">
+                <h2 className="text-2xl font-semibold">Update the name & personality of your AI agent</h2>
+                <p className="text-gray-600 dark:text-gray-300">
+                  Get your first AI agent running in minutes
+                </p>
+              </div>
+            </div>
+            <div className="ml-0 sm:ml-16">
+              <div className="p-6 rounded-xl bg-white dark:bg-black/20 border border-black/[.08] dark:border-white/[.08] shadow-lg">
+                <div className="flex flex-col gap-3">
+                  <p className="text-sm text-gray-600 dark:text-gray-300">
+                    {`Get your first AI agent running in minutes:`}
+                  </p>
+                  <ul className="list-disc list-inside text-sm space-y-2">
+                    <li>{`Clone this repository`}</li>
+                    <li>{`Configure your .env file`}</li>
+                    <li>{`Run npm install && npm run dev`}</li>
+                    <li>{`Visit http://localhost:3000`}</li>
+                    <li>{`Set up webhooks using Ngrok for local testing`}</li>
+                  </ul>
+                  <div className="mt-4 bg-slate-50 dark:bg-black/30 p-4 rounded-lg">
+                    <p className="text-sm font-medium mb-2">Quick command reference:</p>
+                    <pre className="bg-slate-900 text-white p-3 rounded-md text-sm overflow-x-auto">
+                      git clone https://github.com/a1base/a1framework.git my-ai-agent
+                      <br />
+                      cd my-ai-agent
+                      <br />
+                      npm install
+                      <br />
+                      npm run dev
+                    </pre>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 3: Next Steps */}
+          <div className="mb-16 relative">
+            <div className="flex items-center mb-6">
+              <div className="absolute left-0 w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-xl z-10 hidden sm:flex">
+                3
+              </div>
+              <div className="ml-0 sm:ml-16">
+                <h2 className="text-2xl font-semibold">Next Steps</h2>
+                <p className="text-gray-600 dark:text-gray-300">
+                  Customize and deploy your AI agent
+                </p>
+              </div>
+            </div>
+            <div className="ml-0 sm:ml-16">
+              <div className="p-6 rounded-xl bg-white dark:bg-black/20 border border-black/[.08] dark:border-white/[.08] shadow-lg">
+                <ol className="list-inside list-decimal text-sm space-y-3 font-[family-name:var(--font-geist-mono)]">
+                  <li>
+                    {`Customize your agent by editing `}
+                    <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
+                      {`lib/agent/prompts.ts`}
+                    </code>
+                  </li>
+                  <li>
+                    {`Configure communication channels in your `}
+                    <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
+                      {`.env`}
+                    </code>
+                    {` file`}
+                  </li>
+                  <li>{`Set up webhooks using Ngrok for local testing`}</li>
+                  <li>{`Deploy to Vercel or your preferred hosting platform`}</li>
+                  <li>{`Connect to additional services like databases or APIs`}</li>
+                  <li>{`Implement custom features for your specific use case`}</li>
+                </ol>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 4: GitHub Stars */}
+          <div className="mb-16 relative">
+            <div className="flex items-center mb-6">
+              <div className="absolute left-0 w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-xl z-10 hidden sm:flex">
+                4
+              </div>
+              <div className="ml-0 sm:ml-16">
+                <h2 className="text-2xl font-semibold">Support the Project</h2>
+                <p className="text-gray-600 dark:text-gray-300">
+                  Help us grow by starring the repository
+                </p>
+              </div>
+            </div>
+            <div className="ml-0 sm:ml-16">
+              <div className="p-6 rounded-xl bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 border border-black/[.08] dark:border-white/[.08] shadow-lg">
+                <div className="flex flex-col items-center text-center">
+                  <Github className="h-12 w-12 mb-4 text-blue-600 dark:text-blue-400" />
+                  <h3 className="text-xl font-semibold mb-2">Star us on GitHub</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
+                    If you find A1Framework helpful, please consider giving us a star on GitHub. It helps us reach more developers!
+                  </p>
+                  <a
+                    href="https://github.com/a1base/a1framework"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-lg px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-800 hover:shadow-lg text-white flex items-center gap-2 transition-all transform hover:-translate-y-1"
+                  >
+                    <Github className="h-5 w-5" />
+                    Star on GitHub
+                  </a>
+                  
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 5: Resources */}
+          <div className="relative">
+            <div className="flex items-center mb-6">
+              <div className="absolute left-0 w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-xl z-10 hidden sm:flex">
+                5
+              </div>
+              <div className="ml-0 sm:ml-16">
+                <h2 className="text-2xl font-semibold">Resources</h2>
+                <p className="text-gray-600 dark:text-gray-300">
+                  Helpful links and documentation
+                </p>
+              </div>
+            </div>
+            <div className="ml-0 sm:ml-16">
+              <div className="p-6 rounded-xl bg-white dark:bg-black/20 border border-black/[.08] dark:border-white/[.08] shadow-lg">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <a
+                    href="https://docs.a1base.com/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-3 rounded-lg border border-black/[.08] dark:border-white/[.08] hover:bg-gray-50 dark:hover:bg-black/30 transition-colors flex items-center gap-3"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="text-blue-600 dark:text-blue-400"
+                    >
+                      <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+                      <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+                    </svg>
+                    <span>Documentation</span>
+                  </a>
+                  <a
+                    href="https://github.com/a1base/a1framework"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-3 rounded-lg border border-black/[.08] dark:border-white/[.08] hover:bg-gray-50 dark:hover:bg-black/30 transition-colors flex items-center gap-3"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="text-blue-600 dark:text-blue-400"
+                    >
+                      <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
+                    </svg>
+                    <span>GitHub Repository</span>
+                  </a>
+                  <a
+                    href="https://discord.gg/a1framework"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-3 rounded-lg border border-black/[.08] dark:border-white/[.08] hover:bg-gray-50 dark:hover:bg-black/30 transition-colors flex items-center gap-3"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="text-blue-600 dark:text-blue-400"
+                    >
+                      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                      <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                    </svg>
+                    <span>Community Discord</span>
+                  </a>
+                  <a
+                    href="https://www.a1base.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-3 rounded-lg border border-black/[.08] dark:border-white/[.08] hover:bg-gray-50 dark:hover:bg-black/30 transition-colors flex items-center gap-3"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="text-blue-600 dark:text-blue-400"
+                    >
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <line x1="2" y1="12" x2="22" y2="12"></line>
+                      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                    </svg>
+                    <span>A1Base Website</span>
+                  </a>
+                </div>
+                
+                {/* Additional resources section */}
+                <div className="mt-6 bg-slate-50 dark:bg-black/30 p-4 rounded-lg">
+                  <h3 className="font-semibold mb-2">Additional Resources</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <a
+                      href="/tutorials"
+                      className="text-blue-600 hover:underline flex items-center gap-1 text-sm"
+                    >
+                      <ArrowRight className="h-4 w-4" />
+                      <span>Video Tutorials</span>
+                    </a>
+                    <a
+                      href="/examples"
+                      className="text-blue-600 hover:underline flex items-center gap-1 text-sm"
+                    >
+                      <ArrowRight className="h-4 w-4" />
+                      <span>Example Projects</span>
+                    </a>
+                    <a
+                      href="/blog"
+                      className="text-blue-600 hover:underline flex items-center gap-1 text-sm"
+                    >
+                      <ArrowRight className="h-4 w-4" />
+                      <span>Blog & Updates</span>
+                    </a>
+                    <a
+                      href="/faq"
+                      className="text-blue-600 hover:underline flex items-center gap-1 text-sm"
+                    >
+                      <ArrowRight className="h-4 w-4" />
+                      <span>FAQ</span>
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://docs.a1base.com/"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            {`Read A1Base docs`}
-          </a>
-        </div>
+
       </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          {`Learn`}
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          {`Examples`}
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://www.a1base.com"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          {`Go to a1base.com →`}
-        </a>
-      </footer>
+
     </div>
   );
 }
