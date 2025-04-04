@@ -1,6 +1,12 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Github, Download, MessageSquare, Share2, ChevronRight, AlertTriangle } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export default function Home() {
   return (
@@ -72,32 +78,43 @@ export default function Home() {
             </div>
             <div className="ml-0 sm:ml-16">
               <div className="flex gap-4 flex-wrap justify-center sm:justify-start">
-                {process.env.A1BASE_AGENT_NUMBER && (
-                  <a
-                    href={`https://wa.me/${process.env.A1BASE_AGENT_NUMBER.replace(
-                      "+",
-                      ""
-                    )}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="rounded-lg px-6 py-3 bg-gradient-to-r from-[#25D366] to-[#128C7E] hover:shadow-lg text-white flex items-center gap-2 transition-all transform hover:-translate-y-1"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="20"
-                      height="20"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M3 21l1.65-3.8a9 9 0 1 1 3.4 2.9L3 21" />
-                    </svg>
-                    {`Experience the Demo on WhatsApp`}
-                  </a>
-                )}
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <a
+                        href={process.env.A1BASE_AGENT_NUMBER ? `https://wa.me/${process.env.A1BASE_AGENT_NUMBER.replace("+", "")}` : "#"}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => !process.env.A1BASE_AGENT_NUMBER && e.preventDefault()}
+                        className={`rounded-lg px-6 py-3 bg-gradient-to-r from-[#25D366] to-[#128C7E] text-white flex items-center gap-2 transition-all ${
+                          process.env.A1BASE_AGENT_NUMBER 
+                            ? "hover:shadow-lg transform hover:-translate-y-1" 
+                            : "opacity-70 cursor-not-allowed"
+                        }`}
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="20"
+                          height="20"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M3 21l1.65-3.8a9 9 0 1 1 3.4 2.9L3 21" />
+                        </svg>
+                        {`Experience the Demo on WhatsApp`}
+                      </a>
+                    </TooltipTrigger>
+                    {!process.env.A1BASE_AGENT_NUMBER && (
+                      <TooltipContent className="bg-slate-800 text-white">
+                        <p>Get the Pro Plan at <a href="https://www.a1base.com" className="underline" target="_blank" rel="noopener noreferrer">a1base.com</a> for WhatsApp integration</p>
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
+                </TooltipProvider>
                 <Link
                   href="/chat"
                   className="rounded-lg px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-800 hover:shadow-lg text-white flex items-center gap-2 transition-all transform hover:-translate-y-1"
