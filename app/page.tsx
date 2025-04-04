@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Github, Download, MessageSquare, Share2, ChevronRight, AlertTriangle } from "lucide-react";
+import { WhatsAppButton } from "@/components/whatsapp-button-simple";
 
 export default function Home() {
   return (
@@ -72,32 +73,7 @@ export default function Home() {
             </div>
             <div className="ml-0 sm:ml-16">
               <div className="flex gap-4 flex-wrap justify-center sm:justify-start">
-                {process.env.A1BASE_AGENT_NUMBER && (
-                  <a
-                    href={`https://wa.me/${process.env.A1BASE_AGENT_NUMBER.replace(
-                      "+",
-                      ""
-                    )}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="rounded-lg px-6 py-3 bg-gradient-to-r from-[#25D366] to-[#128C7E] hover:shadow-lg text-white flex items-center gap-2 transition-all transform hover:-translate-y-1"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="20"
-                      height="20"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M3 21l1.65-3.8a9 9 0 1 1 3.4 2.9L3 21" />
-                    </svg>
-                    {`Experience the Demo on WhatsApp`}
-                  </a>
-                )}
+                <WhatsAppButton agentNumber={process.env.A1BASE_AGENT_NUMBER} />
                 <Link
                   href="/chat"
                   className="rounded-lg px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-800 hover:shadow-lg text-white flex items-center gap-2 transition-all transform hover:-translate-y-1"
