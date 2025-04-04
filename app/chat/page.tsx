@@ -7,7 +7,7 @@ import { Thread } from "@/components/assistant-ui/thread";
 import { ThreadList } from "@/components/assistant-ui/thread-list";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import { PhoneIcon, MessageSquareIcon, Mail } from "lucide-react";
+import { PhoneIcon, MessageSquareIcon, Mail, AlertTriangle, ChevronRight } from "lucide-react";
 
 import {
   Tooltip,
@@ -294,6 +294,33 @@ const DayLayout = () => {
           </aside>
           <main className="flex-1 flex flex-col">
             <ChatTopInfo />
+            {(!process.env.OPENAI_API_KEY || !process.env.A1BASE_API_KEY) && (
+              <div className="w-full max-w-4xl p-4 m-4 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-700">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <h3 className="font-semibold text-amber-800 dark:text-amber-300">Environment Setup Required</h3>
+                    <p className="text-sm text-amber-700 dark:text-amber-400 mt-1">
+                      {!process.env.OPENAI_API_KEY && (
+                        <span className="block mb-1">• Please add your <code className="bg-amber-100 dark:bg-amber-800/40 px-1 py-0.5 rounded">OPENAI_API_KEY</code> to your .env file.</span>
+                      )}
+                      {!process.env.A1BASE_API_KEY && (
+                        <span className="block mb-1">• Please add your <code className="bg-amber-100 dark:bg-amber-800/40 px-1 py-0.5 rounded">A1BASE_API_KEY</code> to your .env file.</span>
+                      )}
+                    </p>
+                    <div className="mt-2">
+                      <Link 
+                        href="/setup-guide" 
+                        className="text-sm text-amber-800 dark:text-amber-300 font-medium flex items-center gap-1 hover:underline"
+                      >
+                        View setup guide
+                        <ChevronRight className="h-4 w-4" />
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="flex-1 overflow-auto p-2">
               <Thread />
             </div>
