@@ -191,11 +191,56 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Section 4: GitHub Stars */}
+          {/* Section 4: Try A1Mail */}
           <div className="mb-16 relative">
             <div className="flex items-center mb-6">
               <div className="absolute left-0 w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-xl z-10 hidden sm:flex">
                 4
+              </div>
+              <div className="ml-0 sm:ml-16">
+                <h2 className="text-2xl font-semibold">Try A1Mail</h2>
+                <p className="text-gray-600 dark:text-gray-300">
+                  Integrate email capabilities into your AI agent
+                </p>
+              </div>
+            </div>
+            <div className="ml-0 sm:ml-16">
+              <div className="p-6 rounded-xl bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 border border-black/[.08] dark:border-white/[.08] shadow-lg">
+                <div className="flex flex-col items-start">
+                  <h3 className="text-xl font-semibold mb-2">Email Integration</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
+                    Give your AI agent the ability to send and receive emails. A1Mail provides dedicated email addresses and simple APIs for email communication.
+                  </p>
+                  <div className="bg-white dark:bg-black/30 p-4 rounded-lg w-full mb-4">
+                    <pre className="text-xs overflow-x-auto"><code>{`// Create an email address for your agent
+await CreateEmailAddress("your-agent", "a1send.com");
+
+const { subject, body } = await ConstructEmail(threadMessages);
+await SendEmailFromAgent({
+  subject,
+  body,
+  recipient_address: "recipient@example.com"
+});`}</code></pre>
+                  </div>
+                  <a
+                    href="https://docs.a1base.com/email"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-lg px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:shadow-lg text-white flex items-center gap-2 transition-all transform hover:-translate-y-1 text-sm"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                    View A1Mail Documentation
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 5: GitHub Stars */}
+          <div className="mb-16 relative">
+            <div className="flex items-center mb-6">
+              <div className="absolute left-0 w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-xl z-10 hidden sm:flex">
+                5
               </div>
               <div className="ml-0 sm:ml-16">
                 <h2 className="text-2xl font-semibold">Support the Project</h2>
@@ -227,11 +272,11 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Section 5: Resources */}
+          {/* Section 6: Resources */}
           <div className="relative">
             <div className="flex items-center mb-6">
               <div className="absolute left-0 w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-xl z-10 hidden sm:flex">
-                5
+                6
               </div>
               <div className="ml-0 sm:ml-16">
                 <h2 className="text-2xl font-semibold">Resources</h2>

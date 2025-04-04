@@ -201,6 +201,93 @@ export async function DefaultReplyToMessage(
   }
 }
 
+// ===================================================
+
+/**
+ * Constructs an email draft from the conversation thread
+ * @param threadMessages - Array of messages in the thread
+ * @returns Constructed email with subject and body
+ */
+export async function ConstructEmail(
+  threadMessages: ThreadMessage[]
+): Promise<{ subject: string; body: string }> {
+  console.log("Workflow Start [ConstructEmail]");
+
+  try {
+    const response = await generateAgentResponse(
+      threadMessages,
+      basicWorkflowsPrompt.email_draft.user
+    );
+
+    const emailParts = response.split("---");
+    const subject = emailParts[0]?.trim() || "Email from A1Base Agent";
+    const body = emailParts[1]?.trim() || response;
+
+    return { subject, body };
+  } catch (error) {
+    console.error("[ConstructEmail] Error:", error);
+    throw error;
+  }
+}
+
+/**
+ * Sends an email from the agent
+ * @param emailDetails - Email subject, body, and recipient info
+ * @returns Confirmation of email sent
+ */
+export async function SendEmailFromAgent(
+  emailDetails: {
+    subject: string;
+    body: string;
+    recipient_address: string;
+  }
+): Promise<string> {
+  console.log("Workflow Start [SendEmailFromAgent]");
+
+  try {
+    const emailData = {
+      sender_address: process.env.A1BASE_AGENT_EMAIL!,
+      recipient_address: emailDetails.recipient_address,
+      subject: emailDetails.subject,
+      body: emailDetails.body
+    };
+
+    await client.sendEmailMessage(process.env.A1BASE_ACCOUNT_ID!, emailData);
+    
+    return "Email sent successfully";
+  } catch (error) {
+    console.error("[SendEmailFromAgent] Error:", error);
+    throw error;
+  }
+}
+
+/**
+ * Creates a new email address for the agent
+ * @param emailAddress - The email address to create (without domain)
+ * @param domain - The domain for the email address (default: a1send.com)
+ * @returns Confirmation of email creation
+ */
+export async function CreateEmailAddress(
+  emailAddress: string,
+  domain: string = "a1send.com"
+): Promise<string> {
+  console.log("Workflow Start [CreateEmailAddress]");
+
+  try {
+    const emailData = {
+      address: emailAddress,
+      domain_name: domain
+    };
+
+    await client.createEmailAddress(process.env.A1BASE_ACCOUNT_ID!, emailData);
+    
+    return `Email address ${emailAddress}@${domain} created successfully`;
+  } catch (error) {
+    console.error("[CreateEmailAddress] Error:", error);
+    throw error;
+  }
+}
+
 // ====== CUSTOM WORKFLOW INTEGRATION GUIDE =======
 // To add new workflows that connect to your app's API/backend:
 

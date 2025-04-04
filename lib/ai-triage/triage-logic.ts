@@ -3,8 +3,18 @@ import { getInitializedAdapter } from "../supabase/config";
 import {
   DefaultReplyToMessage,
   verifyAgentIdentity,
+  ConstructEmail,
+  SendEmailFromAgent,
 } from "../workflows/basic_workflow";
 import { triageMessageIntent } from "../services/openai";
+import { A1BaseAPI } from "a1base-node";
+
+const client = new A1BaseAPI({
+  credentials: {
+    apiKey: process.env.A1BASE_API_KEY!,
+    apiSecret: process.env.A1BASE_API_SECRET!,
+  },
+});
 
 type MessageRecord = {
   message_id: string;
@@ -57,10 +67,10 @@ type TriageParams = {
 };
 
 type TriageResult = {
-  type: "identity" | "default";
+  type: "identity" | "default" | "email";
   success: boolean;
   message?: string;
-  data?: string[];
+  data?: string[] | { subject?: string; body?: string };
 };
 
 // ======================== MAIN TRIAGE LOGIC ========================
@@ -147,6 +157,36 @@ export async function triageMessage({
           success: true,
           message: identityMessages.join("\n"),
           data: identityMessages,
+        };
+
+      case "handleEmailAction":
+        console.log("Running Email Workflow");
+        
+        const emailData = await ConstructEmail(messages);
+
+        if (service === "web-ui") {
+          return {
+            type: "email",
+            success: true,
+            message: `Email drafted with subject: ${emailData.subject}`,
+            data: emailData
+          };
+        }
+
+        const emailConfirmation = `I've prepared an email with the subject "${emailData.subject}". Would you like me to send it?`;
+        
+        await client.sendIndividualMessage(process.env.A1BASE_ACCOUNT_ID!, {
+          content: emailConfirmation,
+          from: process.env.A1BASE_AGENT_NUMBER!,
+          to: sender_number,
+          service: "whatsapp"
+        });
+
+        return {
+          type: "email",
+          success: true,
+          message: emailConfirmation,
+          data: emailData
         };
 
       case "simpleResponse":
