@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Github, Download, MessageSquare, Share2, ChevronRight, AlertTriangle } from "lucide-react";
-import { WhatsAppButton } from "@/components/whatsapp-button-simple";
+import { WhatsAppButton } from "@/components/whatsapp-button";
 
 export default function Home() {
   return (
