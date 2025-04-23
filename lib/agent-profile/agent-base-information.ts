@@ -1,15 +1,21 @@
 /**
  * Agent Base Information
  * 
- * Provides context about the company and its services to the AI agent.
- * Contains information that helps the agent respond accurately to user queries.
+ * Provides context about the company, product, and team to the AI agent.
  * 
- * Configuration: Set via AGENT_BASE_INFORMATION environment variable or falls back to defaults.
+ * Configuration can come from:
+ * 1. Server-side file storage (if editing via the profile editor UI)
+ * 2. Browser localStorage (as fallback if file storage is unavailable)
+ * 3. AGENT_BASE_INFORMATION environment variable
+ * 4. Default settings if none of the above are available
  */
 
 import { InformationSection } from './types';
+import { loadFromLocalStorage, LOCAL_STORAGE_KEYS } from '../storage/local-storage';
+import { loadBaseInformation } from '../storage/file-storage';
 
-const defaultBaseInformation: InformationSection[] = [
+// Default information that will be used if no custom information is found
+export const defaultBaseInformation: InformationSection[] = [
   {
     title: "Company Overview",
     content: `A1Base is the human-facing communication, trust, and identity layer for AI agents. Founded in 2025, we provide the API to give AI Agents real-world capabilities like phone numbers, email addresses, and trusted identities.
@@ -88,10 +94,80 @@ Connect with us:
   }
 ];
 
-// Parse environment variable if available, otherwise use default settings
-const baseInformation: InformationSection[] = process.env.AGENT_BASE_INFORMATION
-  ? JSON.parse(process.env.AGENT_BASE_INFORMATION)
-  : defaultBaseInformation;
+/**
+ * Get the current agent base information with fallback chain:
+ * 1. Server-side file storage
+ * 2. Browser localStorage
+ * 3. Environment variable
+ * 4. Default information
+ */
+const getAgentBaseInformation = async (): Promise<InformationSection[]> => {
+  // First try to load from file storage via API
+  try {
+    const fileInfo = await loadBaseInformation();
+    if (fileInfo) {
+      return fileInfo;
+    }
+  } catch (error) {
+    console.warn('Error loading base information from API:', error);
+    // Continue to next method if API fails
+  }
+  
+  // Next try to load from localStorage (browser only)
+  if (typeof window !== 'undefined') {
+    const localStorageInfo = loadFromLocalStorage<InformationSection[]>(LOCAL_STORAGE_KEYS.AGENT_INFORMATION);
+    if (localStorageInfo) {
+      return localStorageInfo;
+    }
+  }
+  
+  // Next try environment variable
+  if (process.env.AGENT_BASE_INFORMATION) {
+    try {
+      return JSON.parse(process.env.AGENT_BASE_INFORMATION);
+    } catch (error) {
+      console.warn('Error parsing AGENT_BASE_INFORMATION env variable:', error);
+      // Continue to defaults if parsing fails
+    }
+  }
+  
+  // Fall back to default information
+  return defaultBaseInformation;
+};
+
+/**
+ * Synchronous version for use in contexts where async is not possible
+ * This only checks localStorage and defaults, not file storage
+ */
+const getAgentBaseInformationSync = (): InformationSection[] => {
+  // Try to load from localStorage (browser only)
+  if (typeof window !== 'undefined') {
+    const localStorageInfo = loadFromLocalStorage<InformationSection[]>(LOCAL_STORAGE_KEYS.AGENT_INFORMATION);
+    if (localStorageInfo) {
+      return localStorageInfo;
+    }
+  }
+  
+  // Next try environment variable
+  if (process.env.AGENT_BASE_INFORMATION) {
+    try {
+      return JSON.parse(process.env.AGENT_BASE_INFORMATION);
+    } catch (error) {
+      // Continue to defaults if parsing fails
+    }
+  }
+  
+  // Fall back to default information
+  return defaultBaseInformation;
+};
+
+// Export the sync version of information for immediate use
+// This might not have the file storage data, but components can fetch that separately if needed
+const agentBaseInformation = getAgentBaseInformationSync();
+export default agentBaseInformation;
+
+// Also export the async getter for components that can wait for the file data
+export { getAgentBaseInformation };
 
 /**
  * Returns all base information as formatted text
@@ -99,7 +175,7 @@ const baseInformation: InformationSection[] = process.env.AGENT_BASE_INFORMATION
  * @returns Formatted string with all information sections, ordered by priority
  */
 export function getFormattedInformation(): string {
-  const sortedSections = [...baseInformation].sort(
+  const sortedSections = [...agentBaseInformation].sort(
     (a, b) => b.priority - a.priority
   );
 
@@ -112,5 +188,3 @@ ${section.content}
     )
     .join("\n");
 }
-
-export default baseInformation;

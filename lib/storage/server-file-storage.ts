@@ -1,0 +1,114 @@
+/**
+ * Server-only file storage utilities
+ * 
+ * IMPORTANT: This file should only be imported by server components or API routes.
+ * It contains direct file system access which is not supported in client components.
+ */
+
+import fs from 'fs';
+import path from 'path';
+import { AgentProfileSettings, InformationSection } from '../agent-profile/types';
+
+// Mark this file as server-only to prevent client-side imports
+import { headers } from 'next/headers';
+
+// Make sure this module is only used server-side
+headers();
+
+// Directory where profile data will be stored
+const DATA_DIR = path.join(process.cwd(), 'data');
+
+// File paths for different types of data
+const PROFILE_SETTINGS_FILE = path.join(DATA_DIR, 'profile-settings.json');
+const BASE_INFORMATION_FILE = path.join(DATA_DIR, 'base-information.json');
+
+/**
+ * Initialize the data directory if it doesn't exist
+ */
+export const initializeDataDirectory = (): void => {
+  if (!fs.existsSync(DATA_DIR)) {
+    try {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    } catch (error) {
+      console.error('Error creating data directory:', error);
+    }
+  }
+};
+
+/**
+ * Save agent profile settings to file
+ * 
+ * @param settings AgentProfileSettings object to save
+ * @returns Promise that resolves when the file is written
+ */
+export const saveProfileSettingsToFile = async (settings: AgentProfileSettings): Promise<void> => {
+  initializeDataDirectory();
+  
+  try {
+    await fs.promises.writeFile(
+      PROFILE_SETTINGS_FILE, 
+      JSON.stringify(settings, null, 2)
+    );
+  } catch (error) {
+    console.error('Error saving profile settings to file:', error);
+    throw error;
+  }
+};
+
+/**
+ * Load agent profile settings from file
+ * 
+ * @returns Promise that resolves with the settings or null if not found
+ */
+export const loadProfileSettingsFromFile = async (): Promise<AgentProfileSettings | null> => {
+  if (!fs.existsSync(PROFILE_SETTINGS_FILE)) {
+    return null;
+  }
+  
+  try {
+    const data = await fs.promises.readFile(PROFILE_SETTINGS_FILE, 'utf8');
+    return JSON.parse(data) as AgentProfileSettings;
+  } catch (error) {
+    console.error('Error loading profile settings from file:', error);
+    return null;
+  }
+};
+
+/**
+ * Save agent base information to file
+ * 
+ * @param information Array of InformationSection objects to save
+ * @returns Promise that resolves when the file is written
+ */
+export const saveBaseInformationToFile = async (information: InformationSection[]): Promise<void> => {
+  initializeDataDirectory();
+  
+  try {
+    await fs.promises.writeFile(
+      BASE_INFORMATION_FILE, 
+      JSON.stringify(information, null, 2)
+    );
+  } catch (error) {
+    console.error('Error saving base information to file:', error);
+    throw error;
+  }
+};
+
+/**
+ * Load agent base information from file
+ * 
+ * @returns Promise that resolves with the information or null if not found
+ */
+export const loadBaseInformationFromFile = async (): Promise<InformationSection[] | null> => {
+  if (!fs.existsSync(BASE_INFORMATION_FILE)) {
+    return null;
+  }
+  
+  try {
+    const data = await fs.promises.readFile(BASE_INFORMATION_FILE, 'utf8');
+    return JSON.parse(data) as InformationSection[];
+  } catch (error) {
+    console.error('Error loading base information from file:', error);
+    return null;
+  }
+};
