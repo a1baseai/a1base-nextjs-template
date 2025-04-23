@@ -59,11 +59,12 @@ const LeftSidebar: FC = () => {
           <Image
             src="https://a1base-public.s3.us-east-1.amazonaws.com/profile-moving/20250215_1417_Confident+Startup+Smile_simple_compose_01jm5v0x50f2kaarp5nd556cbw.gif"
             alt="Customer Success Professional"
-            layout="responsive"
             width={3840}
             height={2160}
             quality={75}
-            className="w-full rounded-lg"
+            className="w-full rounded-lg object-cover"
+            style={{ width: '100%', height: 'auto' }}
+            unoptimized
           />
           <div className="absolute bottom-4 right-4 h-12 w-12 rounded-full bg-white shadow-lg overflow-hidden">
             <Image
