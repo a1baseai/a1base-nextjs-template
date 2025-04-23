@@ -5,15 +5,12 @@
  * It contains direct file system access which is not supported in client components.
  */
 
+// Mark this file as server-only
+'use server';
+
 import fs from 'fs';
 import path from 'path';
 import { AgentProfileSettings, InformationSection } from '../agent-profile/types';
-
-// Mark this file as server-only to prevent client-side imports
-import { headers } from 'next/headers';
-
-// Make sure this module is only used server-side
-headers();
 
 // Directory where profile data will be stored
 const DATA_DIR = path.join(process.cwd(), 'data');

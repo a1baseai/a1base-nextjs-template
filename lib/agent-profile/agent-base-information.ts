@@ -172,10 +172,11 @@ export { getAgentBaseInformation };
 /**
  * Returns all base information as formatted text
  * 
+ * @param sections Optional information sections to format (defaults to agentBaseInformation)
  * @returns Formatted string with all information sections, ordered by priority
  */
-export function getFormattedInformation(): string {
-  const sortedSections = [...agentBaseInformation].sort(
+export function getFormattedInformation(sections: InformationSection[] = agentBaseInformation): string {
+  const sortedSections = [...sections].sort(
     (a, b) => b.priority - a.priority
   );
 

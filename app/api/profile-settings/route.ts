@@ -6,8 +6,35 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { saveProfileSettingsToFile, loadProfileSettingsFromFile } from '@/lib/storage/server-file-storage';
+import fs from 'fs';
+import path from 'path';
 import { defaultAgentProfileSettings } from '@/lib/agent-profile/agent-profile-settings';
+import { AgentProfileSettings } from '@/lib/agent-profile/types';
+
+// Directory where profile data will be stored
+const DATA_DIR = path.join(process.cwd(), 'data');
+
+// File path for profile settings
+const PROFILE_SETTINGS_FILE = path.join(DATA_DIR, 'profile-settings.json');
+
+// Log paths to help debug
+console.log('Current working directory:', process.cwd());
+console.log('Data directory path:', DATA_DIR);
+console.log('Profile settings file path:', PROFILE_SETTINGS_FILE);
+console.log('File exists?', fs.existsSync(PROFILE_SETTINGS_FILE));
+
+/**
+ * Initialize the data directory if it doesn't exist
+ */
+const initializeDataDirectory = (): void => {
+  if (!fs.existsSync(DATA_DIR)) {
+    try {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    } catch (error) {
+      console.error('Error creating data directory:', error);
+    }
+  }
+};
 
 /**
  * GET /api/profile-settings
@@ -15,15 +42,28 @@ import { defaultAgentProfileSettings } from '@/lib/agent-profile/agent-profile-s
  */
 export async function GET() {
   try {
-    const settings = await loadProfileSettingsFromFile();
-    return NextResponse.json({ 
-      settings: settings || defaultAgentProfileSettings,
-      source: settings ? 'file' : 'default'
-    });
+    let settings = defaultAgentProfileSettings;
+    
+    // Try to load from file
+    if (fs.existsSync(PROFILE_SETTINGS_FILE)) {
+      try {
+        const data = fs.readFileSync(PROFILE_SETTINGS_FILE, 'utf8');
+        settings = JSON.parse(data) as AgentProfileSettings;
+        console.log('✅ Successfully loaded profile settings from file:');
+        console.log(settings.name); // Log the name to confirm it's loading correctly
+      } catch (error) {
+        console.error('Error reading profile settings file:', error);
+        // Continue with default settings
+      }
+    } else {
+      console.log('❌ Profile settings file not found at:', PROFILE_SETTINGS_FILE);
+    }
+    
+    return NextResponse.json({ settings });
   } catch (error) {
-    console.error('Error in GET /api/profile-settings:', error);
+    console.error('Error getting profile settings:', error);
     return NextResponse.json(
-      { error: 'Failed to load profile settings', message: String(error) }, 
+      { error: 'Failed to get profile settings', message: (error as Error).message },
       { status: 500 }
     );
   }
@@ -35,22 +75,35 @@ export async function GET() {
  */
 export async function POST(request: NextRequest) {
   try {
-    const { settings } = await request.json();
+    const body = await request.json();
+    const { settings } = body;
     
     if (!settings) {
       return NextResponse.json(
-        { error: 'No settings provided' }, 
+        { error: 'Missing settings in request body' },
         { status: 400 }
       );
     }
     
-    await saveProfileSettingsToFile(settings);
+    // Ensure data directory exists
+    initializeDataDirectory();
     
-    return NextResponse.json({ success: true, message: 'Profile settings saved successfully' });
+    // Write settings to file
+    try {
+      fs.writeFileSync(
+        PROFILE_SETTINGS_FILE,
+        JSON.stringify(settings, null, 2)
+      );
+    } catch (error) {
+      console.error('Error writing profile settings file:', error);
+      throw error;
+    }
+    
+    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error in POST /api/profile-settings:', error);
+    console.error('Error saving profile settings:', error);
     return NextResponse.json(
-      { error: 'Failed to save profile settings', message: String(error) }, 
+      { error: 'Failed to save profile settings', message: (error as Error).message },
       { status: 500 }
     );
   }

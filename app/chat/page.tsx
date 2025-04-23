@@ -5,9 +5,16 @@ import { useChatRuntime } from "@assistant-ui/react-ai-sdk";
 import { AssistantRuntimeProvider } from "@assistant-ui/react";
 import { Thread } from "@/components/assistant-ui/thread";
 import { ThreadList } from "@/components/assistant-ui/thread-list";
+import { LeftSidebar } from "@/components/assistant-ui/left-sidebar";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import { PhoneIcon, MessageSquareIcon, Mail, AlertTriangle, ChevronRight } from "lucide-react";
+import {
+  PhoneIcon,
+  MessageSquareIcon,
+  Mail,
+  AlertTriangle,
+  ChevronRight,
+} from "lucide-react";
 
 import {
   Tooltip,
@@ -17,8 +24,10 @@ import {
 } from "@/components/ui/tooltip";
 import Link from "next/link";
 
-import { FC } from "react";
-import agentProfileSettings from "@/lib/agent-profile/agent-profile-settings";
+import { FC, useState, useEffect } from "react";
+import { AgentProfileSettings } from "@/lib/agent-profile/types";
+import { defaultAgentProfileSettings } from "@/lib/agent-profile/agent-profile-settings";
+import { loadProfileSettings } from "@/lib/storage/file-storage";
 
 // A small helper for tooltip usage
 const ButtonWithTooltip: FC<{
@@ -41,82 +50,7 @@ const ButtonWithTooltip: FC<{
   );
 };
 
-// The top-left brand / label area
-// const TopLabel: FC = () => {
-//   return (
-//     <div className="flex h-full w-full items-center gap-2 px-3 text-sm font-semibold">
-//       <span>{agentProfileSettings.companyName}</span>
-//     </div>
-//   );
-// };
-
-// Left sidebar content
-const LeftSidebar: FC = () => {
-  return (
-    <div className="h-full w-full p-4 space-y-6">
-      <div>
-        <div className="w-full relative">
-          <Image
-            src="https://a1base-public.s3.us-east-1.amazonaws.com/profile-moving/20250215_1417_Confident+Startup+Smile_simple_compose_01jm5v0x50f2kaarp5nd556cbw.gif"
-            alt="Customer Success Professional"
-            width={3840}
-            height={2160}
-            quality={75}
-            className="w-full rounded-lg object-cover"
-            style={{ width: '100%', height: 'auto' }}
-            unoptimized
-          />
-          <div className="absolute bottom-4 right-4 h-12 w-12 rounded-full bg-white shadow-lg overflow-hidden">
-            <Image
-              src="/a1base-favicon.png"
-              alt="Logo"
-              width={48}
-              height={48}
-              className="w-full h-full object-cover"
-            />
-          </div>
-        </div>
-        <div className="mt-4 text-sm">
-          <h2 className="text-2xl font-medium">
-            <span className="text-black font-bold">
-              {agentProfileSettings.name}
-            </span>
-            <span className="text-gray-500 text-base">
-              {" "}
-              - {agentProfileSettings.role}
-            </span>
-          </h2>
-          <div className="my-2 flex items-center">
-            <div className="h-px flex-grow bg-border" />
-          </div>
-          <p className="text-gray-500 text-sm mt-2">
-            {agentProfileSettings.botPurpose[0]}
-          </p>
-          <div className="mt-4 flex gap-2 ">
-            <ButtonWithTooltip
-              tooltip="Phone Call"
-              className="bg-blue-50 hover:bg-blue-100"
-            >
-              <PhoneIcon className="h-4 w-4 text-blue-600" />
-            </ButtonWithTooltip>
-            <ButtonWithTooltip
-              tooltip="SMS"
-              className="bg-green-50 hover:bg-green-100"
-            >
-              <MessageSquareIcon className="h-4 w-4 text-green-600" />
-            </ButtonWithTooltip>
-            <ButtonWithTooltip
-              tooltip="Email"
-              className="bg-purple-50 hover:bg-purple-100"
-            >
-              <Mail className="h-4 w-4 text-purple-600" />
-            </ButtonWithTooltip>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
+// Left sidebar is imported at the top of the file as a client component
 
 // Mobile-friendly left sidebar sheet
 // const LeftBarSheet: FC = () => {
@@ -149,7 +83,6 @@ const Header: FC = () => {
           width={80}
           height={10}
           className="py-1"
-
         />
       </Link>
     </header>
@@ -158,6 +91,33 @@ const Header: FC = () => {
 
 // Chat top info area
 const ChatTopInfo: FC = () => {
+  // State to store the fetched profile settings
+  const [profileSettings, setProfileSettings] =
+    useState<AgentProfileSettings | null>(null);
+
+  // Fetch the profile settings on component mount
+  useEffect(() => {
+    async function fetchProfileSettings() {
+      try {
+        const settings = await loadProfileSettings();
+
+        if (settings) {
+          setProfileSettings(settings);
+        } else {
+          setProfileSettings(defaultAgentProfileSettings);
+        }
+      } catch (error) {
+        console.error("Error loading profile settings:", error);
+        setProfileSettings(defaultAgentProfileSettings);
+      }
+    }
+
+    fetchProfileSettings();
+  }, []);
+
+  // Use the loaded settings or defaults if still loading
+  const settings = profileSettings || defaultAgentProfileSettings;
+
   return (
     <div className="m-4 bg-gray-100 p-4 rounded-lg">
       <div className="flex items-center gap-6">
@@ -169,12 +129,8 @@ const ChatTopInfo: FC = () => {
           className="object-cover rounded-lg"
         />
         <div>
-          <h1 className="text-xl font-bold">
-            {agentProfileSettings.companyName}
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            {agentProfileSettings.companyDescription}
-          </p>
+          <h1 className="text-xl font-bold">{settings.companyName}</h1>
+          <p className="text-sm text-gray-500 mt-1">{settings.botPurpose[0]}</p>
         </div>
       </div>
     </div>
@@ -280,6 +236,33 @@ const DayLayout = () => {
     api: "/api/chat",
   });
 
+  // State to track environment variable status
+  const [envStatus, setEnvStatus] = useState({
+    hasOpenAIKey: true, // Default to true to avoid flash of warning
+    hasA1BaseKey: true,
+    isLoading: true,
+  });
+
+  // Check environment variables on component mount
+  useEffect(() => {
+    async function checkEnvVars() {
+      try {
+        const response = await fetch("/api/env-check");
+        const data = await response.json();
+        setEnvStatus({
+          hasOpenAIKey: data.hasOpenAIKey,
+          hasA1BaseKey: data.hasA1BaseKey,
+          isLoading: false,
+        });
+      } catch (error) {
+        console.error("Error checking environment variables:", error);
+        setEnvStatus((prev) => ({ ...prev, isLoading: false }));
+      }
+    }
+
+    checkEnvVars();
+  }, []);
+
   //TODO:
   //  Intercept the chat with our AI Triage Logic
   //  If the choice is to respond, then respond in web chat
@@ -295,33 +278,55 @@ const DayLayout = () => {
           </aside>
           <main className="flex-1 flex flex-col">
             <ChatTopInfo />
-            {(!process.env.OPENAI_API_KEY || !process.env.A1BASE_API_KEY) && (
-              <div className="w-full max-w-4xl p-4 m-4 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-700">
-                <div className="flex items-start gap-3">
-                  <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <h3 className="font-semibold text-amber-800 dark:text-amber-300">Environment Setup Required</h3>
-                    <p className="text-sm text-amber-700 dark:text-amber-400 mt-1">
-                      {!process.env.OPENAI_API_KEY && (
-                        <span className="block mb-1">• Please add your <code className="bg-amber-100 dark:bg-amber-800/40 px-1 py-0.5 rounded">OPENAI_API_KEY</code> to your .env file.</span>
-                      )}
-                      {!process.env.A1BASE_API_KEY && (
-                        <span className="block mb-1">• Please add your <code className="bg-amber-100 dark:bg-amber-800/40 px-1 py-0.5 rounded">A1BASE_API_KEY</code> to your .env file.</span>
-                      )}
-                    </p>
-                    <div className="mt-2">
-                      <Link 
-                        href="/setup-guide" 
-                        className="text-sm text-amber-800 dark:text-amber-300 font-medium flex items-center gap-1 hover:underline"
-                      >
-                        View setup guide
-                        <ChevronRight className="h-4 w-4" />
-                      </Link>
+            {/* Show loading message while checking env vars */}
+            {envStatus.isLoading && (
+              <div className="p-4 text-blue-600">
+                Checking environment setup...
+              </div>
+            )}
+            {/* Show warning if keys are missing */}
+            {!envStatus.isLoading &&
+              (!envStatus.hasOpenAIKey || !envStatus.hasA1BaseKey) && (
+                <div className="w-full max-w-4xl p-4 m-4 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-700">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <h3 className="font-semibold text-amber-800 dark:text-amber-300">
+                        Environment Setup Required
+                      </h3>
+                      <p className="text-sm text-amber-700 dark:text-amber-400 mt-1">
+                        {!process.env.OPENAI_API_KEY && (
+                          <span className="block mb-1">
+                            • Please add your{" "}
+                            <code className="bg-amber-100 dark:bg-amber-800/40 px-1 py-0.5 rounded">
+                              OPENAI_API_KEY
+                            </code>{" "}
+                            to your .env file.
+                          </span>
+                        )}
+                        {!process.env.A1BASE_API_KEY && (
+                          <span className="block mb-1">
+                            • Please add your{" "}
+                            <code className="bg-amber-100 dark:bg-amber-800/40 px-1 py-0.5 rounded">
+                              A1BASE_API_KEY
+                            </code>{" "}
+                            to your .env file.
+                          </span>
+                        )}
+                      </p>
+                      <div className="mt-2">
+                        <Link
+                          href="/setup-guide"
+                          className="text-sm text-amber-800 dark:text-amber-300 font-medium flex items-center gap-1 hover:underline"
+                        >
+                          View setup guide
+                          <ChevronRight className="h-4 w-4" />
+                        </Link>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
             <div className="flex-1 overflow-auto p-2">
               <Thread />
             </div>

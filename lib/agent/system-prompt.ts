@@ -6,16 +6,17 @@
   that generates the complete prompt by:
 
   1. Loading safety configurations from safety-settings.ts
-  2. Loading agent personality settings from agent-profile-settings.ts
-  3. Combining them into a structured prompt with safety guidelines and agent profile information
+  2. Loading agent personality settings from file storage, localStorage, or defaults
+  3. Loading base information from file storage, localStorage, or defaults
+  4. Combining them into a structured prompt with safety guidelines and agent profile information
 
   This is a critical file for customizing the agent's personality, tone, and behavioral boundaries.
-  Modify the imported TypeScript configuration files to adjust the agent's behavior for your use case.
+  Settings can be customized through the profile editor UI.
 */
 
 import safetySettings from "../safety-config/safety-settings";
-import agentProfileSettings from "../agent-profile/agent-profile-settings";
-import { getFormattedInformation } from "../agent-profile/agent-base-information";
+import { defaultAgentProfileSettings, getAgentProfileSettings } from "../agent-profile/agent-profile-settings";
+import { getFormattedInformation, getAgentBaseInformation } from "../agent-profile/agent-base-information";
 
 function getSafetyPrompt(settings: typeof safetySettings): string {
   // Create a readable list of any custom safety prompts
@@ -67,7 +68,7 @@ Please ensure you strictly follow these safety guidelines in every response.
 `;
 }
 
-function getAgentProfileSnippet(profile: typeof agentProfileSettings): string {
+function getAgentProfileSnippet(profile: typeof defaultAgentProfileSettings): string {
   const { name, companyName, botPurpose, languageStyle } = profile;
   const tone = languageStyle?.tone?.join(" ");
   return `
@@ -83,19 +84,34 @@ Tone: ${tone}
 `;
 }
 
-function getAgentBaseInformationSnippet(): string {
+async function getAgentBaseInformationSnippet(): Promise<string> {
+  // Get the most up-to-date base information (from file storage, localStorage, or defaults)
+  const baseInfo = await getAgentBaseInformation();
   return `
-${getFormattedInformation()}
+${getFormattedInformation(baseInfo)}
 `;
 }
 
-export const getSystemPrompt = () => `  
+export const getSystemPrompt = async (): Promise<string> => {
+  // Get the most up-to-date profile settings (from file storage, localStorage, or defaults)
+  const profileSettings = await getAgentProfileSettings();
+  
+  // Debug output to see what profile settings are being used
+  console.log('\n====== SYSTEM PROMPT USING AGENT NAME ======');
+  console.log(`Agent name being used: ${profileSettings.name}`);
+  console.log(`Company name being used: ${profileSettings.companyName}`);
+  console.log('============================================\n');
+  
+  // Get the formatted base information
+  const baseInfoSnippet = await getAgentBaseInformationSnippet();
+  
+  return `  
 <YOUR PROFILE>
-${getAgentProfileSnippet(agentProfileSettings)}
+${getAgentProfileSnippet(profileSettings)}
 </YOUR PROFILE>
 
 <AGENT BASE INFORMATION>
-${getAgentBaseInformationSnippet()}
+${baseInfoSnippet}
 </AGENT BASE INFORMATION>
 
 <SAFETY>
@@ -104,3 +120,4 @@ ${getSafetyPrompt(safetySettings)}
 
 
 `;
+};

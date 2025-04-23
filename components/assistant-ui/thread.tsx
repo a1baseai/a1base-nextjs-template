@@ -5,7 +5,7 @@ import {
   MessagePrimitive,
   ThreadPrimitive,
 } from "@assistant-ui/react";
-import type { FC } from "react";
+import type { FC, ChangeEvent, KeyboardEvent } from "react";
 import {
   ArrowDownIcon,
   CheckIcon,
@@ -111,13 +111,26 @@ const ThreadWelcomeSuggestions: FC = () => {
 };
 
 const Composer: FC = () => {
+  // Only trim whitespace when a message is submitted
+  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      // Get the textarea element
+      const textarea = e.currentTarget;
+      // Only trim the input value before sending
+      textarea.value = textarea.value.trim();
+    }
+  };
+  
   return (
-    <ComposerPrimitive.Root className="focus-within:border-ring/20 flex w-full flex-wrap items-end rounded-lg border bg-inherit px-2.5 shadow-sm transition-colors ease-in">
+    <ComposerPrimitive.Root 
+      className="focus-within:border-ring/20 flex w-full flex-wrap items-end rounded-lg border bg-inherit px-2.5 shadow-sm transition-colors ease-in"
+    >
       <ComposerPrimitive.Input
         rows={1}
         autoFocus
-        placeholder={agentProfileSettings?.name ? `Write a message to ${agentProfileSettings.name}...` : "Write a message..."}
+        placeholder={"Write a message..."}
         className="placeholder:text-muted-foreground max-h-40 flex-grow resize-none border-none bg-transparent px-2 py-4 text-sm outline-none focus:ring-0 disabled:cursor-not-allowed"
+        onKeyDown={handleKeyDown}
       />
       <ComposerAction />
     </ComposerPrimitive.Root>
@@ -184,9 +197,24 @@ const UserActionBar: FC = () => {
 };
 
 const EditComposer: FC = () => {
+  // Only trim input before submitting
+  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      // Get the textarea element
+      const textarea = e.currentTarget;
+      // Trim the input value
+      textarea.value = textarea.value.trim();
+    }
+  };
+  
   return (
-    <ComposerPrimitive.Root className="bg-muted my-4 flex w-full max-w-[var(--thread-max-width)] flex-col gap-2 rounded-xl">
-      <ComposerPrimitive.Input className="text-foreground flex h-8 w-full resize-none bg-transparent p-4 pb-0 outline-none" />
+    <ComposerPrimitive.Root 
+      className="bg-muted my-4 flex w-full max-w-[var(--thread-max-width)] flex-col gap-2 rounded-xl"
+    >
+      <ComposerPrimitive.Input 
+        className="text-foreground flex h-8 w-full resize-none bg-transparent p-4 pb-0 outline-none" 
+        onKeyDown={handleKeyDown}
+      />
 
       <div className="mx-3 mb-3 flex items-center justify-center gap-2 self-end">
         <ComposerPrimitive.Cancel asChild>

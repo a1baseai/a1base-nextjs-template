@@ -6,8 +6,35 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { saveBaseInformationToFile, loadBaseInformationFromFile } from '@/lib/storage/server-file-storage';
+import fs from 'fs';
+import path from 'path';
 import { defaultBaseInformation } from '@/lib/agent-profile/agent-base-information';
+import { InformationSection } from '@/lib/agent-profile/types';
+
+// Directory where profile data will be stored
+const DATA_DIR = path.join(process.cwd(), 'data');
+
+// File path for base information
+const BASE_INFORMATION_FILE = path.join(DATA_DIR, 'base-information.json');
+
+// Log paths to help debug
+console.log('Current working directory (base-info):', process.cwd());
+console.log('Data directory path (base-info):', DATA_DIR);
+console.log('Base information file path:', BASE_INFORMATION_FILE);
+console.log('Base info file exists?', fs.existsSync(BASE_INFORMATION_FILE));
+
+/**
+ * Initialize the data directory if it doesn't exist
+ */
+const initializeDataDirectory = (): void => {
+  if (!fs.existsSync(DATA_DIR)) {
+    try {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    } catch (error) {
+      console.error('Error creating data directory:', error);
+    }
+  }
+};
 
 /**
  * GET /api/base-information
@@ -15,15 +42,31 @@ import { defaultBaseInformation } from '@/lib/agent-profile/agent-base-informati
  */
 export async function GET() {
   try {
-    const information = await loadBaseInformationFromFile();
-    return NextResponse.json({ 
-      information: information || defaultBaseInformation,
-      source: information ? 'file' : 'default'
-    });
+    let information = defaultBaseInformation;
+    
+    // Try to load from file
+    if (fs.existsSync(BASE_INFORMATION_FILE)) {
+      try {
+        const data = fs.readFileSync(BASE_INFORMATION_FILE, 'utf8');
+        information = JSON.parse(data) as InformationSection[];
+        console.log('✅ Successfully loaded base information from file');
+        // Log first section title to confirm it's loading correctly
+        if (information.length > 0) {
+          console.log('First section title:', information[0].title);
+        }
+      } catch (error) {
+        console.error('Error reading base information file:', error);
+        // Continue with default information
+      }
+    } else {
+      console.log('❌ Base information file not found at:', BASE_INFORMATION_FILE);
+    }
+    
+    return NextResponse.json({ information });
   } catch (error) {
-    console.error('Error in GET /api/base-information:', error);
+    console.error('Error getting base information:', error);
     return NextResponse.json(
-      { error: 'Failed to load base information', message: String(error) }, 
+      { error: 'Failed to get base information', message: (error as Error).message },
       { status: 500 }
     );
   }
@@ -35,22 +78,35 @@ export async function GET() {
  */
 export async function POST(request: NextRequest) {
   try {
-    const { information } = await request.json();
+    const body = await request.json();
+    const { information } = body;
     
     if (!information) {
       return NextResponse.json(
-        { error: 'No information provided' }, 
+        { error: 'Missing information in request body' },
         { status: 400 }
       );
     }
     
-    await saveBaseInformationToFile(information);
+    // Ensure data directory exists
+    initializeDataDirectory();
     
-    return NextResponse.json({ success: true, message: 'Base information saved successfully' });
+    // Write information to file
+    try {
+      fs.writeFileSync(
+        BASE_INFORMATION_FILE,
+        JSON.stringify(information, null, 2)
+      );
+    } catch (error) {
+      console.error('Error writing base information file:', error);
+      throw error;
+    }
+    
+    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error in POST /api/base-information:', error);
+    console.error('Error saving base information:', error);
     return NextResponse.json(
-      { error: 'Failed to save base information', message: String(error) }, 
+      { error: 'Failed to save base information', message: (error as Error).message },
       { status: 500 }
     );
   }

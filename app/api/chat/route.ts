@@ -9,7 +9,16 @@ export const maxDuration = 30;
 
 export async function POST(req: Request) {
   const { messages } = await req.json();
-  const systemMessage = { role: "system", content: getSystemPrompt() };
+  
+  // Get the system prompt (with user-customized profile settings and base information)
+  const systemPromptContent = await getSystemPrompt();
+  
+  // DEBUG: Log the system prompt to see what profile settings are being used
+  console.log('\n\n====== SYSTEM PROMPT BEING USED IN CHAT ======');
+  console.log(systemPromptContent);
+  console.log('===============================================\n\n');
+  
+  const systemMessage = { role: "system", content: systemPromptContent };
   const modifiedMessages = [systemMessage, ...messages];
 
   // console.log(

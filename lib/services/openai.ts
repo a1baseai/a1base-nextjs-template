@@ -102,10 +102,13 @@ export async function generateAgentIntroduction(
     return "Hey there!";
   }
 
+  // Get the system prompt with custom settings
+  const systemPromptContent = await getSystemPrompt();
+  
   const conversation = [
     {
       role: "system" as const,
-      content: getSystemPrompt(),
+      content: systemPromptContent,
     },
     {
       role: "user" as const,
@@ -147,9 +150,12 @@ export async function generateAgentResponse(
     return "Hey there!";
   }
 
+  // Get the system prompt with custom settings
+  const systemPromptContent = await getSystemPrompt();
+  
   // Build the conversation to pass to OpenAI
   const conversation = [
-    { role: "system" as ChatRole, content: getSystemPrompt() },
+    { role: "system" as ChatRole, content: systemPromptContent },
   ];
 
   // If there's a user-level prompt from basicWorkflowsPrompt, add it as a user message
