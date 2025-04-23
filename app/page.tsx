@@ -234,7 +234,7 @@ await SendEmailFromAgent({
                     If you find A1Framework helpful, please consider giving us a star on GitHub. It helps us reach more developers!
                   </p>
                   <a
-                    href="https://github.com/a1base/a1framework"
+                    href="https://github.com/a1baseai/a1framework"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="rounded-lg px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-800 hover:shadow-lg text-white flex items-center gap-2 transition-all transform hover:-translate-y-1"
@@ -288,7 +288,7 @@ await SendEmailFromAgent({
                     <span>Documentation</span>
                   </a>
                   <a
-                    href="https://github.com/a1base/a1framework"
+                    href="https://github.com/a1baseai/a1framework"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="p-3 rounded-lg border border-black/[.08] dark:border-white/[.08] hover:bg-gray-50 dark:hover:bg-black/30 transition-colors flex items-center gap-3"
