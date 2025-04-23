@@ -72,22 +72,7 @@ const ButtonWithTooltip: FC<{
 //   );
 // };
 
-// Optional global header
-const Header: FC = () => {
-  return (
-    <header className="flex items-center justify-between p-4 border-b">
-      <Link href="/" className="flex items-center gap-2">
-        <Image
-          src="/a1base-black.png"
-          alt="A1Base Logo"
-          width={80}
-          height={10}
-          className="py-1"
-        />
-      </Link>
-    </header>
-  );
-};
+// Header component has been moved to the global navbar
 
 // Chat top info area
 const ChatTopInfo: FC = () => {
@@ -270,8 +255,7 @@ const DayLayout = () => {
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>
-      <div className="flex h-screen flex-col">
-        <Header />
+      <div className="flex h-[calc(100vh-64px)] flex-col">
         <div className="flex flex-1 overflow-hidden">
           <aside className="hidden w-80 shrink-0 bg-gray-100 md:flex md:flex-col">
             <LeftSidebar />
