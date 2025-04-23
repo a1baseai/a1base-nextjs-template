@@ -11,8 +11,14 @@ const nextConfig: NextConfig = {
     },
   },
   images: {
-    domains: ["a1base-public.s3.us-east-1.amazonaws.com"],
-
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'a1base-public.s3.us-east-1.amazonaws.com',
+        port: '',
+        pathname: '/**',
+      },
+    ],
   },
   
 };
