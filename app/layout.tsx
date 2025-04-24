@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { Toaster } from "@/components/ui/sonner";
+import { Toaster } from "@/components/ui/toaster";
 import { Navbar } from "@/components/ui/navbar";
 import "./globals.css";
 
@@ -33,7 +33,7 @@ export default function RootLayout({
         <main className="min-h-[calc(100vh-64px)]">
           {children}
         </main>
-        <Toaster position="top-right" />
+        <Toaster />
       </body>
     </html>
   );

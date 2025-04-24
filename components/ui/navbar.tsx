@@ -98,7 +98,7 @@ export function Navbar() {
     {
       href: "/debug",
       icon: <LayoutDashboard className="h-5 w-5" />,
-      label: "Debug",
+      label: "Debug & Settings",
       isActive: pathname === "/debug",
       isExternal: false,
     },

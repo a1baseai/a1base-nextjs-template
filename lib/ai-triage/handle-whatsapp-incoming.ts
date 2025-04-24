@@ -120,7 +120,17 @@ async function saveMessage(
 
         // Check if sender is already in participants (using normalized numbers)
         let participants = thread.participants || [];
-        participants = participants.map((p: string) => p.replace(/\+/g, "")); // Normalize existing participants
+        
+        // Safely normalize participant numbers, handling both string and object formats
+        participants = participants.map((p: any) => {
+          if (typeof p === 'string') {
+            return p.replace(/\+/g, "");
+          } else if (p && typeof p === 'object' && p.number) {
+            return String(p.number).replace(/\+/g, "");
+          }
+          return p; // Keep as is if we can't normalize
+        });
+        
         const senderExists = participants.includes(normalizedSenderNumber);
 
         if (!senderExists) {
