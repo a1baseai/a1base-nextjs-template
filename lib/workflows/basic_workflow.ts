@@ -20,9 +20,22 @@ import {
 } from "../services/openai";
 import { ThreadMessage } from "@/types/chat";
 import { basicWorkflowsPrompt } from "./basic_workflows_prompt";
+import fs from "fs";
+import path from "path";
 
-// Configuration
-const SPLIT_PARAGRAPHS = false; // Set to false to send messages without splitting
+// Settings loading function
+function loadMessageSettings() {
+  try {
+    const settingsFilePath = path.join(process.cwd(), "data", "message-settings.json");
+    if (fs.existsSync(settingsFilePath)) {
+      const settings = JSON.parse(fs.readFileSync(settingsFilePath, "utf-8"));
+      return settings.splitParagraphs || false;
+    }
+  } catch (error) {
+    console.error("Error loading message settings:", error);
+  }
+  return false; // Default to false if settings can't be loaded
+}
 
 // Initialize A1Base client
 const client = new A1BaseAPI({
@@ -50,9 +63,12 @@ export async function verifyAgentIdentity(
     "https://www.a1base.com/identity-and-trust/8661d846-d43d-4ee7-a095-0dcc97764b97";
 
   try {
+    // Load current settings
+    const splitParagraphs = loadMessageSettings();
+    
     // Generate response message for identity verification
     const response = await generateAgentIntroduction(message);
-    const messages = SPLIT_PARAGRAPHS
+    const messages = splitParagraphs
       ? response.split("\n").filter((msg) => msg.trim())
       : [response];
 
@@ -135,24 +151,30 @@ export async function DefaultReplyToMessage(
   });
 
   try {
+    // Load current settings
+    const splitParagraphs = loadMessageSettings();
+
     // Use the 'simple_response' prompt
     const response = await generateAgentResponse(
       threadMessages,
       basicWorkflowsPrompt.simple_response.user
     );
-    const messages = SPLIT_PARAGRAPHS
-      ? response.split("\n").filter((msg) => msg.trim())
-      : [response];
 
-    // For web chat, just return the response without sending messages
+    // For web UI, we just return the response without sending through A1Base
     if (service === "web-ui") {
       return response;
     }
+    
+    // Split response into paragraphs if setting is enabled
+    const messages = splitParagraphs
+      ? response.split("\n").filter((msg) => msg.trim())
+      : [response];
 
     // Send each message line individually for WhatsApp
-    for (const msg of messages) {
+    // Send the message(s) through the appropriate channel
+    for (const messageContent of messages) {
       const messageData = {
-        content: msg,
+        content: messageContent,
         from: process.env.A1BASE_AGENT_NUMBER!,
         service: "whatsapp" as const,
       };
@@ -168,7 +190,12 @@ export async function DefaultReplyToMessage(
           to: sender_number,
         });
       } else {
-        throw new Error("Invalid message type or missing required parameters");
+        console.log("No group_id or sender_number provided, skipping message send");
+      }
+      
+      // Add a small delay between messages to maintain order
+      if (splitParagraphs && messages.length > 1) {
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
     }
   } catch (error) {

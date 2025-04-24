@@ -50,3 +50,8 @@ docker-compose.override.yml
 Dockerfile.local
 .dockerignore
 docker-build.sh
+
+# fly.io
+fly.toml
+fly-deploy.yml
+.fly/

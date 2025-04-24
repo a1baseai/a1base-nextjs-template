@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertTriangle, ExternalLink, RefreshCw, CheckCircle2, Upload, ImageIcon } from "lucide-react";
+import { AlertTriangle, ExternalLink, RefreshCw, CheckCircle2, Upload, ImageIcon, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -36,6 +36,8 @@ export default function DebugPage() {
   const [profilePictureUrl, setProfilePictureUrl] = useState("");
   const [isUpdatingProfileName, setIsUpdatingProfileName] = useState(false);
   const [isUpdatingProfilePicture, setIsUpdatingProfilePicture] = useState(false);
+  const [isSavingChunkSetting, setIsSavingChunkSetting] = useState(false);
+  const [messageChunkingEnabled, setMessageChunkingEnabled] = useState(false);
   const [webhookUrls, setWebhookUrls] = useState({
     phoneWebhook: "",
     emailWebhook: ""
@@ -52,10 +54,25 @@ export default function DebugPage() {
       if (data.a1baseAgentName) {
         setProfileName(data.a1baseAgentName);
       }
+      
+      // Load message chunking setting
+      await checkMessageChunkingSetting();
     } catch (error) {
       console.error("Failed to check environment variables:", error);
     } finally {
       setIsLoading(false);
+    }
+  }
+  
+  async function checkMessageChunkingSetting() {
+    try {
+      const response = await fetch("/api/settings/message-chunking");
+      if (response.ok) {
+        const data = await response.json();
+        setMessageChunkingEnabled(data.splitParagraphs || false);
+      }
+    } catch (error) {
+      console.error("Failed to check message chunking setting:", error);
     }
   }
 
@@ -186,6 +203,43 @@ export default function DebugPage() {
       });
     } finally {
       setIsUpdatingProfilePicture(false);
+    }
+  }
+  
+  async function toggleMessageChunking(enabled: boolean) {
+    setIsSavingChunkSetting(true);
+    try {
+      const response = await fetch("/api/settings/message-chunking", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ splitParagraphs: enabled }),
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        setMessageChunkingEnabled(enabled);
+        toast({
+          title: enabled ? "Message chunking enabled" : "Message chunking disabled",
+          description: enabled 
+            ? "WhatsApp messages will be split by paragraph"
+            : "WhatsApp messages will be sent as single messages",
+          variant: "default",
+        });
+      } else {
+        throw new Error(data.error || "Failed to update message chunking setting");
+      }
+    } catch (error) {
+      console.error("Failed to update message chunking setting:", error);
+      toast({
+        title: "Update failed",
+        description: error instanceof Error ? error.message : "Failed to update message chunking setting",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingChunkSetting(false);
     }
   }
 
@@ -464,6 +518,43 @@ export default function DebugPage() {
                 <p className="text-sm text-muted-foreground mt-2">
                   Use a direct URL to a JPG or PNG image (recommended size: square, at least 640x640 pixels).
                 </p>
+              </div>
+              
+              {/* Message Chunking Toggle */}
+              <div className="mt-8">
+                <h3 className="text-base font-medium mb-4">Message Settings</h3>
+                <div className="flex items-center justify-between p-4 rounded-md border">
+                  <div className="flex items-start gap-3">
+                    <Sparkles className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="font-medium">WhatsApp Message Chunking</h4>
+                      <p className="text-sm text-muted-foreground">
+                        Split large messages into multiple paragraphs when sending through WhatsApp.
+                        This improves readability and delivery reliability for long messages.                      
+                      </p>
+                    </div>
+                  </div>
+                  <div>
+                    <Button
+                      variant={messageChunkingEnabled ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => toggleMessageChunking(!messageChunkingEnabled)}
+                      disabled={isSavingChunkSetting || !envStatus.a1baseAgentNumber}
+                      className="min-w-[100px]"
+                    >
+                      {isSavingChunkSetting ? (
+                        <>
+                          <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : messageChunkingEnabled ? (
+                        "Enabled"
+                      ) : (
+                        "Disabled"
+                      )}
+                    </Button>
+                  </div>
+                </div>
               </div>
             </div>
             
