@@ -55,8 +55,8 @@ export const LeftSidebar: React.FC = () => {
       <div>
         <div className="w-full relative">
           <Image
-            src="https://a1base-public.s3.us-east-1.amazonaws.com/profile-moving/20250215_1417_Confident+Startup+Smile_simple_compose_01jm5v0x50f2kaarp5nd556cbw.gif"
-            alt="Customer Success Professional"
+            src={profileSettings.profileImageUrl || "https://a1base-public.s3.us-east-1.amazonaws.com/profile-moving/20250215_1417_Confident+Startup+Smile_simple_compose_01jm5v0x50f2kaarp5nd556cbw.gif"}
+            alt={`${profileSettings.name} Profile`}
             width={3840}
             height={2160}
             quality={75}

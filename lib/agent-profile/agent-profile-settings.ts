@@ -27,6 +27,7 @@ export const defaultAgentProfileSettings: AgentProfileSettings = {
   isPersonified: true,
   companyName: "A1Base",
   companyDescription: "A1Base helps AI developers build AI agents that can communicate with users via WhatsApp, email, and other channels.",
+  profileImageUrl: "https://a1base-public.s3.us-east-1.amazonaws.com/profile-moving/20250210_1742_Corporate+Serene+Smile_simple_compose_01jkq9gs6rea3v4n7w461rwye2.gif",
   botPurpose: [
     "My purpose is to help developers understand and implement A1Base's API for giving AI agents real-world communication capabilities",
     "Guide users in setting up AI agents with verified phone numbers, email addresses, and trusted identities",

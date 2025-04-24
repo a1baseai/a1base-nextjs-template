@@ -35,7 +35,7 @@ const NavLink = ({
 }: NavLinkProps) => {
   const linkContent = (
     <div
-      className={`flex items-center gap-2 rounded-md px-3 py-2 transition-colors hover:bg-gray-100/80 ${
+      className={`flex items-center gap-2 rounded-md text-sm px-3 py-2 transition-colors hover:bg-gray-100/80 ${
         isActive ? "bg-blue-50 font-medium" : ""
       }`}
     >
@@ -84,7 +84,7 @@ export function Navbar() {
     {
       href: "/chat",
       icon: <MessageSquare className="h-5 w-5" />,
-      label: "Chat",
+      label: "Web UI Chat",
       isActive: pathname === "/chat",
       isExternal: false,
     },

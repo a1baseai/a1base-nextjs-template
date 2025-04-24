@@ -66,4 +66,6 @@ export interface AgentProfileSettings {
   agentSettings: AgentSettings;
   /** Description of the company the agent represents */
   companyDescription: string;
+  /** URL of the profile image/GIF for the agent */
+  profileImageUrl?: string;
 } 
