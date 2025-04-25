@@ -4,8 +4,7 @@ import { createAssistantStreamResponse } from "assistant-stream";
 import { getSystemPrompt } from "../../../lib/agent/system-prompt";
 import { triageMessage } from "../../../lib/ai-triage/triage-logic";
 import { createModelStream } from "../../../lib/services/model-provider";
-
-export const maxDuration = 30;
+import { dynamic, runtime, maxDuration } from "../route-config";
 
 export async function POST(req: Request) {
   const { messages } = await req.json();
@@ -83,6 +82,9 @@ export async function POST(req: Request) {
       if (triageResponse.type === 'default') {
         // Stream the default chat response using the selected model provider
         const result = createModelStream(modifiedMessages);
+        // Wait for the stream to be initialized
+        await result.getStream();
+        // Now we can merge the stream
         controller.merge(fromStreamText(result.fullStream));
       } else {
         // Stream the triage response data

@@ -1,8 +1,17 @@
 import fs from 'fs';
 import path from 'path';
-import { openai } from "@ai-sdk/openai";
-import { anthropic } from "@ai-sdk/anthropic";
 import { streamText } from "ai";
+
+// Import AI SDK models dynamically to prevent build-time errors
+const importOpenAI = async () => {
+  const { openai } = await import("@ai-sdk/openai");
+  return openai;
+};
+
+const importAnthropic = async () => {
+  const { anthropic } = await import("@ai-sdk/anthropic");
+  return anthropic;
+};
 
 // Define the path to the settings file
 const settingsFilePath = path.join(process.cwd(), "data", "model-settings.json");
@@ -25,30 +34,50 @@ export function getSelectedModelProvider(): string {
 }
 
 // Get the appropriate model based on the provider
-export function getModelForProvider(provider: string) {
+export async function getModelForProvider(provider: string) {
   switch (provider) {
     case "anthropic":
-      return anthropic("claude-3-opus-20240229");
+      const anthropicFn = await importAnthropic();
+      return anthropicFn("claude-3-opus-20240229");
     case "grok":
       // Grok is currently not supported in the AI SDK
       // For now, we'll fall back to OpenAI
       console.warn("Grok is not yet supported in the AI SDK, falling back to OpenAI");
-      return openai("gpt-4");
+      const openAiFallback = await importOpenAI();
+      return openAiFallback("gpt-4");
     case "openai":
     default:
-      return openai("gpt-4");
+      const openAiFn = await importOpenAI();
+      return openAiFn("gpt-4");
   }
 }
 
 // Create a text stream with the appropriate model
 export function createModelStream(messages: any[]) {
   const provider = getSelectedModelProvider();
-  const model = getModelForProvider(provider);
-
   console.log(`Using model provider: ${provider}`);
-
-  return streamText({
-    model: model,
-    messages: messages,
-  });
+  
+  // Return an object with the full stream and specific streams separated
+  const result = {
+    fullStream: null as any,
+    async getStream() {
+      // Fetch the model asynchronously when actually needed
+      const model = await getModelForProvider(provider);
+      
+      // Create and cache the stream
+      if (!this.fullStream) {
+        this.fullStream = streamText({
+          model: model,
+          messages: messages,
+        });
+      }
+      
+      return this.fullStream;
+    }
+  };
+  
+  // Initialize the stream immediately for backward compatibility
+  result.getStream();
+  
+  return result;
 }

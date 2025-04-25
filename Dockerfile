@@ -17,6 +17,18 @@ ARG NEXT_PUBLIC_SUPABASE_KEY
 ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
 ENV NEXT_PUBLIC_SUPABASE_KEY=$NEXT_PUBLIC_SUPABASE_KEY
 
+# Add dummy environment variables to prevent build failures
+# These will be overridden at runtime with the actual secrets
+ENV OPENAI_API_KEY=dummy-build-time-key
+ENV ANTHROPIC_API_KEY=dummy-build-time-key 
+ENV GROK_API_KEY=dummy-build-time-key
+ENV A1BASE_API_KEY=dummy-build-time-key
+ENV A1BASE_API_SECRET=dummy-build-time-key
+ENV A1BASE_ACCOUNT_ID=dummy-build-time-key
+ENV A1BASE_AGENT_NAME=Agent
+ENV A1BASE_AGENT_NUMBER=+1234567890
+ENV A1BASE_AGENT_EMAIL=agent@example.com
+
 # Build application
 RUN npm run build
 

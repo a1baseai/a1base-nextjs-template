@@ -2,9 +2,22 @@ import { ThreadMessage } from "@/types/chat";
 import OpenAI from "openai";
 import { getSystemPrompt } from "../agent/system-prompt";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Don't initialize during build time
+const isBuildTime = process.env.NODE_ENV === 'production' && process.env.NEXT_PHASE === 'phase-production-build';
+
+// Create a lazy-loaded OpenAI client that will only be initialized at runtime
+let openai: OpenAI;
+const getOpenAI = () => {
+  if (!openai) {
+    if (!process.env.OPENAI_API_KEY) {
+      console.log('Warning: OPENAI_API_KEY is not set. Using dummy API key for build.');
+    }
+    openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY || 'dummy-key-for-build-time',
+    });
+  }
+  return openai;
+};
 
 // Add type for OpenAI chat roles
 type ChatRole = "system" | "user" | "assistant" | "function";
@@ -60,7 +73,7 @@ Return valid JSON with only that single key "responseType" and value as one of t
 `;
 
   // Use a faster model for triage to reduce latency
-  const completion = await openai.chat.completions.create({
+  const completion = await getOpenAI().chat.completions.create({
     model: "gpt-3.5-turbo",
     messages: [
       { role: "system", content: triagePrompt },
@@ -116,7 +129,7 @@ export async function generateAgentIntroduction(
     },
   ];
 
-  const completion = await openai.chat.completions.create({
+  const completion = await getOpenAI().chat.completions.create({
     model: "gpt-4",
     messages: conversation,
   });
@@ -166,7 +179,7 @@ export async function generateAgentResponse(
   // Then add the actual chat messages
   conversation.push(...messages);
 
-  const completion = await openai.chat.completions.create({
+  const completion = await getOpenAI().chat.completions.create({
     model: "gpt-4",
     messages: conversation as OpenAI.Chat.ChatCompletionMessageParam[],
   });

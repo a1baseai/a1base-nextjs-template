@@ -1,9 +1,13 @@
 import { handleWhatsAppIncoming } from "@/lib/ai-triage/handle-whatsapp-incoming";
 import { WhatsAppIncomingData as BaseWhatsAppIncomingData } from "a1base-node";
 import { NextResponse } from "next/server";
+import { dynamic, runtime, maxDuration } from "../../route-config";
 
-// TODO: This extension is temporary until a1base-node updates are published to reflect new fields
-export interface ExtendedWhatsAppIncomingData extends BaseWhatsAppIncomingData {
+// Define our own complete interface to avoid type compatibility issues
+export interface ExtendedWhatsAppIncomingData {
+  thread_id: string;
+  message_id: string;
+  content: string;
   message_type: string;
   message_content: {
     text?: string;
@@ -19,6 +23,13 @@ export interface ExtendedWhatsAppIncomingData extends BaseWhatsAppIncomingData {
     inviteCode?: string;
     error?: string;
   };
+  sender_name: string;
+  sender_number: string;
+  thread_type: string;
+  timestamp: string;
+  service: string;
+  a1_account_id?: string;
+  is_from_agent?: boolean;
 }
 
 // Define webhook payload type based on new A1Base documentation
@@ -89,7 +100,8 @@ export async function POST(request: Request) {
       thread_type: body.thread_type,
       timestamp: body.timestamp,
       a1_account_id: body.a1_account_id,
-      service: "whatsapp"
+      service: "whatsapp",
+      is_from_agent: body.is_from_agent || body.sender_number === process.env.A1BASE_AGENT_NUMBER
     };
 
     await handleWhatsAppIncoming(whatsappData);

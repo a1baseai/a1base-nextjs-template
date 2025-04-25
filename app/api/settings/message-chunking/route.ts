@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import { dynamic, runtime } from "../../route-config";
 
 // Define the path to the settings file
 const settingsFilePath = path.join(process.cwd(), "data", "message-settings.json");
