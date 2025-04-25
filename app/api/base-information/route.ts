@@ -8,6 +8,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import { dynamic, runtime, maxDuration } from '../route-config';
+
+// Export the route configuration to prevent Next.js from trying
+// to access file system during build time
+export { dynamic, runtime, maxDuration };
 import { defaultBaseInformation } from '@/lib/agent-profile/agent-base-information';
 import { InformationSection } from '@/lib/agent-profile/types';
 
@@ -18,10 +23,36 @@ const DATA_DIR = path.join(process.cwd(), 'data');
 const BASE_INFORMATION_FILE = path.join(DATA_DIR, 'base-information.json');
 
 // Log paths to help debug
-console.log('Current working directory (base-info):', process.cwd());
-console.log('Data directory path (base-info):', DATA_DIR);
-console.log('Base information file path:', BASE_INFORMATION_FILE);
-console.log('Base info file exists?', fs.existsSync(BASE_INFORMATION_FILE));
+console.log('[BASE-INFO-API] Current working directory:', process.cwd());
+console.log('[BASE-INFO-API] Data directory path:', DATA_DIR);
+console.log('[BASE-INFO-API] Base information file path:', BASE_INFORMATION_FILE);
+
+try {
+  const fileExists = fs.existsSync(BASE_INFORMATION_FILE);
+  console.log('[BASE-INFO-API] File exists?', fileExists);
+  
+  if (fileExists) {
+    // Get file stats
+    const stats = fs.statSync(BASE_INFORMATION_FILE);
+    console.log('[BASE-INFO-API] File size:', stats.size, 'bytes');
+    console.log('[BASE-INFO-API] Last modified:', stats.mtime);
+    
+    // Try to read the first 100 characters to verify content
+    const sampleContent = fs.readFileSync(BASE_INFORMATION_FILE, 'utf8').substring(0, 100);
+    console.log('[BASE-INFO-API] File content sample:', sampleContent);
+  } else {
+    // Check if the data directory exists
+    const dataDirExists = fs.existsSync(DATA_DIR);
+    console.log('[BASE-INFO-API] Data directory exists?', dataDirExists);
+    
+    if (dataDirExists) {
+      const dirContents = fs.readdirSync(DATA_DIR);
+      console.log('[BASE-INFO-API] Data directory contents:', dirContents);
+    }
+  }
+} catch (error) {
+  console.error('[BASE-INFO-API] Error checking file:', error);
+}
 
 /**
  * Initialize the data directory if it doesn't exist
@@ -41,6 +72,7 @@ const initializeDataDirectory = (): void => {
  * Retrieves base information from the server filesystem
  */
 export async function GET() {
+  console.log('[BASE-INFO-API] GET request received for base information');
   try {
     let information = defaultBaseInformation;
     

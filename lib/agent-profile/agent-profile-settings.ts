@@ -17,11 +17,16 @@ import {
   AgentSettings, 
   AgentProfileSettings 
 } from './types';
+
+// Extend the AgentProfileSettings type to include source tracking
+interface AgentProfileSettingsWithSource extends AgentProfileSettings {
+  _source?: string;
+}
 import { loadFromLocalStorage, LOCAL_STORAGE_KEYS } from '../storage/local-storage';
 import { loadProfileSettings } from '../storage/file-storage';
 
 // Default settings that will be used if no custom settings are found
-export const defaultAgentProfileSettings: AgentProfileSettings = {
+export const defaultAgentProfileSettings: AgentProfileSettingsWithSource = {
   name: "Amy",
   role: "AI Customer Success Manager",
   isPersonified: true,
@@ -60,45 +65,60 @@ export const defaultAgentProfileSettings: AgentProfileSettings = {
  * 3. Environment variable
  * 4. Default settings
  */
-const getAgentProfileSettings = async (): Promise<AgentProfileSettings> => {
+const getAgentProfileSettings = async (): Promise<AgentProfileSettingsWithSource> => {
+  console.log('[PROFILE SETTINGS] Starting to load agent profile settings...');
   // First try to load from file storage via API
   try {
+    console.log('[PROFILE SETTINGS] Attempting to load from file storage...');
     const fileSettings = await loadProfileSettings();
     if (fileSettings) {
-      return fileSettings;
+      console.log(`[PROFILE SETTINGS] Successfully loaded settings for "${fileSettings.name}" from file storage`);
+      return { ...fileSettings, _source: 'file_storage' };
+    } else {
+      console.log('[PROFILE SETTINGS] No settings found in file storage');
     }
   } catch (error) {
-    console.warn('Error loading profile settings from API:', error);
+    console.warn('[PROFILE SETTINGS] Error loading profile settings from API:', error);
     // Continue to next method if API fails
   }
   
   // Next try to load from localStorage (browser only)
   if (typeof window !== 'undefined') {
+    console.log('[PROFILE SETTINGS] Attempting to load from localStorage...');
     const localStorageSettings = loadFromLocalStorage<AgentProfileSettings>(LOCAL_STORAGE_KEYS.AGENT_PROFILE);
     if (localStorageSettings) {
-      return localStorageSettings;
+      console.log(`[PROFILE SETTINGS] Successfully loaded settings for "${localStorageSettings.name}" from localStorage`);
+      return { ...localStorageSettings, _source: 'local_storage' };
+    } else {
+      console.log('[PROFILE SETTINGS] No settings found in localStorage');
     }
   }
   
   // Next try environment variable
   if (process.env.AGENT_PROFILE_SETTINGS) {
+    console.log('[PROFILE SETTINGS] Attempting to load from environment variable...');
     try {
-      return JSON.parse(process.env.AGENT_PROFILE_SETTINGS);
+      const envSettings = JSON.parse(process.env.AGENT_PROFILE_SETTINGS);
+      console.log(`[PROFILE SETTINGS] Successfully loaded settings for "${envSettings.name}" from environment variable`);
+      return { ...envSettings, _source: 'environment_variable' };
     } catch (error) {
-      console.warn('Error parsing AGENT_PROFILE_SETTINGS env variable:', error);
+      console.warn('[PROFILE SETTINGS] Error parsing AGENT_PROFILE_SETTINGS env variable:', error);
       // Continue to defaults if parsing fails
     }
+  } else {
+    console.log('[PROFILE SETTINGS] AGENT_PROFILE_SETTINGS environment variable not found');
   }
   
   // Fall back to default settings
-  return defaultAgentProfileSettings;
+  console.log(`[PROFILE SETTINGS] Using default settings for "${defaultAgentProfileSettings.name}"`);
+  return { ...defaultAgentProfileSettings, _source: 'default' };
 };
 
 /**
  * Synchronous version for use in contexts where async is not possible
  * This only checks localStorage and defaults, not file storage
  */
-const getAgentProfileSettingsSync = (): AgentProfileSettings => {
+const getAgentProfileSettingsSync = (): AgentProfileSettingsWithSource => {
   // Try to load from localStorage (browser only)
   if (typeof window !== 'undefined') {
     const localStorageSettings = loadFromLocalStorage<AgentProfileSettings>(LOCAL_STORAGE_KEYS.AGENT_PROFILE);
@@ -117,7 +137,8 @@ const getAgentProfileSettingsSync = (): AgentProfileSettings => {
   }
   
   // Fall back to default settings
-  return defaultAgentProfileSettings;
+  console.log(`[PROFILE SETTINGS] Using default settings for "${defaultAgentProfileSettings.name}"`);
+  return { ...defaultAgentProfileSettings, _source: 'default' };
 };
 
 // Export the sync version of settings for immediate use
