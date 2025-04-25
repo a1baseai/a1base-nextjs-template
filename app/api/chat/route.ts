@@ -1,10 +1,16 @@
-import { streamText } from "ai";
-import { fromStreamText } from "assistant-stream/ai-sdk";
-import { createAssistantStreamResponse } from "assistant-stream";
+import { NextResponse } from "next/server";
 import { getSystemPrompt } from "../../../lib/agent/system-prompt";
 import { triageMessage } from "../../../lib/ai-triage/triage-logic";
-import { createModelStream } from "../../../lib/services/model-provider";
 import { dynamic, runtime, maxDuration } from "../route-config";
+import { streamText } from "ai";
+import { openai } from "@ai-sdk/openai";
+
+// Check if we're in a build context
+const isBuildTime = () => {
+  return process.env.NODE_ENV === 'production' && 
+         (process.env.NEXT_PHASE === 'phase-production-build' || 
+          !process.env.OPENAI_API_KEY);
+};
 
 export async function POST(req: Request) {
   const { messages } = await req.json();
@@ -78,19 +84,71 @@ export async function POST(req: Request) {
 
     console.log("[POST] Triage Response:", triageResponse);
 
-    return createAssistantStreamResponse(async (controller) => {
-      if (triageResponse.type === 'default') {
-        // Stream the default chat response using the selected model provider
-        const result = createModelStream(modifiedMessages);
-        // Wait for the stream to be initialized
-        await result.getStream();
-        // Now we can merge the stream
-        controller.merge(fromStreamText(result.fullStream));
-      } else {
-        // Stream the triage response data
-        controller.appendText(triageResponse.message || 'No response message available');
+    // Base on triage results, either provide a simple response or generate with AI
+    if (triageResponse.type !== 'default') {
+      // For special responses from triage, just return the message without streaming
+      return NextResponse.json({ 
+        response: triageResponse.message || 'No response message available' 
+      });
+    }
+    
+    try {
+      // For special triage responses (not requiring AI), return directly without streaming
+      if (triageResponse.type !== 'default') {
+        return NextResponse.json({ 
+          response: triageResponse.message || 'No response message available' 
+        });
       }
-    });
+      
+      // For triaged responses with a pre-determined message, format it as JSON
+      if (triageResponse.type !== 'default') {
+        return NextResponse.json({ 
+          response: triageResponse.message || 'No response message available' 
+        });
+      }
+      
+      try {
+        // Handle build-time context without API keys
+        if (isBuildTime()) {
+          console.log('Build-time context detected, returning static response');
+          return NextResponse.json({ 
+            response: "This is a build-time placeholder response."
+          });
+        }
+        
+        // Define the messages in the correct format
+        const aiMessages = modifiedMessages.map(msg => ({
+          role: msg.role,
+          content: typeof msg.content === 'string' ? msg.content : 
+                  Array.isArray(msg.content) && msg.content[0]?.type === 'text' ? 
+                  msg.content[0].text : String(msg.content)
+        }));
+        
+        // Use the streamText function with the OpenAI model
+        // This is the pattern used in the Vercel AI SDK documentation
+        const result = streamText({
+          model: openai('gpt-4'),
+          messages: aiMessages,
+        });
+        
+        
+        // Return the response using the AI SDK's Data Stream format
+        // This is what the Assistant UI components expect
+        return result.toDataStreamResponse();
+      } catch (error) {
+        console.error('Error generating chat response:', error);
+        return NextResponse.json({ 
+          error: 'Failed to generate response',
+          details: error instanceof Error ? error.message : 'Unknown error'
+        }, { status: 500 });
+      }
+    } catch (error: any) {
+      console.error('Error generating chat response:', error);
+      return NextResponse.json({ 
+        error: 'Failed to generate response', 
+        details: error?.message || 'Unknown error' 
+      }, { status: 500 });
+    }
 
   } catch (error) {
     console.error("[POST] Triage Error:", error);
