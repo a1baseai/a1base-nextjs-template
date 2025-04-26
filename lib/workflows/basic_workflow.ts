@@ -293,9 +293,11 @@ export async function CustomApiWorkflow(
 
 // =============================================
 
+import { loadOnboardingFlow } from "../onboarding-flow/onboarding-storage";
+
 /**
  * Handles the onboarding flow when triggered by "Start onboarding"
- * Guides the user through a series of onboarding steps
+ * Guides the user through a series of onboarding steps based on the configured onboarding flow
  * @returns A structured onboarding response
  */
 export async function StartOnboarding(
@@ -308,16 +310,29 @@ export async function StartOnboarding(
   console.log("Workflow Start [StartOnboarding]");
 
   try {
-    // Define the onboarding steps as a series of messages
-    const onboardingResponse = `Welcome to the onboarding process! I'll guide you through setting up your AI assistant.
-
-Here's what we'll cover:
-
-1. **Profile Setup**: Customize your AI personality and appearance
-2. **Use Cases**: Explore how I can help with your specific needs
-3. **Integration**: Connect me with your existing tools and workflows
-
-Shall we get started with step 1? Please reply with "Yes" to continue.`;
+    // Load onboarding flow from storage
+    const onboardingFlow = await loadOnboardingFlow();
+    
+    // Check if onboarding is enabled
+    if (!onboardingFlow.enabled) {
+      return "Onboarding is currently disabled. Please contact your administrator to enable it.";
+    }
+    
+    // Get the first message(s) based on the configured flow
+    // Sort by order to ensure they appear in the correct sequence
+    const sortedMessages = [...onboardingFlow.messages].sort((a, b) => a.order - b.order);
+    
+    // Find the first stop point (message with waitForResponse=true) or take all messages if none have waitForResponse
+    let messagesToSend = [];
+    for (const message of sortedMessages) {
+      messagesToSend.push(message);
+      if (message.waitForResponse) {
+        break; // Stop at the first message requiring a response
+      }
+    }
+    
+    // Combine the messages into a single response with proper formatting
+    const onboardingResponse = messagesToSend.map(msg => msg.text).join("\n\n");
 
     // For web UI, we just return the response without sending through A1Base
     if (service === "web-ui") {

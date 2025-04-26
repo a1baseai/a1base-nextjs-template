@@ -3,7 +3,7 @@
   "messages": [
     {
       "id": "1",
-      "text": "Hi there! 👋 I'm your new AI assistant. Welcome!!!",
+      "text": "Hi there! 👋 I'm your new AI assistant. Welcome!!! I'm a BOSS",
       "waitForResponse": false,
       "order": 1
     },
@@ -15,7 +15,7 @@
     },
     {
       "id": "3",
-      "text": "What can I help you with today?!",
+      "text": "Before I go on, whats your name:",
       "waitForResponse": true,
       "order": 3
     }
