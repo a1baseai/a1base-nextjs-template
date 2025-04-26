@@ -131,7 +131,7 @@ const ChatTopInfo: FC<{
             <div className="flex items-center">
               <div className="mr-4 h-14 w-14 overflow-hidden rounded-full">
                 <Image
-                  src={profileSettings.agentSettings?.profileGifUrl || "/a1base-favicon.png"}
+                  src={settings?.agentSettings?.profileGifUrl || '/a1base-favicon.png'}
                   alt={profileSettings.name}
                   width={56}
                   height={56}
@@ -294,99 +294,85 @@ export default function ChatPage() {
     toast.info("Starting onboarding flow...");
     
     try {
-      // Fetch the onboarding flow from our API
-      const response = await fetch('/api/onboarding-chat');
+      // First, add a user message to start the conversation
+      const userMessage = "Start onboarding";
+      
+      // Add the user message to the chat using the chat interface
+      // It will appear as a user message in the chat
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: [{ role: 'user', content: userMessage }]
+        }),
+      });
+      
       if (!response.ok) {
+        throw new Error('Failed to send the user message');
+      }
+      
+      // Let's wait a moment for the UI to update
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Fetch the onboarding flow from our API
+      const onboardingResponse = await fetch('/api/onboarding-chat');
+      if (!onboardingResponse.ok) {
         throw new Error('Failed to fetch onboarding flow');
       }
       
-      // Process as a stream
-      const reader = response.body?.getReader();
+      // Process the stream of onboarding messages
+      const reader = onboardingResponse.body?.getReader();
+      if (!reader) throw new Error('Stream reader not available');
+      
       const decoder = new TextDecoder();
+      let result = await reader.read();
       
-      if (!reader) {
-        throw new Error('Stream reader not available');
-      }
-      
-      // Helper function to process the messages one at a time with a delay
-      const processStreamWithDelay = async () => {
-        let result = await reader.read();
+      // Process each chunk of the stream
+      while (!result.done) {
+        const chunk = decoder.decode(result.value, { stream: true });
         
-        // Our first "Hi" message to start the conversation
-        if (!result.done) {
-          // Simulate user input by submitting a message via the chat API
+        // Extract SSE messages from chunk
+        const messages = chunk
+          .split('\n\n')
+          .filter(msg => msg.trim().startsWith('data:'))
+          .map(msg => {
+            try {
+              return JSON.parse(msg.replace('data:', '').trim());
+            } catch (e) {
+              return null;
+            }
+          })
+          .filter(Boolean);
+        
+        // Process each message
+        for (const message of messages) {
+          console.log('Processing onboarding message:', message);
+          
+          // Send each assistant message to the chat API
+          // This will make it appear in the chat UI automatically
           await fetch('/api/chat', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              messages: [{
-                role: 'user',
-                content: 'Start onboarding',
-              }],
+              messages: [{ role: 'assistant', content: message.message }]
             }),
           });
           
-          // Wait a moment for the UI to update
-          await new Promise(resolve => setTimeout(resolve, 500));
-        }
-        
-        // Process the stream of messages
-        while (!result.done) {
-          const chunk = decoder.decode(result.value, { stream: true });
-          
-          // Extract SSE messages from chunk
-          const messages = chunk
-            .split('\n\n')
-            .filter(msg => msg.trim().startsWith('data:'))
-            .map(msg => {
-              try {
-                return JSON.parse(msg.replace('data:', '').trim());
-              } catch (e) {
-                return null;
-              }
-            })
-            .filter(Boolean);
-          
-          // Process each message with a delay between them
-          for (const message of messages) {
-            console.log('Onboarding message:', message);
-            
-            // Submit the assistant message via the chat API
-            await fetch('/api/chat', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                messages: [{
-                  role: 'assistant',
-                  content: message.message,
-                  id: message.id,
-                }],
-              }),
-            });
-            
-            // Add a delay between messages for a more natural flow
-            if (!message.waitForResponse) {
-              await new Promise(resolve => setTimeout(resolve, 1000));
-            }
+          // Add a delay between messages for a more natural flow
+          if (!message.waitForResponse) {
+            await new Promise(resolve => setTimeout(resolve, 1500));
           }
-          
-          // Read the next chunk
-          result = await reader.read();
         }
         
-        setIsOnboardingInProgress(false);
-      };
+        // Read the next chunk
+        result = await reader.read();
+      }
       
-      // Start processing the stream
-      processStreamWithDelay().catch(err => {
-        console.error('Error processing stream:', err);
-        setIsOnboardingInProgress(false);
-        toast.error('Failed to process onboarding messages');
-      });
+      setIsOnboardingInProgress(false);
       
       // Safety timeout to ensure we don't get stuck
       setTimeout(() => {

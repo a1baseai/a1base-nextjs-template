@@ -42,6 +42,8 @@ export interface WorkflowSettings {
 export interface AgentSettings {
   /** Specific role or type of agent */
   agent: string;
+  /** URL to the animated profile GIF */
+  profileGifUrl?: string;
 }
 
 /**

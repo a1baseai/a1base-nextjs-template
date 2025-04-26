@@ -298,7 +298,7 @@ export async function triageMessage({
         return {
           type: "default",
           success: true,
-          message: "Default response sent",
+          message: response || "Default response sent",
         };
     }
   } catch (error) {

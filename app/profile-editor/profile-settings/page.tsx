@@ -445,8 +445,6 @@ export default function ProfileSettingsEditor() {
                 }
               />
             </div>
-
-          
           </div>
         </CardContent>
         <CardFooter className="flex justify-between">

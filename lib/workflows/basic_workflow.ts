@@ -58,7 +58,7 @@ export async function DefaultReplyToMessage(
   thread_id?: string,
   sender_number?: string,
   service?: string
-) {
+): Promise<string> {
   console.log("Workflow Start [DefaultReplyToMessage]", {
     sender_number,
     message_count: threadMessages.length,
@@ -74,6 +74,8 @@ export async function DefaultReplyToMessage(
       threadMessages,
       basicWorkflowsPrompt.simple_response.user
     );
+
+    console.log("Generated response:", response);
 
     // For web UI, we just return the response without sending through A1Base
     if (service === "web-ui") {
@@ -113,17 +115,22 @@ export async function DefaultReplyToMessage(
         await new Promise(resolve => setTimeout(resolve, 500));
       }
     }
+
+    // Make sure to return the response
+    return response;
   } catch (error) {
     console.error("[Basic Workflow] Error:", error);
 
+    const errorMessage = "Sorry, I encountered an error processing your message.";
+
     // Skip error message sending for web chat
     if (service === "web-ui") {
-      return "Sorry, I encountered an error processing your message";
+      return errorMessage;
     }
 
     // Prepare error message for WhatsApp
     const errorMessageData = {
-      content: "Sorry, I encountered an error processing your message",
+      content: errorMessage,
       from: process.env.A1BASE_AGENT_NUMBER!,
       service: "whatsapp" as const,
     };
@@ -140,6 +147,9 @@ export async function DefaultReplyToMessage(
         to: sender_number,
       });
     }
+    
+    // Make sure to return the error message
+    return errorMessage;
   }
 }
 
