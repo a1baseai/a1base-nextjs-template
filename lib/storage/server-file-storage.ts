@@ -11,6 +11,7 @@
 import fs from 'fs';
 import path from 'path';
 import { AgentProfileSettings, InformationSection } from '../agent-profile/types';
+import { OnboardingFlow } from '../onboarding-flow/types';
 
 // Directory where profile data will be stored
 const DATA_DIR = path.join(process.cwd(), 'data');
@@ -18,17 +19,58 @@ const DATA_DIR = path.join(process.cwd(), 'data');
 // File paths for different types of data
 const PROFILE_SETTINGS_FILE = path.join(DATA_DIR, 'profile-settings.json');
 const BASE_INFORMATION_FILE = path.join(DATA_DIR, 'base-information.json');
+const ONBOARDING_FLOW_FILE = path.join(DATA_DIR, 'onboarding-flow.json');
 
 /**
  * Initialize the data directory if it doesn't exist
  */
-export const initializeDataDirectory = (): void => {
-  if (!fs.existsSync(DATA_DIR)) {
-    try {
+export const initializeDataDirectory = async (): Promise<void> => {
+  try {
+    if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR, { recursive: true });
-    } catch (error) {
-      console.error('Error creating data directory:', error);
     }
+  } catch (error) {
+    console.error('Error creating data directory:', error);
+    throw error;
+  }
+};
+
+/**
+ * Load onboarding flow data from file
+ * 
+ * @returns Promise that resolves with the flow data or null if not found
+ */
+export const loadOnboardingFlowFromFile = async (): Promise<OnboardingFlow | null> => {
+  if (!fs.existsSync(ONBOARDING_FLOW_FILE)) {
+    return null;
+  }
+  
+  try {
+    const data = await fs.promises.readFile(ONBOARDING_FLOW_FILE, 'utf8');
+    return JSON.parse(data) as OnboardingFlow;
+  } catch (error) {
+    console.error('Error loading onboarding flow from file:', error);
+    return null;
+  }
+};
+
+/**
+ * Save onboarding flow data to file
+ * 
+ * @param flow OnboardingFlow object to save
+ * @returns Promise that resolves when the file is written
+ */
+export const saveOnboardingFlowToFile = async (flow: OnboardingFlow): Promise<void> => {
+  initializeDataDirectory();
+  
+  try {
+    await fs.promises.writeFile(
+      ONBOARDING_FLOW_FILE, 
+      JSON.stringify(flow, null, 2)
+    );
+  } catch (error) {
+    console.error('Error saving onboarding flow to file:', error);
+    throw error;
   }
 };
 

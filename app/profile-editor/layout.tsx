@@ -3,7 +3,18 @@
 import React, { useState, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowLeft, Settings, Database, LayoutDashboard, Users, MessageSquare, Zap, Globe, Save, CheckCircle2 } from "lucide-react";
+import {
+  ArrowLeft,
+  Settings,
+  Database,
+  LayoutDashboard,
+  Users,
+  MessageSquare,
+  Zap,
+  Globe,
+  Save,
+  CheckCircle2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -18,7 +29,7 @@ interface SidebarItem {
 // Custom event for triggering saves across components
 export const triggerSave = () => {
   // Create and dispatch a custom event for saving
-  const saveEvent = new CustomEvent('save-profile-settings');
+  const saveEvent = new CustomEvent("save-profile-settings");
   document.dispatchEvent(saveEvent);
 };
 
@@ -31,21 +42,21 @@ export default function ProfileEditorLayout({
   const [isSaving, setIsSaving] = useState(false);
   const [showSavedMessage, setShowSavedMessage] = useState(false);
   const pathname = usePathname();
-  
+
   // Handle save action
   const handleSave = useCallback(() => {
     // Set saving status
     setIsSaving(true);
-    
+
     // Trigger the save event for child components to listen to
     triggerSave();
-    
+
     // Simulate successful save (in a real app, this would wait for all save promises to resolve)
     setTimeout(() => {
       setIsSaving(false);
       setShowSavedMessage(true);
       toast.success("All changes saved successfully");
-      
+
       // Hide the success message after a delay
       setTimeout(() => setShowSavedMessage(false), 3000);
     }, 1000);
@@ -83,12 +94,14 @@ export default function ProfileEditorLayout({
       href: "/profile-editor/integrations",
       variant: pathname.includes("/integrations") ? "default" : "ghost",
     },
-    
+
     {
       title: "Conversation Settings",
       icon: <MessageSquare className="h-5 w-5" />,
       href: "/profile-editor/conversation-settings",
-      variant: pathname.includes("/conversation-settings") ? "default" : "ghost",
+      variant: pathname.includes("/conversation-settings")
+        ? "default"
+        : "ghost",
     },
     {
       title: "Advanced Settings",
@@ -114,13 +127,13 @@ export default function ProfileEditorLayout({
           <h2 className="text-xl font-bold mb-6">Agent Settings</h2>
           <nav className="space-y-1">
             {sidebarItems.map((item, index) => (
-              <Link 
-                key={index} 
+              <Link
+                key={index}
                 href={item.href}
                 className={cn(
                   "flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
-                  item.variant === "default" 
-                    ? "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300" 
+                  item.variant === "default"
+                    ? "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
                     : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                 )}
               >
@@ -135,14 +148,17 @@ export default function ProfileEditorLayout({
         </div>
         <div className="absolute bottom-0 p-4 w-64 border-t border-gray-200 dark:border-gray-700">
           <Link href="/chat">
-            <Button variant="default" className="w-full bg-gradient-to-r from-blue-600 to-blue-800">
+            <Button
+              variant="default"
+              className="w-full bg-gradient-to-r from-blue-600 to-blue-800"
+            >
               <MessageSquare className="h-4 w-4 mr-2" />
               Preview Agent
             </Button>
           </Link>
         </div>
       </aside>
-      
+
       {/* Main content */}
       <main className="flex-1 overflow-auto p-6 pb-24">
         <div className="max-w-4xl mx-auto">
@@ -152,24 +168,34 @@ export default function ProfileEditorLayout({
               {pathname.includes("/get-started") && "Get Started"}
               {pathname.includes("/profile-settings") && "Profile Settings"}
               {pathname.includes("/base-information") && "Base Information"}
-              {pathname.includes("/onboarding-flow") && "Onboarding Flow Builder"}
+              {pathname.includes("/onboarding-flow") &&
+                "Onboarding Flow Builder"}
               {pathname.includes("/integrations") && "Integrations"}
               {pathname.includes("/web-behavior") && "Web Behavior"}
-              {pathname.includes("/conversation-settings") && "Conversation Settings"}
+              {pathname.includes("/conversation-settings") &&
+                "Conversation Settings"}
               {pathname.includes("/advanced-settings") && "Advanced Settings"}
             </h1>
             <p className="text-gray-500 dark:text-gray-400 mt-1">
-              {pathname.includes("/get-started") && "Set up your AI agent with a guided flow"}
-              {pathname.includes("/profile-settings") && "Configure your agent's identity and appearance"}
-              {pathname.includes("/base-information") && "Provide base knowledge for your agent"}
-              {pathname.includes("/onboarding-flow") && "Create welcome messages and onboarding experience for new users"}
-              {pathname.includes("/integrations") && "Connect your agent to external services"}
-              {pathname.includes("/web-behavior") && "Configure how your agent behaves on the web"}
-              {pathname.includes("/conversation-settings") && "Customize the chat experience"}
-              {pathname.includes("/advanced-settings") && "Advanced configuration options"}
+              {pathname.includes("/get-started") &&
+                "Set up your AI agent with a guided flow"}
+              {pathname.includes("/profile-settings") &&
+                "Configure your agent's identity and appearance"}
+              {pathname.includes("/base-information") &&
+                "Provide base knowledge for your agent"}
+              {pathname.includes("/onboarding-flow") &&
+                "Create welcome messages and onboarding experience for new users. Create your first onboarding flow here, but we strongly encourage you to code your own onboarding flows as your agent grows in complexity."}
+              {pathname.includes("/integrations") &&
+                "Connect your agent to external services"}
+              {pathname.includes("/web-behavior") &&
+                "Configure how your agent behaves on the web"}
+              {pathname.includes("/conversation-settings") &&
+                "Customize the chat experience"}
+              {pathname.includes("/advanced-settings") &&
+                "Advanced configuration options"}
             </p>
           </div>
-          
+
           {/* Page content */}
           {children}
         </div>
@@ -185,10 +211,10 @@ export default function ProfileEditorLayout({
                 </div>
               )}
             </div>
-            
+
             <div className="flex space-x-3">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => {
                   // You can add a discard changes function here
                   toast.info("Changes discarded");
@@ -196,7 +222,7 @@ export default function ProfileEditorLayout({
               >
                 Cancel
               </Button>
-              <Button 
+              <Button
                 onClick={handleSave}
                 disabled={isSaving}
                 className={isSaving ? "opacity-80" : ""}

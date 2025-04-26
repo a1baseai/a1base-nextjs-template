@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,8 +11,8 @@ import Image from "next/image";
 import { defaultAgentProfileSettings } from "@/lib/agent-profile/agent-profile-settings";
 import { AgentProfileSettings } from "@/lib/agent-profile/types";
 import { defaultBaseInformation } from "@/lib/agent-profile/agent-base-information";
-import { saveToLocalStorage, LOCAL_STORAGE_KEYS } from "@/lib/storage/local-storage";
-import { saveProfileSettings, saveBaseInformation } from "@/lib/storage/file-storage";
+import { saveToLocalStorage, loadFromLocalStorage, LOCAL_STORAGE_KEYS } from "@/lib/storage/local-storage";
+import { saveProfileSettings, saveBaseInformation, loadProfileSettings } from "@/lib/storage/file-storage";
 import { toast } from "sonner";
 
 // Define the steps in the onboarding process
@@ -52,7 +52,8 @@ const steps = [
 export default function OnboardingPage() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(0);
-  const [profileSettings, setProfileSettings] = useState<AgentProfileSettings>({ ...defaultAgentProfileSettings });
+  const [profileSettings, setProfileSettings] = useState<AgentProfileSettings | null>(null);
+  const [loading, setLoading] = useState(true);
   
   // Available GIF URLs for profile selection (same as in profile-settings page)
   const gifUrls = [
@@ -62,6 +63,35 @@ export default function OnboardingPage() {
     "https://a1base-public.s3.us-east-1.amazonaws.com/profile-moving/20250213_1255_Startup+Workplace+Smile_simple_compose_01jm0hgd5afymrz6ewd1c0nbra.gif",
     "https://a1base-public.s3.us-east-1.amazonaws.com/profile-moving/20250213_1256_Confident+Startup+Glance_simple_compose_01jm0hj6cfedn8m2gr8ynrwbgs.gif",
   ];
+  
+  // Load data on component mount
+  useEffect(() => {
+    // Load profile settings from the server
+    const loadServerData = async () => {
+      try {
+        setLoading(true);
+        // Try to load profile settings from API first
+        const profileData = await loadProfileSettings();
+        if (profileData) {
+          setProfileSettings(profileData);
+        } else {
+          // Check localStorage as fallback
+          const storedSettings = loadFromLocalStorage<AgentProfileSettings>(LOCAL_STORAGE_KEYS.AGENT_PROFILE);
+          setProfileSettings(storedSettings || { ...defaultAgentProfileSettings });
+        }
+      } catch (error) {
+        console.error("Error loading profile settings:", error);
+        toast.error("Failed to load profile settings");
+        
+        // Fallback to default settings
+        setProfileSettings({ ...defaultAgentProfileSettings });
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadServerData();
+  }, []);
 
   // Function to go to the next step
   const nextStep = () => {
@@ -79,25 +109,39 @@ export default function OnboardingPage() {
 
   // Function to handle input changes
   const handleInputChange = (field: keyof AgentProfileSettings, value: any) => {
-    setProfileSettings(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    if (!profileSettings) return;
+    
+    setProfileSettings(prev => {
+      if (!prev) return { ...defaultAgentProfileSettings, [field]: value };
+      
+      return {
+        ...prev,
+        [field]: value
+      };
+    });
   };
 
   // Function to handle changes in nested objects
   const handleNestedChange = (parent: keyof AgentProfileSettings, field: string, value: any) => {
-    setProfileSettings(prev => ({
-      ...prev,
-      [parent]: {
-        ...(prev[parent] as any),
-        [field]: value
-      }
-    }));
+    if (!profileSettings) return;
+    
+    setProfileSettings(prev => {
+      if (!prev) return { ...defaultAgentProfileSettings };
+      
+      return {
+        ...prev,
+        [parent]: {
+          ...(prev[parent] as any),
+          [field]: value
+        }
+      };
+    });
   };
 
   // Function to complete the onboarding
   const completeOnboarding = async () => {
+    if (!profileSettings) return;
+    
     try {
       // Save profile settings
       await saveProfileSettings(profileSettings);
@@ -105,22 +149,32 @@ export default function OnboardingPage() {
       
       // Save default base information
       await saveBaseInformation(defaultBaseInformation);
-      saveToLocalStorage(LOCAL_STORAGE_KEYS.AGENT_INFORMATION, defaultBaseInformation);
       
-      toast.success("Agent setup complete! Redirecting to profile settings...");
+      toast.success("Profile settings saved successfully");
       
-      // Navigate to profile settings page after a short delay
-      setTimeout(() => {
-        router.push("/profile-editor/profile-settings");
-      }, 1500);
+      // Redirect to the profile editor main page
+      router.push("/profile-editor/profile-settings");
     } catch (error) {
-      toast.error("There was an error saving your settings. Please try again.");
+      console.error("Error saving profile settings:", error);
+      toast.error("Failed to save profile settings");
       console.error("Error in onboarding completion:", error);
     }
   };
 
   // Calculate progress percentage
   const progressPercentage = ((currentStep + 1) / steps.length) * 100;
+  
+  // If still loading or profile settings not available, show loading state
+  if (loading || !profileSettings) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold mb-4">Loading your profile...</h2>
+          <Progress value={100} className="w-64 h-2 animate-pulse" />
+        </div>
+      </div>
+    );
+  }
 
   // Render different content based on the current step
   const renderStepContent = () => {
