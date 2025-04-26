@@ -120,7 +120,7 @@ export function Navbar() {
     <div className="bg-white border-b sticky top-0 z-10 shadow-sm">
       <div className=" mx-auto px-4 sm:px-6 lg:px-8">
         {/* Desktop layout: 3-column grid with logo left, nav center, github right */}
-        <div className="hidden md:grid md:grid-cols-3 items-center h-16">
+        <div className="hidden md:grid md:grid-cols-6 items-center h-16">
           {/* Left: Logo */}
           <div className="flex items-center justify-start">
             <Link href="/">
@@ -136,7 +136,7 @@ export function Navbar() {
           </div>
 
           {/* Center: Main Navigation */}
-          <nav className="flex items-center justify-center space-x-2">
+          <nav className="flex items-center justify-center col-span-4 space-x-2">
             {mainNavigation.map((item) => (
               <NavLink
                 key={item.href}
