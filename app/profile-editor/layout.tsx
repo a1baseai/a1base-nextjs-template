@@ -172,7 +172,7 @@ export default function ProfileEditorLayout({
         </div>
 
         {/* Floating action bar - now positioned relative to the main content area */}
-        <div className="fixed bottom-6 right-6 left-[280px] max-w-4xl mx-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-4 rounded-lg shadow-lg z-10">
+        <div className="fixed bottom-6 right-6 left-[280px] max-w-4xl mx-auto bg-gradient-to-r from-blue-600 to-blue-800 dark:bg-gray-800 border  dark:border-gray-700 p-4 rounded-lg shadow-lg z-10">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-2">
               {showSavedMessage && (
