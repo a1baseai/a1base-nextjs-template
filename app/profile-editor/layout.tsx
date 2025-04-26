@@ -54,10 +54,10 @@ export default function ProfileEditorLayout({
   // Define sidebar items
   const sidebarItems: SidebarItem[] = [
     {
-      title: "Onboarding",
+      title: "Get Started",
       icon: <LayoutDashboard className="h-5 w-5" />,
-      href: "/profile-editor/onboarding",
-      variant: pathname.includes("/onboarding") ? "default" : "ghost",
+      href: "/profile-editor/get-started",
+      variant: pathname.includes("/get-started") ? "default" : "ghost",
     },
     {
       title: "Profile Settings",
@@ -72,17 +72,18 @@ export default function ProfileEditorLayout({
       variant: pathname.includes("/base-information") ? "default" : "ghost",
     },
     {
+      title: "Onboarding Flow Builder",
+      icon: <MessageSquare className="h-5 w-5" />,
+      href: "/profile-editor/onboarding-flow",
+      variant: pathname.includes("/onboarding-flow") ? "default" : "ghost",
+    },
+    {
       title: "Integrations",
       icon: <Zap className="h-5 w-5" />,
       href: "/profile-editor/integrations",
       variant: pathname.includes("/integrations") ? "default" : "ghost",
     },
-    {
-      title: "Web Behavior",
-      icon: <Globe className="h-5 w-5" />,
-      href: "/profile-editor/web-behavior",
-      variant: pathname.includes("/web-behavior") ? "default" : "ghost",
-    },
+    
     {
       title: "Conversation Settings",
       icon: <MessageSquare className="h-5 w-5" />,
@@ -148,18 +149,20 @@ export default function ProfileEditorLayout({
           {/* Page header */}
           <div className="mb-8">
             <h1 className="text-2xl font-bold">
-              {pathname.includes("/onboarding") && "Agent Onboarding"}
+              {pathname.includes("/get-started") && "Get Started"}
               {pathname.includes("/profile-settings") && "Profile Settings"}
               {pathname.includes("/base-information") && "Base Information"}
+              {pathname.includes("/onboarding-flow") && "Onboarding Flow Builder"}
               {pathname.includes("/integrations") && "Integrations"}
               {pathname.includes("/web-behavior") && "Web Behavior"}
               {pathname.includes("/conversation-settings") && "Conversation Settings"}
               {pathname.includes("/advanced-settings") && "Advanced Settings"}
             </h1>
             <p className="text-gray-500 dark:text-gray-400 mt-1">
-              {pathname.includes("/onboarding") && "Set up your AI agent with a guided flow"}
+              {pathname.includes("/get-started") && "Set up your AI agent with a guided flow"}
               {pathname.includes("/profile-settings") && "Configure your agent's identity and appearance"}
               {pathname.includes("/base-information") && "Provide base knowledge for your agent"}
+              {pathname.includes("/onboarding-flow") && "Create welcome messages and onboarding experience for new users"}
               {pathname.includes("/integrations") && "Connect your agent to external services"}
               {pathname.includes("/web-behavior") && "Configure how your agent behaves on the web"}
               {pathname.includes("/conversation-settings") && "Customize the chat experience"}
