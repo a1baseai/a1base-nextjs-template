@@ -20,9 +20,6 @@ export default function DebugPage() {
     a1baseAgentName: string | null;
     a1baseAgentNumber: string | null;
     selectedModelProvider: string;
-    supabaseUrlAvailable: boolean;
-    supabaseKeyAvailable: boolean;
-    supabaseConnected: boolean;
   }>({
     openaiKeyAvailable: false,
     anthropicKeyAvailable: false,
@@ -31,9 +28,6 @@ export default function DebugPage() {
     a1baseAgentName: null,
     a1baseAgentNumber: null,
     selectedModelProvider: "openai",
-    supabaseUrlAvailable: false,
-    supabaseKeyAvailable: false,
-    supabaseConnected: false,
   });
   
   const [isLoading, setIsLoading] = useState(true);
@@ -355,36 +349,6 @@ export default function DebugPage() {
                   Agent Number: {envStatus.a1baseAgentNumber}
                 </div>
               )}
-            </div>
-
-            <div className={`p-3 sm:p-4 rounded-lg border ${envStatus.supabaseConnected ? "bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800" : "bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800"}`}>
-              <h3 className="font-medium mb-1 sm:mb-2 flex items-center gap-2 text-sm sm:text-base">
-                {envStatus.supabaseConnected ? (
-                  <CheckCircle2 className="h-5 w-5 text-green-500" />
-                ) : (
-                  <AlertTriangle className="h-5 w-5 text-red-500" />
-                )}
-                Supabase Connection
-              </h3>
-              <div className="space-y-1">
-                <p className="text-xs sm:text-sm text-muted-foreground">
-                  {envStatus.supabaseUrlAvailable
-                    ? "Supabase URL is correctly configured"
-                    : "Supabase URL is missing. Set NEXT_PUBLIC_SUPABASE_URL in your .env file"}
-                </p>
-                <p className="text-xs sm:text-sm text-muted-foreground">
-                  {envStatus.supabaseKeyAvailable
-                    ? "Supabase API key is correctly configured"
-                    : "Supabase API key is missing. Set NEXT_PUBLIC_SUPABASE_ANON_KEY in your .env file"}
-                </p>
-                {envStatus.supabaseUrlAvailable && envStatus.supabaseKeyAvailable && (
-                  <p className="text-xs sm:text-sm text-muted-foreground">
-                    {envStatus.supabaseConnected
-                      ? "✅ Connection to Supabase established successfully"
-                      : "❌ Connection to Supabase failed. Check your credentials and Supabase service status"}
-                  </p>
-                )}
-              </div>
             </div>
           </div>
         </CardContent>

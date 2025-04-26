@@ -6,28 +6,28 @@ import { WhatsAppButton } from "@/components/whatsapp-button-simple";
 export default function Home() {
   return (
     <>
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 sm:p-20 font-[font-family:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
+    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-4 pb-16 sm:p-8 md:p-16 lg:p-20 font-[font-family:var(--font-geist-sans)] max-w-full overflow-hidden">
+      <main className="flex flex-col gap-6 md:gap-8 row-start-2 items-center sm:items-start w-full max-w-5xl mx-auto">
         <Image
-          className="dark:invert"
+          className="dark:invert w-auto h-auto max-w-[150px] sm:max-w-[180px]"
           src="/a1base-black.png"
           alt="A1Framework logo"
           width={180}
           height={38}
           priority
         />
-        <div>
-          <h1 className="text-3xl font-bold text-center sm:text-left">
+        <div className="w-full">
+          <h1 className="text-2xl md:text-3xl font-bold text-center sm:text-left">
             {`Welcome to A1Framework`}
           </h1>
-          <p className="text-lg text-center sm:text-left">
+          <p className="text-base md:text-lg text-center sm:text-left mt-2">
             {`Quickly build a conversational AI Agent that people love to work with.`}
           </p>
         </div>
 
         {/* Environment Setup Alert */}
         {(!process.env.OPENAI_API_KEY || !process.env.A1BASE_API_KEY) && (
-          <div className="w-full max-w-4xl p-4 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-700">
+          <div className="w-full max-w-4xl p-3 md:p-4 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-700">
             <div className="flex items-start gap-3">
               <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
               <div>
@@ -60,12 +60,12 @@ export default function Home() {
         {/* Timeline Container */}
         <div className="relative w-full max-w-4xl">
           {/* Timeline Line */}
-          <div className="absolute left-6 top-10 bottom-0 w-0.5 bg-gray-200 hidden sm:block"></div>
+          <div className="absolute left-5 md:left-6 top-10 bottom-0 w-0.5 bg-gray-200 hidden sm:block"></div>
 
           {/* Section 1: Try your AI Assistant */}
           <div className="mb-16 relative">
             <div className="flex flex-col mb-6">
-              <div className="absolute left-0 w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-xl z-10 hidden sm:flex">
+              <div className="absolute left-0 w-10 h-10 md:w-12 md:h-12 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-lg md:text-xl z-10 hidden sm:flex">
                 1
               </div>
               <h2 className="text-2xl font-semibold ml-0 sm:ml-16">Try Your AI Assistant</h2>
@@ -100,7 +100,7 @@ export default function Home() {
           {/* Section 2: Quick Start */}
           <div className="mb-16 relative">
             <div className="flex items-center mb-6">
-              <div className="absolute left-0 w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-xl z-10 hidden sm:flex">
+              <div className="absolute left-0 w-10 h-10 md:w-12 md:h-12 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-lg md:text-xl z-10 hidden sm:flex">
                 2
               </div>
               <div className="ml-0 sm:ml-16">
@@ -132,7 +132,7 @@ export default function Home() {
           {/* Section 3: Next Steps */}
           <div className="mb-16 relative">
             <div className="flex items-center mb-6">
-              <div className="absolute left-0 w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-xl z-10 hidden sm:flex">
+              <div className="absolute left-0 w-10 h-10 md:w-12 md:h-12 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-lg md:text-xl z-10 hidden sm:flex">
                 3
               </div>
               <div className="ml-0 sm:ml-16">
@@ -170,7 +170,7 @@ export default function Home() {
           {/* Section 4: Try A1Mail */}
           <div className="mb-16 relative">
             <div className="flex items-center mb-6">
-              <div className="absolute left-0 w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-xl z-10 hidden sm:flex">
+              <div className="absolute left-0 w-10 h-10 md:w-12 md:h-12 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-lg md:text-xl z-10 hidden sm:flex">
                 4
               </div>
               <div className="ml-0 sm:ml-16">
@@ -215,7 +215,7 @@ await SendEmailFromAgent({
           {/* Section 5: GitHub Stars */}
           <div className="mb-16 relative">
             <div className="flex items-center mb-6">
-              <div className="absolute left-0 w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-xl z-10 hidden sm:flex">
+              <div className="absolute left-0 w-10 h-10 md:w-12 md:h-12 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-lg md:text-xl z-10 hidden sm:flex">
                 5
               </div>
               <div className="ml-0 sm:ml-16">
@@ -251,7 +251,7 @@ await SendEmailFromAgent({
           {/* Section 6: Resources */}
           <div className="relative">
             <div className="flex items-center mb-6">
-              <div className="absolute left-0 w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-xl z-10 hidden sm:flex">
+              <div className="absolute left-0 w-10 h-10 md:w-12 md:h-12 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-lg md:text-xl z-10 hidden sm:flex">
                 6
               </div>
               <div className="ml-0 sm:ml-16">
@@ -359,9 +359,9 @@ await SendEmailFromAgent({
                 </div>
                 
                 {/* Additional resources section */}
-                <div className="mt-6 bg-slate-50 dark:bg-black/30 p-4 rounded-lg">
+                <div className="mt-6 bg-slate-50 dark:bg-black/30 p-3 md:p-4 rounded-lg">
                   <h3 className="font-semibold mb-2">Additional Resources</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:gap-3">
                     <a
                       href="/tutorials"
                       className="text-blue-600 hover:underline flex items-center gap-1 text-sm"
