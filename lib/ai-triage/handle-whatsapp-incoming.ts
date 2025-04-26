@@ -1,6 +1,6 @@
 // import { WhatsAppIncomingData } from "a1base-node";
 import { MessageRecord } from "@/types/chat";
-import { triageMessage } from "./triage-logic";
+import { triageMessage, triggerOnboardingFlow } from "./triage-logic";
 import { initializeDatabase, getInitializedAdapter } from "../supabase/config";
 import { ExtendedWhatsAppIncomingData } from "@/app/api/whatsapp/incoming/route";
 
@@ -238,6 +238,27 @@ export async function handleWhatsAppIncoming({
   if (sender_number === process.env.A1BASE_AGENT_NUMBER) {
     sender_name = process.env.A1BASE_AGENT_NAME || sender_name;
   }
+  
+  // Check if this is a new user/thread and should trigger onboarding
+  const adapter = await getInitializedAdapter();
+  let shouldTriggerOnboarding = false;
+  
+  if (adapter) {
+    // Check if this is a new thread in the database
+    const thread = await adapter.getThread(thread_id);
+    if (!thread) {
+      shouldTriggerOnboarding = true;
+      console.log(`[WhatsApp] New thread detected: ${thread_id}. Will trigger onboarding.`);
+    }
+  } else {
+    // Using in-memory storage
+    // Check if this is the first message in this thread
+    const threadMessages = messagesByThread.get(thread_id) || [];
+    if (threadMessages.length === 0) {
+      shouldTriggerOnboarding = true;
+      console.log(`[WhatsApp] First message in thread: ${thread_id}. Will trigger onboarding.`);
+    }
+  }
 
   // Store message with new structure
   await saveMessage(thread_id, {
@@ -254,18 +275,25 @@ export async function handleWhatsAppIncoming({
   if (sender_number === process.env.A1BASE_AGENT_NUMBER!) {
     return;
   }
-
-  await triageMessage({
-    thread_id,
-    message_id,
-    content,
-    message_type,
-    message_content,
-    sender_name,
-    sender_number,
-    thread_type,
-    timestamp,
-    messagesByThread,
-    service,
-  });
+  
+  // If this is a new thread/user, trigger onboarding flow
+  if (shouldTriggerOnboarding) {
+    console.log(`[WhatsApp] Triggering onboarding flow for thread ${thread_id}`);
+    await triggerOnboardingFlow(thread_id, sender_number);
+  } else {
+    // Otherwise process as normal message
+    await triageMessage({
+      thread_id,
+      message_id,
+      content,
+      message_type,
+      message_content,
+      sender_name,
+      sender_number,
+      thread_type,
+      timestamp,
+      messagesByThread,
+      service,
+    });
+  }
 }

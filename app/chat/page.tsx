@@ -7,13 +7,15 @@ import { ThreadList } from "@/components/assistant-ui/thread-list";
 import { LeftSidebar } from "@/components/assistant-ui/left-sidebar";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, ArrowRight, ChevronRight, Menu, X } from "lucide-react";
+import { AlertTriangle, ArrowRight, ChevronRight, Menu, RefreshCw, X } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import Link from "next/link";
 import { FC, useState, useEffect } from "react";
 import { AgentProfileSettings } from "@/lib/agent-profile/types";
 import { defaultAgentProfileSettings } from "@/lib/agent-profile/agent-profile-settings";
 import { loadProfileSettings } from "@/lib/storage/file-storage";
+import { v4 as uuidv4 } from "uuid";
+import { toast } from "sonner";
 
 // Mobile-friendly left sidebar sheet
 const LeftBarSheet: FC = () => {
@@ -91,7 +93,9 @@ const MobileActions: FC<{
 };
 
 // Chat top info area
-const ChatTopInfo: FC = () => {
+const ChatTopInfo: FC<{
+  onTriggerOnboarding: () => void;
+}> = ({ onTriggerOnboarding }) => {
   // State to store the fetched profile settings
   const [profileSettings, setProfileSettings] =
     useState<AgentProfileSettings | null>(null);
@@ -121,23 +125,40 @@ const ChatTopInfo: FC = () => {
 
   return (
     <div className="m-2 sm:m-4 bg-gray-100 dark:bg-gray-800 p-3 sm:p-4 rounded-lg shadow-sm">
-      <div className="flex items-center gap-3 sm:gap-6">
-        <Image
-          src="/a1base-favicon.png"
-          alt="A1Base Logo"
-          width={80}
-          height={80}
-          className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-lg"
-          unoptimized
-        />
-        <div>
-          <h1 className="text-lg sm:text-xl font-bold">
-            {settings.companyName}
-          </h1>
-          <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-300 mt-1">
-            {settings.botPurpose[0]}
-          </p>
+      <div className="flex items-center justify-between w-full">
+        <div className="flex items-center">
+          {profileSettings && (
+            <div className="flex items-center">
+              <div className="mr-4 h-14 w-14 overflow-hidden rounded-full">
+                <Image
+                  src={profileSettings.agentSettings?.profileGifUrl || "/a1base-favicon.png"}
+                  alt={profileSettings.name}
+                  width={56}
+                  height={56}
+                  unoptimized={true}
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold">{profileSettings.name}</h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {profileSettings.companyName}
+                </p>
+              </div>
+            </div>
+          )}
         </div>
+
+        {/* Onboarding Button */}
+        <Button
+          variant="outline"
+          size="sm"
+          className="flex items-center gap-1 text-xs"
+          onClick={onTriggerOnboarding}
+        >
+          <RefreshCw className="h-3 w-3" />
+          Start Onboarding
+        </Button>
       </div>
     </div>
   );
@@ -258,6 +279,129 @@ export default function ChatPage() {
   const runtime = useChatRuntime({
     api: "/api/chat",
   });
+  
+  // State to track onboarding progress
+  const [isOnboardingInProgress, setIsOnboardingInProgress] = useState(false);
+  
+  // Handle triggering the onboarding flow
+  const handleTriggerOnboarding = async () => {
+    if (isOnboardingInProgress) {
+      toast.info("Onboarding is already in progress");
+      return;
+    }
+    
+    setIsOnboardingInProgress(true);
+    toast.info("Starting onboarding flow...");
+    
+    try {
+      // Fetch the onboarding flow from our API
+      const response = await fetch('/api/onboarding-chat');
+      if (!response.ok) {
+        throw new Error('Failed to fetch onboarding flow');
+      }
+      
+      // Process as a stream
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      
+      if (!reader) {
+        throw new Error('Stream reader not available');
+      }
+      
+      // Helper function to process the messages one at a time with a delay
+      const processStreamWithDelay = async () => {
+        let result = await reader.read();
+        
+        // Our first "Hi" message to start the conversation
+        if (!result.done) {
+          // Simulate user input by submitting a message via the chat API
+          await fetch('/api/chat', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              messages: [{
+                role: 'user',
+                content: 'Start onboarding',
+              }],
+            }),
+          });
+          
+          // Wait a moment for the UI to update
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+        
+        // Process the stream of messages
+        while (!result.done) {
+          const chunk = decoder.decode(result.value, { stream: true });
+          
+          // Extract SSE messages from chunk
+          const messages = chunk
+            .split('\n\n')
+            .filter(msg => msg.trim().startsWith('data:'))
+            .map(msg => {
+              try {
+                return JSON.parse(msg.replace('data:', '').trim());
+              } catch (e) {
+                return null;
+              }
+            })
+            .filter(Boolean);
+          
+          // Process each message with a delay between them
+          for (const message of messages) {
+            console.log('Onboarding message:', message);
+            
+            // Submit the assistant message via the chat API
+            await fetch('/api/chat', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                messages: [{
+                  role: 'assistant',
+                  content: message.message,
+                  id: message.id,
+                }],
+              }),
+            });
+            
+            // Add a delay between messages for a more natural flow
+            if (!message.waitForResponse) {
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+          }
+          
+          // Read the next chunk
+          result = await reader.read();
+        }
+        
+        setIsOnboardingInProgress(false);
+      };
+      
+      // Start processing the stream
+      processStreamWithDelay().catch(err => {
+        console.error('Error processing stream:', err);
+        setIsOnboardingInProgress(false);
+        toast.error('Failed to process onboarding messages');
+      });
+      
+      // Safety timeout to ensure we don't get stuck
+      setTimeout(() => {
+        if (isOnboardingInProgress) {
+          setIsOnboardingInProgress(false);
+          toast.info('Onboarding process completed or timed out');
+        }
+      }, 30000); // 30 seconds timeout
+      
+    } catch (error) {
+      console.error("Error initiating onboarding:", error);
+      setIsOnboardingInProgress(false);
+      toast.error("Failed to start onboarding flow");
+    }
+  };
 
   // Define content workflows for sidebar and mobile menu
   const contentWorkflows = [
@@ -296,7 +440,7 @@ export default function ChatPage() {
             </div>
 
             {/* Chat header with profile info */}
-            <ChatTopInfo />
+            <ChatTopInfo onTriggerOnboarding={handleTriggerOnboarding} />
 
             {/* Environment check */}
             <EnvironmentCheck />

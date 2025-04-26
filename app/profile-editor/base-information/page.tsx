@@ -22,6 +22,9 @@ export default function BaseInformationEditor() {
   
   // State to track if changes have been made
   const [hasChanges, setHasChanges] = useState(false);
+  
+  // State to track if data loading is complete (even if empty)
+  const [isLoaded, setIsLoaded] = useState(false);
 
   // Set up event listener for save action from the floating bar
   useEffect(() => {
@@ -52,14 +55,17 @@ export default function BaseInformationEditor() {
         } else {
           // Check localStorage as fallback
           const storedInfo = loadFromLocalStorage<InformationSection[]>(LOCAL_STORAGE_KEYS.AGENT_INFORMATION);
-          setBaseInformation(storedInfo || [...defaultBaseInformation]);
+          setBaseInformation(storedInfo || []);
         }
       } catch (error) {
         console.error("Error loading base information:", error);
         toast.error("Failed to load base information");
         
-        // Fallback to default information
-        setBaseInformation([...defaultBaseInformation]);
+        // Leave as empty array if there's an error
+        setBaseInformation([]);
+      } finally {
+        // Mark loading as complete regardless of result
+        setIsLoaded(true);
       }
     };
     
@@ -123,8 +129,8 @@ export default function BaseInformationEditor() {
     setHasChanges(true);
   };
 
-  // If base information hasn't loaded yet, show a loading state
-  if (baseInformation.length === 0 && !hasChanges) {
+  // Only show loading spinner while data is being loaded
+  if (!isLoaded) {
     return (
       <div className="flex justify-center items-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-700"></div>
@@ -134,6 +140,26 @@ export default function BaseInformationEditor() {
 
   return (
     <div className="space-y-6">
+      {/* Empty State UI */}
+      {baseInformation.length === 0 && (
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-center justify-center py-10 text-center">
+            <div className="mb-4 rounded-full bg-blue-100 p-3">
+              <Plus className="h-8 w-8 text-blue-600" />
+            </div>
+            <h3 className="mb-2 text-xl font-semibold">No Information Sections Yet</h3>
+            <p className="mb-6 text-gray-500 max-w-md">
+              Add your first information section to provide context to your AI assistant. 
+              This helps your assistant understand your business, products, or services.
+            </p>
+            <Button onClick={addInformationSection} className="flex items-center gap-2">
+              <Plus className="h-4 w-4" />
+              Add Your First Section
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+      
       {/* Base Information Sections */}
       {baseInformation.map((section, index) => (
         <Card key={index}>
