@@ -446,49 +446,7 @@ export default function ProfileSettingsEditor() {
               />
             </div>
 
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="use-web-search">Web Search</Label>
-                <div className="text-sm text-gray-500 dark:text-gray-400">
-                  Allow agent to search the web for information
-                </div>
-              </div>
-              <Switch
-                id="use-web-search"
-                checked={profileSettings.workflowSettings.workflow === "web_search"}
-                onCheckedChange={(checked) =>
-                  setProfileSettings({
-                    ...profileSettings,
-                    workflowSettings: {
-                      ...profileSettings.workflowSettings,
-                      workflow: checked ? "web_search" : "standard"
-                    }
-                  })
-                }
-              />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="use-file-access">File Access</Label>
-                <div className="text-sm text-gray-500 dark:text-gray-400">
-                  Allow agent to read and write files
-                </div>
-              </div>
-              <Switch
-                id="use-file-access"
-                checked={profileSettings.agentSettings.agent === "file_access"}
-                onCheckedChange={(checked) =>
-                  setProfileSettings({
-                    ...profileSettings,
-                    agentSettings: {
-                      ...profileSettings.agentSettings,
-                      agent: checked ? "file_access" : "standard"
-                    }
-                  })
-                }
-              />
-            </div>
+          
           </div>
         </CardContent>
         <CardFooter className="flex justify-between">
