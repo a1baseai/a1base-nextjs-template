@@ -93,14 +93,7 @@ export default function BaseInformationEditor() {
     }
   };
 
-  // Reset base information to defaults
-  const resetBaseInformation = () => {
-    if (confirm("Are you sure you want to reset base information to default values? This action cannot be undone.")) {
-      setBaseInformation([...defaultBaseInformation]);
-      setHasChanges(true);
-      toast.info("Base information reset to defaults. Click Save to apply changes.");
-    }
-  };
+  
 
   // Add a new information section
   const addInformationSection = () => {
@@ -228,13 +221,7 @@ export default function BaseInformationEditor() {
       
       {/* Action Buttons */}
       <div className="flex justify-between">
-        <Button 
-          variant="destructive" 
-          onClick={resetBaseInformation}
-        >
-          <Trash2 className="h-4 w-4 mr-2" />
-          Reset to Default Information
-        </Button>
+        
         <Button 
           variant="outline" 
           onClick={saveBaseInfo}

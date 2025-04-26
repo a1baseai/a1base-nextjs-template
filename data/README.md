@@ -40,6 +40,3 @@ You can manually edit these JSON files if needed, but be careful to maintain the
 
 It's a good practice to back up or version control these files if you've made significant customizations to your agent's personality.
 
-## Resetting to Defaults
-
-You can either delete these files to reset to defaults, or use the "Reset to Default" buttons in the profile editor UI.

@@ -105,13 +105,7 @@ export default function ProfileSettingsEditor() {
   };
 
   // Reset profile settings to defaults
-  const resetProfileSettings = () => {
-    if (confirm("Are you sure you want to reset profile settings to default values? This action cannot be undone.")) {
-      setProfileSettings({ ...defaultAgentProfileSettings });
-      setHasChanges(true);
-      toast.info("Profile settings reset to defaults. Click Save to apply changes.");
-    }
-  };
+  
 
   // Add a new tone item
   const addToneItem = () => {
@@ -498,10 +492,7 @@ export default function ProfileSettingsEditor() {
           </div>
         </CardContent>
         <CardFooter className="flex justify-between">
-          <Button variant="destructive" onClick={resetProfileSettings}>
-            <Trash2 className="h-4 w-4 mr-2" />
-            Reset to Default
-          </Button>
+
           {/* We can keep this button for direct saves, but the floating action bar is the primary save method */}
           <Button variant="outline" onClick={saveProfileSettings} disabled={!hasChanges}>
             <Save className="h-4 w-4 mr-2" />

@@ -83,12 +83,7 @@ export default function OnboardingFlowBuilder() {
     }
   };
 
-  // Reset onboarding flow settings to defaults
-  const resetOnboardingFlow = () => {
-    setOnboardingFlow({ ...defaultOnboardingFlow });
-    setHasChanges(true);
-    toast.info("Onboarding flow settings reset to defaults");
-  };
+  
 
   // Add a new message
   const addMessage = () => {
@@ -413,10 +408,7 @@ export default function OnboardingFlowBuilder() {
           )}
         </CardContent>
         <CardFooter className="flex justify-between">
-          <Button variant="destructive" onClick={resetOnboardingFlow}>
-            <Trash2 className="h-4 w-4 mr-2" />
-            Reset to Default
-          </Button>
+          
           <Button variant="outline" onClick={saveOnboardingFlowSettings} disabled={!hasChanges}>
             <Save className="h-4 w-4 mr-2" />
             Save
