@@ -167,8 +167,6 @@ const RightSidebar: FC<{
           </div>
         ))}
       </div>
-
-      
     </div>
   );
 };
@@ -185,6 +183,7 @@ const EnvironmentCheck: FC = () => {
     async function checkEnvVars() {
       try {
         const response = await fetch("/api/env-check");
+        console.log("Environment check response:", response);
         const data = await response.json();
         setStatus({
           hasOpenAIKey: data.hasOpenAIKey,
@@ -257,10 +256,7 @@ const EnvironmentCheck: FC = () => {
 export default function ChatPage() {
   // Initialize chat runtime
   const runtime = useChatRuntime({
-    initialMemory: undefined,
-    apiEndpointConfig: {
-      baseUrl: "/api",
-    },
+    api: "/api/chat",
   });
 
   // Define content workflows for sidebar and mobile menu

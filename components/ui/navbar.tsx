@@ -91,7 +91,7 @@ export function Navbar() {
     {
       href: "/profile-editor",
       icon: <Settings className="h-5 w-5" />,
-      label: "Profile Editor",
+      label: "Agent Profile Editor",
       isActive: pathname === "/profile-editor",
       isExternal: false,
     },
