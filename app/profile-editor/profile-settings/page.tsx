@@ -420,15 +420,16 @@ export default function ProfileSettingsEditor() {
             <Input
               id="dialect"
               value={profileSettings.languageStyle.dialect}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                 setProfileSettings({
                   ...profileSettings,
                   languageStyle: {
                     ...profileSettings.languageStyle,
                     dialect: e.target.value
                   }
-                })
-              }
+                });
+                setHasChanges(true);
+              }}
               placeholder="e.g., American English"
             />
           </div>
