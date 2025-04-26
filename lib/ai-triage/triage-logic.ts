@@ -237,12 +237,41 @@ export async function triageMessage({
       message_content: msg.message_content || {
         text: msg.content,
       },
+      role: msg.sender_number === process.env.A1BASE_AGENT_NUMBER ? "assistant" : "user"
     }));
-
-    const triage = await triageMessageIntent(messages);
+    
+    // Check for the exact "Start onboarding" trigger phrase in the most recent message
+    const latestMessage = messages[messages.length - 1];
+    const isOnboardingTrigger = 
+      latestMessage && 
+      latestMessage.role === "user" && 
+      latestMessage.content && 
+      latestMessage.content.trim().toLowerCase() === "start onboarding";
+    
+    // If it's an onboarding trigger, skip the intent classification
+    const triage = isOnboardingTrigger 
+      ? { responseType: "onboardingFlow" } 
+      : await triageMessageIntent(messages);
     // Based on the triage result, choose the appropriate workflow
 
     switch (triage.responseType) {
+      case "onboardingFlow":
+        console.log("Running Onboarding Flow");
+        
+        const onboardingResponse = await DefaultReplyToMessage(
+          messages,
+          thread_type as "individual" | "group",
+          thread_id,
+          sender_number,
+          service
+        );
+        
+        return {
+          type: "onboarding",
+          success: true,
+          message: onboardingResponse,
+        };
+        
       case "handleEmailAction":
         console.log("Running Email Workflow");
 

@@ -19,6 +19,9 @@ export interface ThreadMessage {
   sender_number: string
   sender_name: string
   timestamp: string
+  thread_id?: string
+  thread_type?: string
+  role?: 'user' | 'assistant' | 'system'
 }
 
 export interface MessageRecord {

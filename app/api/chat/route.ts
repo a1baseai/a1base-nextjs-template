@@ -75,12 +75,30 @@ export async function POST(req: Request) {
     
     console.log(`[CHAT-API] Triage result: ${triageResponse.type}`);
     
-    // For non-default triage types, return JSON response
+    // For non-default triage types, create a direct streaming response without using the AI model
     if (triageResponse.type !== 'default') {
-      console.log('[CHAT-API] Returning non-default triage response');
-      return NextResponse.json({ 
-        response: triageResponse.message || 'No response message available' 
+      console.log('[CHAT-API] Creating direct stream for non-default triage response');
+      const responseMessage = triageResponse.message || 'No response message available';
+      
+      // Rather than creating our own stream directly, let's use the OpenAI API
+      // but make it return only the onboarding message as a completion
+      console.log('[CHAT-API] Using OpenAI API for streaming');
+      
+      // Use the streamText function from the Vercel AI SDK for consistent format
+      const result = streamText({
+        model: openai('gpt-3.5-turbo'), // Using faster model since we just need to stream predefined text
+        system: "You are an assistant helping with onboarding. Return ONLY the message provided to you without any modifications.",
+        messages: [
+          {
+            role: "user",
+            content: `Simply respond with this exact message, no commentary before or after:\n\n${responseMessage}`
+          }
+        ],
+        temperature: 0,
+        maxTokens: 1000,
       });
+      
+      return result.toDataStreamResponse();
     }
 
     // Prepare messages array with system prompt

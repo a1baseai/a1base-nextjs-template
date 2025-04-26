@@ -3,7 +3,7 @@
   "messages": [
     {
       "id": "1",
-      "text": "Hi there! 👋 I'm your new AI assistant. Welcome!",
+      "text": "Hi there! 👋 I'm your new AI assistant. Welcome!!!",
       "waitForResponse": false,
       "order": 1
     },

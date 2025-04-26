@@ -1,7 +1,7 @@
 "use client";
 
 import { useChatRuntime } from "@assistant-ui/react-ai-sdk";
-import { AssistantRuntimeProvider } from "@assistant-ui/react";
+import { AssistantRuntimeProvider, useThreadRuntime } from "@assistant-ui/react";
 import { Thread } from "@/components/assistant-ui/thread";
 import { ThreadList } from "@/components/assistant-ui/thread-list";
 import { LeftSidebar } from "@/components/assistant-ui/left-sidebar";
@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { AlertTriangle, ArrowRight, ChevronRight, Menu, RefreshCw, X } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import Link from "next/link";
-import { FC, useState, useEffect } from "react";
+import { FC, useState, useEffect, useRef } from "react";
 import { AgentProfileSettings } from "@/lib/agent-profile/types";
 import { defaultAgentProfileSettings } from "@/lib/agent-profile/agent-profile-settings";
 import { loadProfileSettings } from "@/lib/storage/file-storage";
@@ -93,9 +93,7 @@ const MobileActions: FC<{
 };
 
 // Chat top info area
-const ChatTopInfo: FC<{
-  onTriggerOnboarding: () => void;
-}> = ({ onTriggerOnboarding }) => {
+const ChatTopInfo: FC = () => {
   // State to store the fetched profile settings
   const [profileSettings, setProfileSettings] =
     useState<AgentProfileSettings | null>(null);
@@ -149,16 +147,7 @@ const ChatTopInfo: FC<{
           )}
         </div>
 
-        {/* Onboarding Button */}
-        <Button
-          variant="outline"
-          size="sm"
-          className="flex items-center gap-1 text-xs"
-          onClick={onTriggerOnboarding}
-        >
-          <RefreshCw className="h-3 w-3" />
-          Start Onboarding
-        </Button>
+        {/* Profile edit button can be added here if needed */}
       </div>
     </div>
   );
@@ -280,114 +269,7 @@ export default function ChatPage() {
     api: "/api/chat",
   });
   
-  // State to track onboarding progress
-  const [isOnboardingInProgress, setIsOnboardingInProgress] = useState(false);
-  
-  // Handle triggering the onboarding flow
-  const handleTriggerOnboarding = async () => {
-    if (isOnboardingInProgress) {
-      toast.info("Onboarding is already in progress");
-      return;
-    }
-    
-    setIsOnboardingInProgress(true);
-    toast.info("Starting onboarding flow...");
-    
-    try {
-      // First, add a user message to start the conversation
-      const userMessage = "Start onboarding";
-      
-      // Add the user message to the chat using the chat interface
-      // It will appear as a user message in the chat
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          messages: [{ role: 'user', content: userMessage }]
-        }),
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to send the user message');
-      }
-      
-      // Let's wait a moment for the UI to update
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Fetch the onboarding flow from our API
-      const onboardingResponse = await fetch('/api/onboarding-chat');
-      if (!onboardingResponse.ok) {
-        throw new Error('Failed to fetch onboarding flow');
-      }
-      
-      // Process the stream of onboarding messages
-      const reader = onboardingResponse.body?.getReader();
-      if (!reader) throw new Error('Stream reader not available');
-      
-      const decoder = new TextDecoder();
-      let result = await reader.read();
-      
-      // Process each chunk of the stream
-      while (!result.done) {
-        const chunk = decoder.decode(result.value, { stream: true });
-        
-        // Extract SSE messages from chunk
-        const messages = chunk
-          .split('\n\n')
-          .filter(msg => msg.trim().startsWith('data:'))
-          .map(msg => {
-            try {
-              return JSON.parse(msg.replace('data:', '').trim());
-            } catch (e) {
-              return null;
-            }
-          })
-          .filter(Boolean);
-        
-        // Process each message
-        for (const message of messages) {
-          console.log('Processing onboarding message:', message);
-          
-          // Send each assistant message to the chat API
-          // This will make it appear in the chat UI automatically
-          await fetch('/api/chat', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              messages: [{ role: 'assistant', content: message.message }]
-            }),
-          });
-          
-          // Add a delay between messages for a more natural flow
-          if (!message.waitForResponse) {
-            await new Promise(resolve => setTimeout(resolve, 1500));
-          }
-        }
-        
-        // Read the next chunk
-        result = await reader.read();
-      }
-      
-      setIsOnboardingInProgress(false);
-      
-      // Safety timeout to ensure we don't get stuck
-      setTimeout(() => {
-        if (isOnboardingInProgress) {
-          setIsOnboardingInProgress(false);
-          toast.info('Onboarding process completed or timed out');
-        }
-      }, 30000); // 30 seconds timeout
-      
-    } catch (error) {
-      console.error("Error initiating onboarding:", error);
-      setIsOnboardingInProgress(false);
-      toast.error("Failed to start onboarding flow");
-    }
-  };
+  // Define content workflows for sidebar and mobile menu
 
   // Define content workflows for sidebar and mobile menu
   const contentWorkflows = [
@@ -426,7 +308,7 @@ export default function ChatPage() {
             </div>
 
             {/* Chat header with profile info */}
-            <ChatTopInfo onTriggerOnboarding={handleTriggerOnboarding} />
+            <ChatTopInfo />
 
             {/* Environment check */}
             <EnvironmentCheck />

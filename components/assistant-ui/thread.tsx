@@ -84,36 +84,36 @@ const ThreadWelcome: FC = () => {
 };
 
 const ThreadWelcomeSuggestions: FC = () => {
-  return null;
+  // return null;
   
   // Uncomment the following code to add welcome suggestion buttons
   // Customize the prompts and text to match your use case
-  /*
+
   return (
     <div className="mt-3 flex w-full items-stretch justify-center gap-4">
       <ThreadPrimitive.Suggestion
         className="hover:bg-muted/80 flex max-w-sm grow basis-0 flex-col items-center justify-center rounded-lg border p-3 transition-colors ease-in"
-        prompt="Your first suggestion prompt here"
+        prompt="Start onboarding"
         method="replace"
         autoSend
       >
         <span className="line-clamp-2 text-ellipsis text-sm font-semibold">
-          First suggestion button text
+          Start Onboarding
         </span>
       </ThreadPrimitive.Suggestion>
       <ThreadPrimitive.Suggestion
         className="hover:bg-muted/80 flex max-w-sm grow basis-0 flex-col items-center justify-center rounded-lg border p-3 transition-colors ease-in"
-        prompt="Your second suggestion prompt here"
+        prompt="Tell me about your capabilities"
         method="replace"
         autoSend
       >
         <span className="line-clamp-2 text-ellipsis text-sm font-semibold">
-          Second suggestion button text
+          What can you do?
         </span>
       </ThreadPrimitive.Suggestion>
     </div>
   );
-  */
+  
 };
 
 const Composer: FC = () => {
