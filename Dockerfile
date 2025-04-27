@@ -12,10 +12,10 @@ RUN npm ci
 COPY . .
 
 # Set environment variables for build
-ARG NEXT_PUBLIC_SUPABASE_URL
-ARG NEXT_PUBLIC_SUPABASE_KEY
-ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
-ENV NEXT_PUBLIC_SUPABASE_KEY=$NEXT_PUBLIC_SUPABASE_KEY
+ARG SUPABASE_URL
+ARG SUPABASE_KEY
+ENV SUPABASE_URL=$SUPABASE_URL
+ENV SUPABASE_KEY=$SUPABASE_KEY
 
 # Add dummy environment variables to prevent build failures
 # These will be overridden at runtime with the actual secrets

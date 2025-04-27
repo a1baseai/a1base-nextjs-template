@@ -11,8 +11,10 @@ export async function GET() {
   const a1baseAgentNumber = process.env.A1BASE_AGENT_NUMBER || null;
   
   // Check Supabase configuration
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_KEY;
+  console.log("Supabase URL:", supabaseUrl)
+  console.log("Supabase Key:", supabaseKey)
   const supabaseUrlAvailable = !!supabaseUrl;
   const supabaseKeyAvailable = !!supabaseKey;
   let supabaseConnected = false;
@@ -26,7 +28,7 @@ export async function GET() {
       
       // If there's no error, connection is working - even if the table doesn't exist
       // We're checking if we can establish a connection, not if specific tables exist
-      supabaseConnected = !error || error.code === 'PGRST116'; // PGRST116 = table not found, which is fine
+      supabaseConnected = !error || error.code === 'PGRST116' || Boolean(error && error.message && error.message.includes("relation \"public.health_check\" does not exist")); // Accept both error code or specific message
       
       console.log('Supabase connection test:', error ? `Error: ${error.message}` : 'Success');
     } catch (e) {
@@ -57,6 +59,53 @@ export async function GET() {
   console.log(`Supabase Key available: ${supabaseKeyAvailable}`);
   console.log(`Supabase connected: ${supabaseConnected}`);
   
+  // Get the list of tables if connected to Supabase
+  let requiredTables = [
+    'conversation_users',
+    'chats',
+    'chat_participants',
+    'messages',
+    'cron_jobs',
+    'user_preferences',
+    'projects',
+    'project_history'
+  ];
+  
+  let existingTables: string[] = [];
+  let otherTables: string[] = [];
+  
+  if (supabaseConnected && supabaseUrlAvailable && supabaseKeyAvailable) {
+    try {
+      const supabase = createClient(supabaseUrl!, supabaseKey!);
+      
+      // Create a custom RPC function to check if tables exist
+      // Use individual queries to check if each table exists
+      for (const tableName of requiredTables) {
+        try {
+          // Attempt to get a single row from the table (will error if table doesn't exist)
+          const { error } = await supabase
+            .from(tableName)
+            .select('*')
+            .limit(1);
+          
+          // If no error or error is just about permissions but table exists
+          if (!error || error.code === 'PGRST301') { // PGRST301 = permission denied
+            existingTables.push(tableName);
+          }
+        } catch (tableError) {
+          console.log(`Table check for ${tableName}:`, tableError);
+        }
+      }
+      
+      // In production with a real setup, we'd also query for other tables,
+      // but for simplicity and to avoid permissions issues, we'll skip checking for
+      // tables beyond the required ones in this implementation
+      
+    } catch (e) {
+      console.error('Error checking table existence:', e);
+    }
+  }
+
   return NextResponse.json({
     openaiKeyAvailable,
     anthropicKeyAvailable,
@@ -68,5 +117,8 @@ export async function GET() {
     supabaseUrlAvailable,
     supabaseKeyAvailable,
     supabaseConnected,
+    requiredTables,
+    existingTables,
+    otherTables,
   });
 }

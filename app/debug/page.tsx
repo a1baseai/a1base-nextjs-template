@@ -23,6 +23,9 @@ export default function DebugPage() {
     supabaseUrlAvailable: boolean;
     supabaseKeyAvailable: boolean;
     supabaseConnected: boolean;
+    requiredTables: string[];
+    existingTables: string[];
+    otherTables: string[];
   }>({
     openaiKeyAvailable: false,
     anthropicKeyAvailable: false,
@@ -34,6 +37,9 @@ export default function DebugPage() {
     supabaseUrlAvailable: false,
     supabaseKeyAvailable: false,
     supabaseConnected: false,
+    requiredTables: [],
+    existingTables: [],
+    otherTables: [],
   });
   
   const [isLoading, setIsLoading] = useState(true);
@@ -364,18 +370,18 @@ export default function DebugPage() {
                 ) : (
                   <AlertTriangle className="h-5 w-5 text-red-500" />
                 )}
-                Supabase Connection
+                Supabase Configuration
               </h3>
               <div className="space-y-1">
                 <p className="text-xs sm:text-sm text-muted-foreground">
                   {envStatus.supabaseUrlAvailable
                     ? "Supabase URL is correctly configured"
-                    : "Supabase URL is missing. Set NEXT_PUBLIC_SUPABASE_URL in your .env file"}
+                    : "Supabase URL is missing. Set SUPABASE_URL in your .env file"}
                 </p>
                 <p className="text-xs sm:text-sm text-muted-foreground">
                   {envStatus.supabaseKeyAvailable
                     ? "Supabase API key is correctly configured"
-                    : "Supabase API key is missing. Set NEXT_PUBLIC_SUPABASE_ANON_KEY in your .env file"}
+                    : "Supabase API key is missing. Set SUPABASE_KEY in your .env file"}
                 </p>
                 {envStatus.supabaseUrlAvailable && envStatus.supabaseKeyAvailable && (
                   <p className="text-xs sm:text-sm text-muted-foreground">
@@ -383,6 +389,56 @@ export default function DebugPage() {
                       ? "✅ Connection to Supabase established successfully"
                       : "❌ Connection to Supabase failed. Check your credentials and Supabase service status"}
                   </p>
+                )}
+                
+                {/* Supabase Tables Status Section */}
+                {envStatus.supabaseConnected && (
+                  <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                    <h4 className="font-medium mb-2 text-sm">Database Tables</h4>
+                    
+                    <div className="space-y-3">
+                      {/* Required Tables */}
+                      <div>
+                        <h5 className="text-xs font-medium mb-1">Required Tables ({envStatus.existingTables.length}/{envStatus.requiredTables.length})</h5>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
+                          {envStatus.requiredTables.map(table => {
+                            const exists = envStatus.existingTables.includes(table);
+                            return (
+                              <div key={table} className="flex items-center gap-1">
+                                <span className="text-xs">
+                                  {exists ? "✅" : "❌"}
+                                </span>
+                                <span className="text-xs truncate">{table}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      
+                      {/* Other Tables */}
+                      {envStatus.otherTables.length > 0 && (
+                        <div>
+                          <h5 className="text-xs font-medium mb-1">Additional Tables ({envStatus.otherTables.length})</h5>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
+                            {envStatus.otherTables.map(table => (
+                              <div key={table} className="flex items-center gap-1">
+                                <span className="text-xs">•</span>
+                                <span className="text-xs truncate">{table}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Setup Instructions */}
+                      {envStatus.existingTables.length < envStatus.requiredTables.length && (
+                        <div className="mt-2 text-xs px-2 py-2 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
+                          <p className="font-medium">Missing required tables</p>
+                          <p className="mt-1">To set up the database, run the SQL commands in <code>supabase.sql</code> in your Supabase SQL editor.</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
