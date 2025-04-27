@@ -4,7 +4,7 @@ import { triageMessage } from "../../../lib/ai-triage/triage-logic";
 import { dynamic, runtime, maxDuration } from "../route-config";
 import { streamText } from "ai";
 import { openai } from "@ai-sdk/openai";
-import { handleAgenticOnboarding } from "../../../lib/workflows/agentic-onboarding";
+import { handleAgenticOnboarding } from "../../../lib/workflows/agentic-onboarding-workflows";
 
 // Export the route configuration to prevent Next.js from trying
 // to access file system during build time
