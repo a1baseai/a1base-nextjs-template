@@ -94,12 +94,6 @@ export default function ProfileEditorLayout({
       variant: pathname.includes("/onboarding-flow") ? "default" : "ghost",
     },
     {
-      title: "Integrations",
-      icon: <Zap className="h-5 w-5" />,
-      href: "/profile-editor/integrations",
-      variant: pathname.includes("/integrations") ? "default" : "ghost",
-    },
-    {
       title: "Triage Logic",
       icon: <FileCode className="h-5 w-5" />,
       href: "/profile-editor/triage-logic",
@@ -110,21 +104,6 @@ export default function ProfileEditorLayout({
       icon: <FolderCog className="h-5 w-5" />,
       href: "/profile-editor/workflows",
       variant: pathname.includes("/workflows") ? "default" : "ghost",
-    },
-
-    {
-      title: "Conversation Settings",
-      icon: <MessageSquare className="h-5 w-5" />,
-      href: "/profile-editor/conversation-settings",
-      variant: pathname.includes("/conversation-settings")
-        ? "default"
-        : "ghost",
-    },
-    {
-      title: "Advanced Settings",
-      icon: <Settings className="h-5 w-5" />,
-      href: "/profile-editor/advanced-settings",
-      variant: pathname.includes("/advanced-settings") ? "default" : "ghost",
     },
   ];
 
@@ -218,7 +197,8 @@ export default function ProfileEditorLayout({
         </div>
 
         {/* Floating action bar - now positioned relative to the main content area */}
-        <div className="fixed bottom-6 right-6 left-[280px] max-w-4xl mx-auto bg-gradient-to-r from-blue-600 to-blue-800 dark:bg-gray-800 border  dark:border-gray-700 p-4 rounded-lg shadow-lg z-10">
+        {!pathname.includes("/triage-logic") && !pathname.includes("/workflows") && (
+          <div className="fixed bottom-6 right-6 left-[280px] max-w-4xl mx-auto bg-gradient-to-r from-blue-600 to-blue-800 dark:bg-gray-800 border dark:border-gray-700 p-4 rounded-lg shadow-lg z-10">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-2">
               {showSavedMessage && (
@@ -259,6 +239,7 @@ export default function ProfileEditorLayout({
             </div>
           </div>
         </div>
+        )}
       </main>
     </div>
   );
