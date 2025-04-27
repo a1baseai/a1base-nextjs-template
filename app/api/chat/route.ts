@@ -4,6 +4,7 @@ import { triageMessage } from "../../../lib/ai-triage/triage-logic";
 import { dynamic, runtime, maxDuration } from "../route-config";
 import { streamText } from "ai";
 import { openai } from "@ai-sdk/openai";
+import { handleAgenticOnboarding } from "../../../lib/workflows/agentic-onboarding";
 
 // Export the route configuration to prevent Next.js from trying
 // to access file system during build time
@@ -80,18 +81,26 @@ export async function POST(req: Request) {
       console.log('[CHAT-API] Creating direct stream for non-default triage response');
       const responseMessage = triageResponse.message || 'No response message available';
       
-      // Rather than creating our own stream directly, let's use the OpenAI API
-      // but make it return only the onboarding message as a completion
-      console.log('[CHAT-API] Using OpenAI API for streaming');
+      // Check if this is an agentic onboarding message (contains "Collect the following information:")
+      const isAgenticOnboarding = responseMessage.includes('Collect the following information:');
       
-      // Use the streamText function from the Vercel AI SDK for consistent format
+      if (isAgenticOnboarding) {
+        console.log('[CHAT-API] Detected agentic onboarding message, delegating to dedicated module');
+        
+        // Use our dedicated agentic onboarding handler
+        return await handleAgenticOnboarding(responseMessage);
+      }
+      
+      // For regular non-agentic responses, just stream the message directly
+      console.log('[CHAT-API] Using OpenAI API for streaming a regular message');
+      
       const result = streamText({
-        model: openai('gpt-3.5-turbo'), // Using faster model since we just need to stream predefined text
+        model: openai('gpt-3.5-turbo'),
         system: "You are an assistant helping with onboarding. Return ONLY the message provided to you without any modifications.",
         messages: [
           {
             role: "user",
-            content: `Simply respond with this exact message, no commentary before or after:\n\n${responseMessage}`
+            content: `Return exactly this text, with no modifications or additional text: ${responseMessage}`
           }
         ],
         temperature: 0,

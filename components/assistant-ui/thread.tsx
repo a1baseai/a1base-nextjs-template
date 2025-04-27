@@ -4,6 +4,7 @@ import {
   ComposerPrimitive,
   MessagePrimitive,
   ThreadPrimitive,
+  useThreadRuntime
 } from "@assistant-ui/react";
 import type { FC, ChangeEvent, KeyboardEvent } from "react";
 import {
@@ -23,6 +24,8 @@ import { Button } from "@/components/ui/button";
 import { MarkdownText } from "@/components/assistant-ui/markdown-text";
 import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button";
 import agentProfileSettings from "@/lib/agent-profile/agent-profile-settings";
+import { useEffect } from 'react';
+import { useOnboardingFlow } from "@/hooks/useOnboardingFlow";
 
 export const Thread: FC = () => {
   return (
@@ -84,23 +87,58 @@ const ThreadWelcome: FC = () => {
 };
 
 const ThreadWelcomeSuggestions: FC = () => {
-  // return null;
+  const { startOnboarding, continueOnboarding, isOnboardingInProgress } = useOnboardingFlow();
+  const thread = useThreadRuntime();
   
-  // Uncomment the following code to add welcome suggestion buttons
-  // Customize the prompts and text to match your use case
+  // Listen for messages in the thread to continue onboarding after user response
+  useEffect(() => {
+    // We don't have direct access to messages this way, so we'll use an event listener
+    // to detect when new messages are added to the thread
+    if (!thread || !isOnboardingInProgress) return;
+    
+    // Create an observer to watch for changes to the thread
+    const observer = new MutationObserver((mutations) => {
+      // Check if a new message was added
+      const userMessageEls = document.querySelectorAll('[data-message-role="user"]');
+      if (userMessageEls.length > 0) {
+        // Get the last user message element
+        const lastUserMessage = userMessageEls[userMessageEls.length - 1];
+        // If we found a user message, continue the onboarding flow
+        if (lastUserMessage) {
+          continueOnboarding();
+        }
+      }
+    });
+    
+    // Start observing the thread container
+    const threadContainer = document.querySelector('[data-thread-messages]');
+    if (threadContainer) {
+      observer.observe(threadContainer, { childList: true, subtree: true });
+    }
+    
+    // Clean up the observer when the component unmounts
+    return () => {
+      observer.disconnect();
+    };
+  }, [isOnboardingInProgress, continueOnboarding, thread]);
+
+  // Handle the onboarding button click directly, without sending a message
+  const handleStartOnboarding = (e: React.MouseEvent) => {
+    e.preventDefault();
+    startOnboarding();
+  };
 
   return (
     <div className="mt-3 flex w-full items-stretch justify-center gap-4">
-      <ThreadPrimitive.Suggestion
+      <button
+        onClick={handleStartOnboarding}
+        disabled={isOnboardingInProgress}
         className="hover:bg-muted/80 flex max-w-sm grow basis-0 flex-col items-center justify-center rounded-lg border p-3 transition-colors ease-in"
-        prompt="Start onboarding"
-        method="replace"
-        autoSend
       >
         <span className="line-clamp-2 text-ellipsis text-sm font-semibold">
           Start Onboarding
         </span>
-      </ThreadPrimitive.Suggestion>
+      </button>
       <ThreadPrimitive.Suggestion
         className="hover:bg-muted/80 flex max-w-sm grow basis-0 flex-col items-center justify-center rounded-lg border p-3 transition-colors ease-in"
         prompt="Tell me about your capabilities"
@@ -113,7 +151,6 @@ const ThreadWelcomeSuggestions: FC = () => {
       </ThreadPrimitive.Suggestion>
     </div>
   );
-  
 };
 
 const Composer: FC = () => {

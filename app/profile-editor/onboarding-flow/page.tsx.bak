@@ -1,0 +1,378 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
+import { v4 as uuidv4 } from "uuid";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Plus, Trash2, ArrowUp, ArrowDown, MessageSquare, Bot, Save } from "lucide-react";
+import { OnboardingFlow, OnboardingMessage, defaultOnboardingFlow } from "@/lib/onboarding-flow/types";
+import { loadOnboardingFlow, saveOnboardingFlow } from "@/lib/onboarding-flow/onboarding-storage";
+import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+
+export default function OnboardingFlowBuilder() {
+  // State for onboarding flow
+  const [onboardingFlow, setOnboardingFlow] = useState<OnboardingFlow | null>(null);
+  
+  // State to track if changes have been made
+  const [hasChanges, setHasChanges] = useState(false);
+
+  // Set up event listener for save action from the floating bar
+  useEffect(() => {
+    const handleSaveEvent = () => {
+      if (hasChanges && onboardingFlow) {
+        saveOnboardingFlowSettings();
+      }
+    };
+
+    // Add event listener for the custom save event
+    document.addEventListener('save-profile-settings', handleSaveEvent);
+
+    // Clean up the event listener when component unmounts
+    return () => {
+      document.removeEventListener('save-profile-settings', handleSaveEvent);
+    };
+  }, [hasChanges, onboardingFlow]);
+
+  // Load data on component mount
+  useEffect(() => {
+    const fetchOnboardingFlow = async () => {
+      try {
+        setIsLoading(true);
+        const flow = await loadOnboardingFlow();
+        
+        // Ensure flow is in agentic mode with agentic settings
+        if (flow.mode !== 'agentic' || !flow.agenticSettings) {
+          // Initialize agentic settings if needed
+          const updatedFlow = {
+            ...flow,
+            mode: 'agentic',
+            agenticSettings: flow.agenticSettings || {
+              systemPrompt: 'You are conducting an onboarding conversation with a new user. Your goal is to make them feel welcome and collect some basic information that will help you assist them better in the future. Be friendly, professional, and conversational.',
+              userFields: [
+                {
+                  id: uuidv4(),
+                  label: 'Full Name',
+                  required: true,
+                  description: 'Ask for the user\'s full name'
+                },
+                {
+                  id: uuidv4(),
+                  label: 'Email Address',
+                  required: true,
+                  description: 'Ask for the user\'s email address'
+                }
+              ],
+              finalMessage: 'Thank you for sharing this information. I\'ve saved your details and I\'m ready to help you achieve your goals.'
+            }
+          };
+          setOnboardingFlow(updatedFlow);
+          // Save the updated flow immediately
+          await saveOnboardingFlow(updatedFlow);
+        } else {
+          setOnboardingFlow(flow);
+        }
+      } catch (error) {
+        console.error('Error loading onboarding flow:', error);
+        toast.error('Failed to load onboarding flow');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchOnboardingFlow();
+  }, []);
+
+  // Save onboarding flow settings
+  const saveOnboardingFlowSettings = async () => {
+    if (!onboardingFlow) return;
+    
+    try {
+      const success = await saveOnboardingFlow(onboardingFlow);
+      
+      if (success) {
+        setHasChanges(false);
+        toast.success("Onboarding flow settings saved successfully");
+      } else {
+        toast.error("Failed to save onboarding flow settings");
+      }
+    } catch (error) {
+      console.error("Error saving onboarding flow settings:", error);
+      toast.error("Failed to save onboarding flow settings");
+    }
+  };
+
+  // Add a new user field
+  const addUserField = () => {
+    if (!onboardingFlow || !onboardingFlow.agenticSettings) return;
+    
+    const newField = {
+      id: uuidv4(),
+      label: 'New Field',
+      required: false,
+      description: 'Ask about this information'
+    };
+    
+    updateAgenticSettings('userFields', [...onboardingFlow.agenticSettings.userFields, newField]);
+  };
+
+  // Remove a user field
+  const removeUserField = (id: string) => {
+    if (!onboardingFlow || !onboardingFlow.agenticSettings) return;
+    
+    const updatedFields = onboardingFlow.agenticSettings.userFields.filter(field => field.id !== id);
+    updateAgenticSettings('userFields', updatedFields);
+  };
+
+  // Update a user field
+  const updateUserField = (id: string, field: string, value: any) => {
+    if (!onboardingFlow || !onboardingFlow.agenticSettings) return;
+    
+    const updatedFields = onboardingFlow.agenticSettings.userFields.map(item => {
+      if (item.id === id) {
+        return { ...item, [field]: value };
+      }
+      return item;
+    });
+    
+    updateAgenticSettings('userFields', updatedFields);
+  };
+
+  // Update agentic settings
+  const updateAgenticSettings = (field: string, value: any) => {
+    if (!onboardingFlow) return;
+    
+    setOnboardingFlow({
+      ...onboardingFlow,
+      agenticSettings: {
+        ...onboardingFlow.agenticSettings,
+        [field]: value
+      }
+    });
+    
+    setHasChanges(true);
+  };
+
+  // Initialize agentic settings if they don't exist
+  const initializeAgenticSettings = () => {
+    if (!onboardingFlow) return;
+    
+    if (!onboardingFlow.agenticSettings) {
+      setOnboardingFlow({
+        ...onboardingFlow,
+        mode: 'agentic',
+        agenticSettings: {
+          systemPrompt: 'You are conducting an onboarding conversation with a new user. Your goal is to make them feel welcome and collect some basic information that will help you assist them better in the future. Be friendly, professional, and conversational.',
+          userFields: [
+            {
+              id: uuidv4(),
+              label: 'Full Name',
+              required: true,
+              description: 'Ask for the user\'s full name'
+            },
+            {
+              id: uuidv4(),
+              label: 'Email Address',
+              required: true,
+              description: 'Ask for the user\'s email address'
+            }
+          ],
+          finalMessage: 'Thank you for sharing this information. I\'ve saved your details and I\'m ready to help you achieve your goals.'
+        }
+      });
+      
+      setHasChanges(true);
+    }
+  };
+
+  // If onboarding flow hasn't loaded yet, show loading state
+  if (!onboardingFlow) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-700"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Main settings card */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Agentic Onboarding Settings</CardTitle>
+          <CardDescription>
+            Configure the AI-powered onboarding conversation
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-6">
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">AI Instructions</h3>
+              <div className="space-y-2">
+                <Label htmlFor="system-prompt">System Prompt</Label>
+                <Textarea
+                  id="system-prompt"
+                  value={onboardingFlow.agenticSettings.systemPrompt}
+                  onChange={(e) => updateAgenticSettings('systemPrompt', e.target.value)}
+                  placeholder="Instructions for the AI during onboarding..."
+                  className="min-h-32"
+                />
+                <p className="text-sm text-gray-500">
+                  Guide the AI on how to conduct the onboarding conversation and collect user information.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-semibold">User Information Fields</h3>
+                <Button variant="secondary" onClick={addUserField}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Field
+                </Button>
+              </div>
+              
+              {onboardingFlow.agenticSettings.userFields.length === 0 ? (
+                <div className="flex flex-col items-center justify-center space-y-3 border border-dashed rounded-lg p-8 my-4">
+                  <p className="text-gray-500 text-center">No user fields defined yet</p>
+                  <Button variant="outline" onClick={addUserField}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add First Field
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {onboardingFlow.agenticSettings.userFields.map((field) => (
+                    <Card key={field.id} className="overflow-hidden">
+                      <CardContent className="p-4 space-y-4">
+                        <div className="flex justify-between items-center">
+                          <Badge variant={field.required ? "default" : "outline"}>
+                            {field.required ? "Required" : "Optional"}
+                          </Badge>
+              {onboardingFlow.messages
+                .sort((a, b) => a.order - b.order)
+                .map((message, index) => (
+                <Card key={message.id} className="relative border border-gray-200 dark:border-gray-700">
+                  <CardContent className="p-4">
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center">
+                        <Badge variant="outline" className="bg-blue-50 dark:bg-blue-900 border-blue-200 dark:border-blue-700 text-blue-700 dark:text-blue-300">
+                          Message {index + 1}
+                        </Badge>
+                        <div className="flex items-center space-x-1">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => moveMessageUp(message.id)}
+                            disabled={index === 0}
+                          >
+                            <ArrowUp className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => moveMessageDown(message.id)}
+                            disabled={index === onboardingFlow.messages.length - 1}
+                          >
+                            <ArrowDown className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900"
+                            onClick={() => removeMessage(message.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor={`message-${message.id}`}>Message Text</Label>
+                        <Textarea
+                          id={`message-${message.id}`}
+                          value={message.text}
+                          onChange={(e) => updateMessage(message.id, 'text', e.target.value)}
+                          placeholder="Enter your welcome message here..."
+                          className="min-h-24"
+                        />
+                      </div>
+                      
+                      <div className="flex items-center space-x-2">
+                        <Switch 
+                          id={`wait-response-${message.id}`}
+                          checked={message.waitForResponse}
+                          onCheckedChange={(checked) => updateMessage(message.id, 'waitForResponse', checked)} 
+                        />
+                        <Label htmlFor={`wait-response-${message.id}`}>
+                          Wait for user response before continuing
+                        </Label>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </CardContent>
+        <CardFooter className="flex justify-between">
+          
+          <Button variant="outline" onClick={saveOnboardingFlowSettings} disabled={!hasChanges}>
+            <Save className="h-4 w-4 mr-2" />
+            Save
+          </Button>
+        </CardFooter>
+      </Card>
+
+      {/* Preview section */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Message Flow Preview</CardTitle>
+          <CardDescription>
+            See how your onboarding messages will appear to users
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="border rounded-lg overflow-hidden bg-gray-50 dark:bg-gray-900">
+            <div className="p-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-sm font-medium">Chat Preview</h3>
+            </div>
+            <div className="p-4 space-y-4">
+              {onboardingFlow.messages
+                .sort((a, b) => a.order - b.order)
+                .map((message, index) => (
+                <div key={message.id} className="flex gap-2">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-600 to-blue-800 flex items-center justify-center text-white text-xs">
+                    AI
+                  </div>
+                  <div className="bg-blue-100 dark:bg-blue-900 px-4 py-2 rounded-lg max-w-[80%]">
+                    <p className="text-sm text-gray-800 dark:text-gray-200">{message.text}</p>
+                  </div>
+                </div>
+              ))}
+              
+              {onboardingFlow.messages.some(m => m.waitForResponse) && (
+                <div className="flex gap-2 justify-end">
+                  <div className="bg-gray-200 dark:bg-gray-700 px-4 py-2 rounded-lg max-w-[80%]">
+                    <p className="text-sm text-gray-800 dark:text-gray-200 italic">User response here...</p>
+                  </div>
+                  <div className="w-8 h-8 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center text-gray-700 dark:text-gray-300 text-xs">
+                    You
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

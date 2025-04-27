@@ -9,10 +9,24 @@ export interface OnboardingMessage {
   order: number;
 }
 
+export interface UserField {
+  id: string;
+  label: string;
+  required: boolean;
+  description: string;
+}
+
+export interface AgenticSettings {
+  systemPrompt: string;
+  userFields: UserField[];
+  finalMessage: string;
+}
+
 export interface OnboardingFlow {
   enabled: boolean;
   messages: OnboardingMessage[];
-  mode: 'flow' | 'agentic';
+  mode: 'agentic';
+  agenticSettings: AgenticSettings;
   settings: {
     // General settings for the onboarding flow
     skipForReturningUsers: boolean;
@@ -45,7 +59,25 @@ export const defaultOnboardingFlow: OnboardingFlow = {
       order: 3
     }
   ],
-  mode: 'flow',
+  mode: 'agentic',
+  agenticSettings: {
+    systemPrompt: 'You are conducting an onboarding conversation with a new user. Your goal is to make them feel welcome and collect some basic information that will help you assist them better in the future. Be friendly, professional, and conversational.',
+    userFields: [
+      {
+        id: 'name',
+        label: 'Full Name',
+        required: true,
+        description: 'Ask for the user\'s full name'
+      },
+      {
+        id: 'email',
+        label: 'Email Address',
+        required: true,
+        description: 'Ask for the user\'s email address'
+      }
+    ],
+    finalMessage: 'Thank you for sharing this information. I\'ve saved your details and I\'m ready to help you achieve your goals.'
+  },
   settings: {
     skipForReturningUsers: true,
     captureUserPreferences: false,

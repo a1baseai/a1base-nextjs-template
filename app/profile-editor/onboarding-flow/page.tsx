@@ -8,11 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, ArrowUp, ArrowDown, MessageSquare, Bot, Save } from "lucide-react";
-import { OnboardingFlow, OnboardingMessage, defaultOnboardingFlow } from "@/lib/onboarding-flow/types";
+import { Plus, Trash2, Bot, Save } from "lucide-react";
+import { OnboardingFlow, UserField } from "@/lib/onboarding-flow/types";
 import { loadOnboardingFlow, saveOnboardingFlow } from "@/lib/onboarding-flow/onboarding-storage";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -24,183 +21,121 @@ export default function OnboardingFlowBuilder() {
   
   // State to track if changes have been made
   const [hasChanges, setHasChanges] = useState(false);
-
-  // Set up event listener for save action from the floating bar
-  useEffect(() => {
-    const handleSaveEvent = () => {
-      if (hasChanges && onboardingFlow) {
-        saveOnboardingFlowSettings();
-      }
-    };
-
-    // Add event listener for the custom save event
-    document.addEventListener('save-profile-settings', handleSaveEvent);
-
-    // Clean up the event listener when component unmounts
-    return () => {
-      document.removeEventListener('save-profile-settings', handleSaveEvent);
-    };
-  }, [hasChanges, onboardingFlow]);
+  
+  // State for tracking loading and saving operations
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Load data on component mount
   useEffect(() => {
-    const loadData = async () => {
+    const fetchOnboardingFlow = async () => {
       try {
-        const flowData = await loadOnboardingFlow();
-        if (flowData) {
-          setOnboardingFlow(flowData);
+        setIsLoading(true);
+        const flow = await loadOnboardingFlow();
+        
+        // Ensure flow is in agentic mode with agentic settings
+        if (flow.mode !== 'agentic' || !flow.agenticSettings) {
+          // Initialize agentic settings if needed
+          const updatedFlow = {
+            ...flow,
+            mode: 'agentic' as const,
+            agenticSettings: flow.agenticSettings || {
+              systemPrompt: 'You are conducting an onboarding conversation with a new user. Your goal is to make them feel welcome and collect some basic information that will help you assist them better in the future. Be friendly, professional, and conversational.',
+              userFields: [
+                {
+                  id: uuidv4(),
+                  label: 'Full Name',
+                  required: true,
+                  description: 'Ask for the user\'s full name'
+                },
+                {
+                  id: uuidv4(),
+                  label: 'Email Address',
+                  required: true,
+                  description: 'Ask for the user\'s email address'
+                }
+              ],
+              finalMessage: 'Thank you for sharing this information. I\'ve saved your details and I\'m ready to help you achieve your goals.'
+            }
+          };
+          setOnboardingFlow(updatedFlow);
+          // Save the updated flow immediately
+          await saveOnboardingFlow(updatedFlow);
         } else {
-          setOnboardingFlow({ ...defaultOnboardingFlow });
+          setOnboardingFlow(flow);
         }
       } catch (error) {
-        console.error("Error loading onboarding flow settings:", error);
-        toast.error("Failed to load onboarding flow settings");
-        
-        // Fallback to default settings
-        setOnboardingFlow({ ...defaultOnboardingFlow });
+        console.error('Error loading onboarding flow:', error);
+        toast.error('Failed to load onboarding flow');
+      } finally {
+        setIsLoading(false);
       }
     };
-    
-    loadData();
+
+    fetchOnboardingFlow();
   }, []);
 
   // Save onboarding flow settings
-  const saveOnboardingFlowSettings = async () => {
+  const handleSave = async () => {
     if (!onboardingFlow) return;
     
     try {
-      const success = await saveOnboardingFlow(onboardingFlow);
-      
-      if (success) {
-        setHasChanges(false);
-        toast.success("Onboarding flow settings saved successfully");
-      } else {
-        toast.error("Failed to save onboarding flow settings");
-      }
+      setIsSaving(true);
+      await saveOnboardingFlow(onboardingFlow);
+      setHasChanges(false);
+      toast.success("Onboarding flow saved successfully");
     } catch (error) {
-      console.error("Error saving onboarding flow settings:", error);
-      toast.error("Failed to save onboarding flow settings");
+      console.error("Error saving onboarding flow:", error);
+      toast.error("Failed to save onboarding flow");
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  
-
-  // Add a new message
-  const addMessage = () => {
-    if (!onboardingFlow) return;
+  // Add a new user field
+  const addUserField = () => {
+    if (!onboardingFlow || !onboardingFlow.agenticSettings) return;
     
-    const newMessage: OnboardingMessage = {
+    const newField: UserField = {
       id: uuidv4(),
-      text: "Type your message here...",
-      waitForResponse: false,
-      order: onboardingFlow.messages.length + 1
+      label: "New Field",
+      required: false,
+      description: "Ask for this information from the user"
     };
     
-    const updatedMessages = [...onboardingFlow.messages, newMessage];
-    
-    setOnboardingFlow({
-      ...onboardingFlow,
-      messages: updatedMessages
-    });
-    
-    setHasChanges(true);
+    updateAgenticSettings('userFields', [...onboardingFlow.agenticSettings.userFields, newField]);
   };
 
-  // Remove a message
-  const removeMessage = (id: string) => {
-    if (!onboardingFlow) return;
+  // Remove a user field
+  const removeUserField = (id: string) => {
+    if (!onboardingFlow || !onboardingFlow.agenticSettings) return;
     
-    const updatedMessages = onboardingFlow.messages
-      .filter(message => message.id !== id)
-      .map((message, index) => ({
-        ...message,
-        order: index + 1
-      }));
-    
-    setOnboardingFlow({
-      ...onboardingFlow,
-      messages: updatedMessages
-    });
-    
-    setHasChanges(true);
+    const updatedFields = onboardingFlow.agenticSettings.userFields.filter(field => field.id !== id);
+    updateAgenticSettings('userFields', updatedFields);
   };
 
-  // Update a message
-  const updateMessage = (id: string, field: keyof OnboardingMessage, value: any) => {
-    if (!onboardingFlow) return;
+  // Update a user field
+  const updateUserField = (id: string, field: string, value: any) => {
+    if (!onboardingFlow || !onboardingFlow.agenticSettings) return;
     
-    const updatedMessages = onboardingFlow.messages.map(message => {
-      if (message.id === id) {
-        return {
-          ...message,
-          [field]: value
-        };
+    const updatedFields = onboardingFlow.agenticSettings.userFields.map(userField => {
+      if (userField.id === id) {
+        return { ...userField, [field]: value };
       }
-      return message;
+      return userField;
     });
     
-    setOnboardingFlow({
-      ...onboardingFlow,
-      messages: updatedMessages
-    });
-    
-    setHasChanges(true);
+    updateAgenticSettings('userFields', updatedFields);
   };
 
-  // Move message up in order
-  const moveMessageUp = (id: string) => {
-    if (!onboardingFlow) return;
-    
-    const messageIndex = onboardingFlow.messages.findIndex(message => message.id === id);
-    
-    if (messageIndex <= 0) return; // Can't move up if it's the first message
-    
-    const updatedMessages = [...onboardingFlow.messages];
-    
-    // Swap with the message above
-    const temp = { ...updatedMessages[messageIndex] };
-    updatedMessages[messageIndex] = { ...updatedMessages[messageIndex - 1], order: messageIndex + 1 };
-    updatedMessages[messageIndex - 1] = { ...temp, order: messageIndex };
-    
-    setOnboardingFlow({
-      ...onboardingFlow,
-      messages: updatedMessages
-    });
-    
-    setHasChanges(true);
-  };
-
-  // Move message down in order
-  const moveMessageDown = (id: string) => {
-    if (!onboardingFlow) return;
-    
-    const messageIndex = onboardingFlow.messages.findIndex(message => message.id === id);
-    
-    if (messageIndex >= onboardingFlow.messages.length - 1) return; // Can't move down if it's the last message
-    
-    const updatedMessages = [...onboardingFlow.messages];
-    
-    // Swap with the message below
-    const temp = { ...updatedMessages[messageIndex] };
-    updatedMessages[messageIndex] = { ...updatedMessages[messageIndex + 1], order: messageIndex + 1 };
-    updatedMessages[messageIndex + 1] = { ...temp, order: messageIndex + 2 };
-    
-    setOnboardingFlow({
-      ...onboardingFlow,
-      messages: updatedMessages
-    });
-    
-    setHasChanges(true);
-  };
-
-  // Update general settings
-  const updateSettings = (field: string, value: any) => {
+  // Update agentic settings
+  const updateAgenticSettings = (field: string, value: any) => {
     if (!onboardingFlow) return;
     
     setOnboardingFlow({
       ...onboardingFlow,
-      settings: {
-        ...onboardingFlow.settings,
+      agenticSettings: {
+        ...onboardingFlow.agenticSettings,
         [field]: value
       }
     });
@@ -208,13 +143,13 @@ export default function OnboardingFlowBuilder() {
     setHasChanges(true);
   };
 
-  // Handle onboarding mode change
-  const handleModeChange = (mode: 'flow' | 'agentic') => {
+  // Toggle onboarding flow enabled
+  const toggleEnabled = (enabled: boolean) => {
     if (!onboardingFlow) return;
     
     setOnboardingFlow({
       ...onboardingFlow,
-      mode: mode
+      enabled
     });
     
     setHasChanges(true);
@@ -230,233 +165,224 @@ export default function OnboardingFlowBuilder() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Main settings card */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Onboarding Type</CardTitle>
-          <CardDescription>
-            Select how you want to onboard new users when they first interact with your agent
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="flow" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="flow" onClick={() => handleModeChange('flow')}>Flow Onboarding</TabsTrigger>
-              <TabsTrigger value="agentic" disabled onClick={() => handleModeChange('agentic')}>Agentic Onboarding (Coming Soon)</TabsTrigger>
-            </TabsList>
-            <TabsContent value="flow" className="pt-4">
-              <div className="space-y-4">
-                <div className="flex items-center space-x-2">
-                  <Switch 
-                    id="enable-onboarding"
-                    checked={onboardingFlow.enabled}
-                    onCheckedChange={(checked) => {
-                      setOnboardingFlow({
-                        ...onboardingFlow,
-                        enabled: checked
-                      });
-                      setHasChanges(true);
-                    }} 
-                  />
-                  <Label htmlFor="enable-onboarding">Enable onboarding flow for new users</Label>
-                </div>
-                
-                <div className="pt-2">
-                  <Alert variant="default" className="bg-blue-50 border-blue-200 dark:bg-blue-950 dark:border-blue-800">
-                    <MessageSquare className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                    <AlertTitle>Flow Onboarding</AlertTitle>
-                    <AlertDescription>
-                      This approach uses predefined welcome messages to guide new users through their first interaction with your agent.
-                      You can customize each message and decide whether to wait for user responses.
-                    </AlertDescription>
-                  </Alert>
-                </div>
-                
-                <div className="space-y-2 pt-2">
-                  <div className="flex items-center space-x-2">
-                    <Switch 
-                      id="skip-returning-users"
-                      checked={onboardingFlow.settings.skipForReturningUsers}
-                      onCheckedChange={(checked) => updateSettings('skipForReturningUsers', checked)} 
-                    />
-                    <Label htmlFor="skip-returning-users">Skip onboarding for returning users</Label>
-                  </div>
-                  
-                  <div className="flex items-center space-x-2">
-                    <Switch 
-                      id="ask-for-name"
-                      checked={onboardingFlow.settings.askForName || false}
-                      onCheckedChange={(checked) => updateSettings('askForName', checked)} 
-                    />
-                    <Label htmlFor="ask-for-name">Ask for user's name during onboarding</Label>
-                  </div>
-                  
-                  <div className="flex items-center space-x-2">
-                    <Switch 
-                      id="ask-for-business"
-                      checked={onboardingFlow.settings.askForBusinessType || false}
-                      onCheckedChange={(checked) => updateSettings('askForBusinessType', checked)} 
-                    />
-                    <Label htmlFor="ask-for-business">Ask for business type during onboarding</Label>
-                  </div>
-                </div>
+    <>
+      <div className="container py-6 space-y-6">
+        <h1 className="text-2xl font-bold">Agentic Onboarding Settings</h1>
+        <p className="text-gray-500 dark:text-gray-400">
+          Configure the AI-guided onboarding experience for new users
+        </p>
+        
+        {/* Main settings card */}
+        <Card>
+          <CardHeader>
+            <div className="flex justify-between items-center">
+              <div>
+                <CardTitle>Onboarding Configuration</CardTitle>
+                <CardDescription>
+                  Customize how new users are welcomed and what information is collected
+                </CardDescription>
               </div>
-            </TabsContent>
-            <TabsContent value="agentic" className="pt-4">
+              <Switch 
+                id="enable-onboarding"
+                checked={onboardingFlow.enabled}
+                onCheckedChange={toggleEnabled}
+                disabled={isSaving}
+              />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-6">
               <div className="space-y-4">
-                <Alert variant="default" className="bg-amber-50 border-amber-200 dark:bg-amber-950 dark:border-amber-800">
-                  <Bot className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                  <AlertTitle>Agentic Onboarding (Coming Soon)</AlertTitle>
+                <Alert className="bg-blue-50 dark:bg-blue-950 border-blue-300 dark:border-blue-800">
+                  <Bot className="h-4 w-4" />
+                  <AlertTitle>Agentic Onboarding</AlertTitle>
                   <AlertDescription>
-                    The agentic approach uses goal-oriented conversations to understand user needs and customize the experience.
-                    Instead of a fixed flow, the agent actively guides the conversation to gather relevant information and set
-                    expectations based on the user's responses and needs. This helps create a more personalized experience.
+                    The AI will guide the conversation naturally while collecting the information you specify below.
                   </AlertDescription>
                 </Alert>
-              </div>
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
-
-      {/* Messages section */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <div>
-            <CardTitle>Onboarding Messages</CardTitle>
-            <CardDescription>
-              Customize the welcome messages shown to new users
-            </CardDescription>
-          </div>
-          <Button onClick={addMessage}>
-            <Plus className="h-4 w-4 mr-1" />
-            Add Message
-          </Button>
-        </CardHeader>
-        <CardContent className="pt-4">
-          {onboardingFlow.messages.length === 0 ? (
-            <div className="text-center p-6 border border-dashed rounded-lg">
-              <p className="text-gray-500 dark:text-gray-400">No messages yet. Click "Add Message" to create your first welcome message.</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {onboardingFlow.messages
-                .sort((a, b) => a.order - b.order)
-                .map((message, index) => (
-                <Card key={message.id} className="relative border border-gray-200 dark:border-gray-700">
-                  <CardContent className="p-4">
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-center">
-                        <Badge variant="outline" className="bg-blue-50 dark:bg-blue-900 border-blue-200 dark:border-blue-700 text-blue-700 dark:text-blue-300">
-                          Message {index + 1}
-                        </Badge>
-                        <div className="flex items-center space-x-1">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            onClick={() => moveMessageUp(message.id)}
-                            disabled={index === 0}
-                          >
-                            <ArrowUp className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            onClick={() => moveMessageDown(message.id)}
-                            disabled={index === onboardingFlow.messages.length - 1}
-                          >
-                            <ArrowDown className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon"
-                            className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900"
-                            onClick={() => removeMessage(message.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <Label htmlFor={`message-${message.id}`}>Message Text</Label>
-                        <Textarea
-                          id={`message-${message.id}`}
-                          value={message.text}
-                          onChange={(e) => updateMessage(message.id, 'text', e.target.value)}
-                          placeholder="Enter your welcome message here..."
-                          className="min-h-24"
-                        />
-                      </div>
-                      
-                      <div className="flex items-center space-x-2">
-                        <Switch 
-                          id={`wait-response-${message.id}`}
-                          checked={message.waitForResponse}
-                          onCheckedChange={(checked) => updateMessage(message.id, 'waitForResponse', checked)} 
-                        />
-                        <Label htmlFor={`wait-response-${message.id}`}>
-                          Wait for user response before continuing
-                        </Label>
-                      </div>
+                
+                <div className="space-y-6">
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold">AI Instructions</h3>
+                    <div className="space-y-2">
+                      <Label htmlFor="system-prompt">System Prompt</Label>
+                      <Textarea
+                        id="system-prompt"
+                        value={onboardingFlow.agenticSettings.systemPrompt}
+                        onChange={(e) => updateAgenticSettings('systemPrompt', e.target.value)}
+                        placeholder="Instructions for the AI during onboarding..."
+                        className="min-h-32"
+                        disabled={isSaving}
+                      />
+                      <p className="text-sm text-gray-500">
+                        Guide the AI on how to conduct the onboarding conversation and collect user information.
+                      </p>
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </CardContent>
-        <CardFooter className="flex justify-between">
-          
-          <Button variant="outline" onClick={saveOnboardingFlowSettings} disabled={!hasChanges}>
-            <Save className="h-4 w-4 mr-2" />
-            Save
-          </Button>
-        </CardFooter>
-      </Card>
+                  </div>
 
-      {/* Preview section */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Message Flow Preview</CardTitle>
-          <CardDescription>
-            See how your onboarding messages will appear to users
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="border rounded-lg overflow-hidden bg-gray-50 dark:bg-gray-900">
-            <div className="p-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-              <h3 className="text-sm font-medium">Chat Preview</h3>
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-lg font-semibold">User Information Fields</h3>
+                      <Button 
+                        variant="secondary" 
+                        onClick={addUserField}
+                        disabled={isSaving}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Field
+                      </Button>
+                    </div>
+                    
+                    {onboardingFlow.agenticSettings.userFields.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center space-y-3 border border-dashed rounded-lg p-8 my-4">
+                        <p className="text-gray-500 text-center">No user fields defined yet</p>
+                        <Button 
+                          variant="outline" 
+                          onClick={addUserField}
+                          disabled={isSaving}
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add First Field
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {onboardingFlow.agenticSettings.userFields.map((field) => (
+                          <Card key={field.id} className="overflow-hidden">
+                            <CardContent className="p-4 space-y-4">
+                              <div className="flex justify-between items-center">
+                                <Badge variant={field.required ? "default" : "outline"}>
+                                  {field.required ? "Required" : "Optional"}
+                                </Badge>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon"
+                                  className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900"
+                                  onClick={() => removeUserField(field.id)}
+                                  disabled={isSaving}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+
+                              <div className="grid gap-4 md:grid-cols-2">
+                                <div className="space-y-2">
+                                  <Label htmlFor={`field-id-${field.id}`}>Field ID</Label>
+                                  <Input
+                                    id={`field-id-${field.id}`}
+                                    value={field.id}
+                                    onChange={(e) => updateUserField(field.id, 'id', e.target.value)}
+                                    placeholder="name, email, etc."
+                                    disabled={isSaving}
+                                  />
+                                </div>
+                                
+                                <div className="space-y-2">
+                                  <Label htmlFor={`field-label-${field.id}`}>Display Label</Label>
+                                  <Input
+                                    id={`field-label-${field.id}`}
+                                    value={field.label}
+                                    onChange={(e) => updateUserField(field.id, 'label', e.target.value)}
+                                    placeholder="Full Name"
+                                    disabled={isSaving}
+                                  />
+                                </div>
+                              </div>
+                              
+                              <div className="space-y-2">
+                                <Label htmlFor={`field-desc-${field.id}`}>Description for AI</Label>
+                                <Textarea
+                                  id={`field-desc-${field.id}`}
+                                  value={field.description}
+                                  onChange={(e) => updateUserField(field.id, 'description', e.target.value)}
+                                  placeholder="Tell the AI how to ask for this information"
+                                  className="min-h-20"
+                                  disabled={isSaving}
+                                />
+                              </div>
+                              
+                              <div className="flex items-center space-x-2">
+                                <Switch 
+                                  id={`field-required-${field.id}`}
+                                  checked={field.required}
+                                  onCheckedChange={(checked) => updateUserField(field.id, 'required', checked)} 
+                                  disabled={isSaving}
+                                />
+                                <Label htmlFor={`field-required-${field.id}`}>
+                                  This field is required
+                                </Label>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold">Final Message</h3>
+                    <div className="space-y-2">
+                      <Label htmlFor="final-message">Completion Message</Label>
+                      <Textarea
+                        id="final-message"
+                        value={onboardingFlow.agenticSettings.finalMessage}
+                        onChange={(e) => updateAgenticSettings('finalMessage', e.target.value)}
+                        placeholder="Message to show when all information is collected..."
+                        className="min-h-24"
+                        disabled={isSaving}
+                      />
+                      <p className="text-sm text-gray-500">
+                        Message that will be shown when all required information has been collected.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="p-4 space-y-4">
-              {onboardingFlow.messages
-                .sort((a, b) => a.order - b.order)
-                .map((message, index) => (
-                <div key={message.id} className="flex gap-2">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-600 to-blue-800 flex items-center justify-center text-white text-xs">
-                    AI
-                  </div>
-                  <div className="bg-blue-100 dark:bg-blue-900 px-4 py-2 rounded-lg max-w-[80%]">
-                    <p className="text-sm text-gray-800 dark:text-gray-200">{message.text}</p>
-                  </div>
-                </div>
-              ))}
-              
-              {onboardingFlow.messages.some(m => m.waitForResponse) && (
-                <div className="flex gap-2 justify-end">
-                  <div className="bg-gray-200 dark:bg-gray-700 px-4 py-2 rounded-lg max-w-[80%]">
-                    <p className="text-sm text-gray-800 dark:text-gray-200 italic">User response here...</p>
-                  </div>
-                  <div className="w-8 h-8 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center text-gray-700 dark:text-gray-300 text-xs">
-                    You
-                  </div>
-                </div>
+          </CardContent>
+          <CardFooter className="flex justify-end">
+            <Button 
+              onClick={handleSave}
+              disabled={isSaving || !hasChanges}
+            >
+              {isSaving ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  Save Changes
+                </>
               )}
-            </div>
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+      
+      {/* Floating action bar */}
+      {hasChanges && (
+        <div className="fixed bottom-0 inset-x-0 p-4 bg-background border-t shadow-lg transition-all ease-in-out duration-300">
+          <div className="container flex items-center justify-between">
+            <p className="text-sm">You have unsaved changes</p>
+            <Button 
+              onClick={handleSave} 
+              disabled={isSaving}
+              size="sm"
+            >
+              {isSaving ? (
+                <>
+                  <div className="animate-spin mr-2 h-4 w-4 border-2 border-background border-t-foreground rounded-full"></div>
+                  Saving...
+                </>
+              ) : (
+                <>Save Changes</>
+              )}
+            </Button>
           </div>
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+      )}
+    </>
   );
 }

@@ -20,11 +20,41 @@
       "order": 3
     }
   ],
-  "mode": "flow",
+  "mode": "agentic",
+  "agenticSettings": {
+    "systemPrompt": "You are conducting an onboarding conversation with a new user. Your goal is to make them feel welcome and collect some basic information that will help you assist them better in the future. Be friendly, professional, and conversational. Ask one question at a time, and acknowledge their answers before moving to the next question. Once you've collected all the requested information, summarize what you've learned and let them know you're ready to help them with their tasks.",
+    "userFields": [
+      {
+        "id": "name",
+        "label": "Full Name",
+        "required": true,
+        "description": "Ask for the user's full name"
+      },
+      {
+        "id": "email",
+        "label": "Email Address",
+        "required": true,
+        "description": "Ask for the user's email address"
+      },
+      {
+        "id": "business_type",
+        "label": "Business Type",
+        "required": false,
+        "description": "Ask what industry or business type they're in"
+      },
+      {
+        "id": "goals",
+        "label": "Goals",
+        "required": false,
+        "description": "Ask what they hope to accomplish with the AI assistant"
+      }
+    ],
+    "finalMessage": "Thank you for sharing this information. I've saved your details and I'm ready to help you achieve your goals. What would you like assistance with today?"
+  },
   "settings": {
     "skipForReturningUsers": true,
-    "captureUserPreferences": false,
-    "askForName": false,
-    "askForBusinessType": false
+    "captureUserPreferences": true,
+    "askForName": true,
+    "askForBusinessType": true
   }
 }

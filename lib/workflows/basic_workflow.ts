@@ -70,8 +70,18 @@ export async function DefaultReplyToMessage(
     const latestMessage = threadMessages[threadMessages.length - 1];
     if (latestMessage?.role === "user" && 
         latestMessage?.content?.trim().toLowerCase() === "start onboarding") {
-      // If it matches the exact trigger phrase, start the onboarding flow
-      return await StartOnboarding(threadMessages, thread_type, thread_id, sender_number, service);
+      console.log("Detected onboarding trigger, starting onboarding workflow");
+      const onboardingResult = await StartOnboarding(threadMessages, thread_type, thread_id, sender_number, service);
+      
+      // For web-ui, we need to convert the messages array to a single string to maintain
+      // backward compatibility with the existing API. The API route will handle the full message array.
+      if (service === "web-ui") {
+        // Just return a placeholder - the actual implementation for web UI is in the API route
+        return JSON.stringify(onboardingResult);
+      }
+      
+      // For other services, StartOnboarding already sent the messages, so we just return a placeholder
+      return "Onboarding started.";
     }
     
     // Load current settings
@@ -294,11 +304,12 @@ export async function CustomApiWorkflow(
 // =============================================
 
 import { loadOnboardingFlow } from "../onboarding-flow/onboarding-storage";
+import { createAgenticOnboardingPrompt } from "./agentic-onboarding";
 
 /**
  * Handles the onboarding flow when triggered by "Start onboarding"
- * Guides the user through a series of onboarding steps based on the configured onboarding flow
- * @returns A structured onboarding response
+ * Creates an agentic onboarding experience where the AI guides the conversation
+ * @returns A structured onboarding response with a system prompt for the AI
  */
 export async function StartOnboarding(
   threadMessages: ThreadMessage[],
@@ -306,59 +317,50 @@ export async function StartOnboarding(
   thread_id?: string,
   sender_number?: string,
   service?: string
-): Promise<string> {
+): Promise<{ messages: { text: string, waitForResponse: boolean }[] }> {
   console.log("Workflow Start [StartOnboarding]");
 
   try {
-    // Load onboarding flow from storage
+    // Safely load the onboarding flow
     const onboardingFlow = await loadOnboardingFlow();
-    
-    // Check if onboarding is enabled
+  
+    // If onboarding is disabled, just skip
     if (!onboardingFlow.enabled) {
-      return "Onboarding is currently disabled. Please contact your administrator to enable it.";
+      console.log("Onboarding flow is disabled, skipping");
+      return { messages: [] };
     }
+
+    console.log("Using agentic onboarding mode with AI-driven conversation");
     
-    // Get the first message(s) based on the configured flow
-    // Sort by order to ensure they appear in the correct sequence
-    const sortedMessages = [...onboardingFlow.messages].sort((a, b) => a.order - b.order);
+    // Use the dedicated function to create the agentic onboarding prompt
+    const aiPrompt = createAgenticOnboardingPrompt(onboardingFlow);
     
-    // Find the first stop point (message with waitForResponse=true) or take all messages if none have waitForResponse
-    let messagesToSend = [];
-    for (const message of sortedMessages) {
-      messagesToSend.push(message);
-      if (message.waitForResponse) {
-        break; // Stop at the first message requiring a response
+    // Create a single message with the agentic prompt
+    const agenticMessage = { text: aiPrompt, waitForResponse: true };
+    
+    // For WhatsApp or other channels, send the message through A1Base
+    if ((thread_type === "group" || thread_type === "individual") && service !== "web-ui") {
+      const messageData = {
+        content: agenticMessage.text,
+        from: process.env.A1BASE_AGENT_NUMBER!,
+        service: "whatsapp" as const,
+      };
+
+      if (thread_type === "group" && thread_id) {
+        await client.sendGroupMessage(process.env.A1BASE_ACCOUNT_ID!, {
+          ...messageData,
+          thread_id,
+        });
+      } else if (thread_type === "individual" && sender_number) {
+        await client.sendIndividualMessage(process.env.A1BASE_ACCOUNT_ID!, {
+          ...messageData,
+          to: sender_number,
+        });
       }
     }
     
-    // Combine the messages into a single response with proper formatting
-    const onboardingResponse = messagesToSend.map(msg => msg.text).join("\n\n");
-
-    // For web UI, we just return the response without sending through A1Base
-    if (service === "web-ui") {
-      return onboardingResponse;
-    }
-    
-    // For WhatsApp or other channels, send it through A1Base
-    const messageData = {
-      content: onboardingResponse,
-      from: process.env.A1BASE_AGENT_NUMBER!,
-      service: "whatsapp" as const,
-    };
-
-    if (thread_type === "group" && thread_id) {
-      await client.sendGroupMessage(process.env.A1BASE_ACCOUNT_ID!, {
-        ...messageData,
-        thread_id,
-      });
-    } else if (thread_type === "individual" && sender_number) {
-      await client.sendIndividualMessage(process.env.A1BASE_ACCOUNT_ID!, {
-        ...messageData,
-        to: sender_number,
-      });
-    }
-    
-    return onboardingResponse;
+    // Return the agentic message for the web UI or other channels
+    return { messages: [agenticMessage] };
   } catch (error) {
     console.error("[StartOnboarding] Error:", error);
     const errorMessage = "Sorry, I encountered an error starting the onboarding process.";
@@ -384,7 +386,7 @@ export async function StartOnboarding(
       }
     }
     
-    return errorMessage;
+    return { messages: [{ text: errorMessage, waitForResponse: false }] };
   }
 }
 
