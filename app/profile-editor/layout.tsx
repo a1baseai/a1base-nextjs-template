@@ -7,11 +7,16 @@ import {
   ArrowLeft,
   Settings,
   Database,
+  Coins,
+  Cog,
   LayoutDashboard,
   Users,
   MessageSquare,
+  Paintbrush,
   Zap,
   Globe,
+  FileCode,
+  FolderCog,
   Save,
   CheckCircle2,
 } from "lucide-react";
@@ -83,7 +88,7 @@ export default function ProfileEditorLayout({
       variant: pathname.includes("/base-information") ? "default" : "ghost",
     },
     {
-      title: "Onboarding Flow Builder",
+      title: "Onboarding Builder",
       icon: <MessageSquare className="h-5 w-5" />,
       href: "/profile-editor/onboarding-flow",
       variant: pathname.includes("/onboarding-flow") ? "default" : "ghost",
@@ -93,6 +98,18 @@ export default function ProfileEditorLayout({
       icon: <Zap className="h-5 w-5" />,
       href: "/profile-editor/integrations",
       variant: pathname.includes("/integrations") ? "default" : "ghost",
+    },
+    {
+      title: "Triage Logic",
+      icon: <FileCode className="h-5 w-5" />,
+      href: "/profile-editor/triage-logic",
+      variant: pathname.includes("/triage-logic") ? "default" : "ghost",
+    },
+    {
+      title: "Workflows",
+      icon: <FolderCog className="h-5 w-5" />,
+      href: "/profile-editor/workflows",
+      variant: pathname.includes("/workflows") ? "default" : "ghost",
     },
 
     {
