@@ -3,7 +3,6 @@
  * through the A1Base API.
  *
  * Key workflow functions:
- * - verifyAgentIdentity: Sends identity verification message
  * - DefaultReplyToMessage: Generates and sends simple response
  * - ConstructEmail: Creates email draft from thread messages
  * - SendEmailFromAgent: Sends composed email via agent
@@ -45,9 +44,8 @@ const client = new A1BaseAPI({
   },
 });
 
-// ====== BASIC SEND AND VERIFICATION WORKFLOW =======
-// Functions for sending messages and verifying agent identity
-// - verifyAgentIdentity: Sends identity verification message
+// ====== BASIC SEND WORKFLOW =======
+// Functions for sending messages
 // - DefaultReplyToMessage: Generates and sends simple response
 // ===================================================
 
