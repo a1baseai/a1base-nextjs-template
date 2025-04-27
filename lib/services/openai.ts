@@ -35,9 +35,9 @@ export async function triageMessageIntent(
   threadMessages: ThreadMessage[]
 ): Promise<{
   responseType:
-    | "sendIdentityCard"
     | "simpleResponse"
     | "handleEmailAction"
+    | "onboardingFlow"
 }> {
   // Convert thread messages to OpenAI chat format
   const conversationContext = threadMessages.map((msg) => ({
@@ -48,28 +48,20 @@ export async function triageMessageIntent(
     content: msg.content,
   }));
 
-  // Heuristic check: if the latest message clearly asks for identity or contains an email address, return early
+  // Heuristic check: if the latest message clearly contains an email address, return early
   const latestMessage =
     threadMessages[threadMessages.length - 1]?.content.toLowerCase() || "";
-  if (
-    latestMessage.includes("who are you") ||
-    latestMessage.includes("what are you")
-  ) {
-    return { responseType: "sendIdentityCard" };
-  }
 
   const triagePrompt = `
 Based on the conversation, analyze the user's intent and respond with exactly one of these JSON responses:
-{"responseType":"sendIdentityCard"}
 {"responseType":"simpleResponse"}
 {"responseType":"handleEmailAction"}
 
 Rules:
-- If the user is requesting some sort of identification i.e 'who are you', select "sendIdentityCard"
 - If the user is asking to create, draft, or send an email, select "handleEmailAction"
 - Otherwise, select "simpleResponse"
 
-Return valid JSON with only that single key "responseType" and value as one of the three allowed strings.
+Return valid JSON with only that single key "responseType" and value as one of the allowed strings.
 `;
 
   // Use a faster model for triage to reduce latency
@@ -87,7 +79,6 @@ Return valid JSON with only that single key "responseType" and value as one of t
   try {
     const parsed = JSON.parse(content);
     const validTypes = [
-      "sendIdentityCard",
       "simpleResponse",
       "handleEmailAction",
     ];

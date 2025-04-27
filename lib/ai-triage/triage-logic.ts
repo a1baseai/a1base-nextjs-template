@@ -87,7 +87,7 @@ type TriageParams = {
 };
 
 type TriageResult = {
-  type: "identity" | "default" | "email" | "onboarding";
+  type: "default" | "email" | "onboarding";
   success: boolean;
   message?: string;
   data?: string[] | { subject?: string; body?: string };
@@ -97,7 +97,6 @@ type TriageResult = {
 // Processes incoming messages and routes them to appropriate workflows
 // in basic_workflow.ts. Currently triages for:
 // - Simple response to one off message
-// - Sharing A1 Agent Identity card
 // - Drafting and sending an email
 //
 // To add new triage cases:
