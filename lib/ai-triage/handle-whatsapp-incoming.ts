@@ -2,7 +2,7 @@
 import { MessageRecord } from "@/types/chat";
 import { triageMessage, triggerOnboardingFlow } from "./triage-logic";
 import { initializeDatabase, getInitializedAdapter } from "../supabase/config";
-import { ExtendedWhatsAppIncomingData } from "@/app/api/whatsapp/incoming/route";
+import { ExtendedWhatsAppIncomingData } from "@/app/api/messaging/incoming/route";
 
 // IN-MEMORY STORAGE
 const messagesByThread = new Map();
