@@ -1,8 +1,9 @@
 // import { WhatsAppIncomingData } from "a1base-node";
 import { MessageRecord } from "@/types/chat";
-import { triageMessage, triggerOnboardingFlow } from "./triage-logic";
+import { triageMessage } from "./triage-logic";
 import { initializeDatabase, getInitializedAdapter } from "../supabase/config";
 import { WebhookPayload } from "@/app/api/messaging/incoming/route";
+import { StartOnboarding } from "../workflows/basic_workflow";
 
 // IN-MEMORY STORAGE
 const messagesByThread = new Map();
@@ -294,10 +295,31 @@ export async function handleWhatsAppIncoming(webhookData: WebhookPayload) {
     return;
   }
   
-  // If this is a new thread/user, trigger onboarding flow
+  // If this is a new thread/user, trigger agentic onboarding flow
   if (shouldTriggerOnboarding) {
-    console.log(`[WhatsApp] Triggering onboarding flow for thread ${thread_id}`);
-    await triggerOnboardingFlow(thread_id, sender_number);
+    console.log(`[WhatsApp] Triggering agentic onboarding flow for thread ${thread_id}`);
+    // Use direct agentic onboarding workflow instead of static onboarding flow
+    
+    // Create a thread message structure expected by StartOnboarding
+    const threadMessages = [
+      {
+        content,
+        message_id,
+        message_type,
+        message_content,
+        sender_name,
+        sender_number,
+        timestamp
+      }
+    ];
+    
+    await StartOnboarding(
+      threadMessages, 
+      thread_type as "individual" | "group",
+      thread_id,
+      sender_number,
+      service
+    );
   } else {
     // Otherwise process as normal message
     await triageMessage({
