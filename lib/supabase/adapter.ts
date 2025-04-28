@@ -6,6 +6,9 @@ import { USERS_TABLE, THREADS_TABLE } from './config'
  * SupabaseAdapter class provides an interface for database operations
  * using Supabase as the backend database.
  */
+// Import WebhookPayload type
+import { WebhookPayload } from '@/app/api/messaging/incoming/route'
+
 export class SupabaseAdapter {
   private supabase: SupabaseClient<Database>
   private isInitialized: boolean = false
@@ -61,6 +64,7 @@ export class SupabaseAdapter {
       throw error;
     }
   }
+  
 
   /**
    * Ensure the adapter is initialized before performing operations
@@ -93,6 +97,53 @@ export class SupabaseAdapter {
   }
   // Note: Users are only saved when they send a message in a chat
   // Update to pull participants from a group chat coming soon.
+  
+  /**
+   * Get or create a user from webhook payload
+   */
+  async getUserFromWebhook(
+    senderNumber: string, 
+    senderName: string, 
+    service: string,
+    metadata?: Record<string, any>
+  ): Promise<string | null> {
+    this.ensureInitialized();
+    
+    // Remove + from phone number for consistent storage
+    const normalizedNumber = senderNumber.replace(/\+/g, "");
+    
+    try {
+      // First try to find existing user
+      const { data: existingUser, error: findError } = await this.supabase
+        .from(USERS_TABLE)
+        .select('id')
+        .eq('phone_number', normalizedNumber)
+        .single();
+      
+      if (!findError && existingUser) {
+        return existingUser.id;
+      }
+      
+      // Create new user if not found
+      const { data: newUser, error: insertError } = await this.supabase
+        .from(USERS_TABLE)
+        .insert({
+          name: senderName,
+          phone_number: normalizedNumber,
+          service: service,
+          metadata: metadata || {},
+          created_at: new Date().toISOString()
+        })
+        .select('id')
+        .single();
+      
+      if (insertError) throw insertError;
+      return newUser.id;
+    } catch (error) {
+      console.error('Error in getUserFromWebhook:', error);
+      return null;
+    }
+  }
 
   async updateUser(phoneNumber: number, updates: { name?: string }): Promise<boolean> {
     this.ensureInitialized()
@@ -210,6 +261,174 @@ export class SupabaseAdapter {
     } catch (error) {
       console.error('Error updating thread participants:', error)
       return false
+    }
+  }
+  
+  /**
+   * Get or create a chat from webhook payload
+   */
+  async getChatFromWebhook(
+    threadId: string,
+    threadType: string,
+    service: string,
+    metadata?: Record<string, any>
+  ): Promise<string | null> {
+    this.ensureInitialized();
+    
+    try {
+      // First try to find existing chat by external_id
+      const { data: existingChat, error: findError } = await this.supabase
+        .from('chats')
+        .select('id')
+        .eq('external_id', threadId)
+        .single();
+      
+      if (!findError && existingChat) {
+        return existingChat.id;
+      }
+      
+      // Create new chat if not found
+      const { data: newChat, error: insertError } = await this.supabase
+        .from('chats')
+        .insert({
+          external_id: threadId,
+          type: threadType,
+          service: service,
+          metadata: metadata || {},
+          created_at: new Date().toISOString()
+        })
+        .select('id')
+        .single();
+      
+      if (insertError) throw insertError;
+      return newChat.id;
+    } catch (error) {
+      console.error('Error in getChatFromWebhook:', error);
+      return null;
+    }
+  }
+  
+  /**
+   * Add participant to chat
+   */
+  async addParticipantToChat(chatId: string, userId: string): Promise<boolean> {
+    this.ensureInitialized();
+    
+    try {
+      // Check if participant already exists
+      const { data: existingParticipant, error: findError } = await this.supabase
+        .from('chat_participants')
+        .select('*')
+        .eq('chat_id', chatId)
+        .eq('user_id', userId)
+        .single();
+      
+      if (!findError && existingParticipant) {
+        // Already exists
+        return true;
+      }
+      
+      // Add participant
+      const { error: insertError } = await this.supabase
+        .from('chat_participants')
+        .insert({
+          chat_id: chatId,
+          user_id: userId
+        });
+      
+      if (insertError) throw insertError;
+      return true;
+    } catch (error) {
+      console.error('Error in addParticipantToChat:', error);
+      return false;
+    }
+  }
+  
+  /**
+   * Store message from webhook payload
+   */
+  async storeMessage(
+    chatId: string,
+    senderId: string | null,
+    messageId: string,
+    content: string,
+    messageType: string,
+    service: string,
+    richContent: Record<string, any>
+  ): Promise<string | null> {
+    this.ensureInitialized();
+    
+    try {
+      const { data, error } = await this.supabase
+        .from('messages')
+        .insert({
+          chat_id: chatId,
+          sender_id: senderId,
+          external_id: messageId,
+          content: content,
+          message_type: messageType,
+          service: service,
+          rich_content: richContent,
+          created_at: new Date().toISOString()
+        })
+        .select('id')
+        .single();
+      
+      if (error) throw error;
+      return data.id;
+    } catch (error) {
+      console.error('Error in storeMessage:', error);
+      return null;
+    }
+  }
+  
+  /**
+   * Process entire webhook payload
+   */
+  async processWebhookPayload(payload: WebhookPayload): Promise<boolean> {
+    try {
+      // 1. Get or create user
+      const userId = await this.getUserFromWebhook(
+        payload.sender_number, 
+        payload.sender_name,
+        payload.service,
+        { a1_account_id: payload.a1_account_id }
+      );
+      
+      if (!userId) throw new Error("Failed to get or create user");
+      
+      // 2. Get or create chat
+      const chatId = await this.getChatFromWebhook(
+        payload.thread_id,
+        payload.thread_type,
+        payload.service,
+        { a1_account_id: payload.a1_account_id }
+      );
+      
+      if (!chatId) throw new Error("Failed to get or create chat");
+      
+      // 3. Add user as participant 
+      const participantAdded = await this.addParticipantToChat(chatId, userId);
+      if (!participantAdded) throw new Error("Failed to add participant to chat");
+      
+      // 4. Store the message
+      const textContent = payload.message_content.text || '';
+      const messageId = await this.storeMessage(
+        chatId,
+        userId,
+        payload.message_id,
+        textContent,
+        payload.message_type,
+        payload.service,
+        payload.message_content
+      );
+      
+      if (!messageId) throw new Error("Failed to store message");
+      
+      return true;
+    } catch (error) {
+      console.error('Error processing webhook payload:', error);
+      return false;
     }
   }
 } 

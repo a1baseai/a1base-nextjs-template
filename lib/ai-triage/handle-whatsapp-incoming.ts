@@ -2,7 +2,7 @@
 import { MessageRecord } from "@/types/chat";
 import { triageMessage, triggerOnboardingFlow } from "./triage-logic";
 import { initializeDatabase, getInitializedAdapter } from "../supabase/config";
-import { ExtendedWhatsAppIncomingData } from "@/app/api/messaging/incoming/route";
+import { WebhookPayload } from "@/app/api/messaging/incoming/route";
 
 // IN-MEMORY STORAGE
 const messagesByThread = new Map();
@@ -207,18 +207,24 @@ async function saveToMemory(threadId: string, message: MessageRecord) {
   messagesByThread.set(threadId, threadMessages);
 }
 
-export async function handleWhatsAppIncoming({
-  thread_id,
-  message_id,
-  content,
-  message_type,
-  message_content,
-  sender_name,
-  sender_number,
-  thread_type,
-  timestamp,
-  service,
-}: ExtendedWhatsAppIncomingData) {
+export async function handleWhatsAppIncoming(webhookData: WebhookPayload) {
+  // Extract data for easier access
+  const {
+    thread_id,
+    message_id,
+    message_type,
+    message_content,
+    sender_number,
+    thread_type,
+    timestamp,
+    service,
+  } = webhookData;
+  
+  // The content field is for backward compatibility
+  const content = message_content.text || '';
+  
+  // Get sender name with potential override for agent
+  let sender_name = webhookData.sender_name;
   // Initialize database on first message
   await initializeDatabase();
 
@@ -244,11 +250,23 @@ export async function handleWhatsAppIncoming({
   let shouldTriggerOnboarding = false;
   
   if (adapter) {
-    // Check if this is a new thread in the database
-    const thread = await adapter.getThread(thread_id);
-    if (!thread) {
-      shouldTriggerOnboarding = true;
-      console.log(`[WhatsApp] New thread detected: ${thread_id}. Will trigger onboarding.`);
+    try {
+      // Process and store the webhook data in Supabase
+      const success = await adapter.processWebhookPayload(webhookData);
+      if (success) {
+        console.log(`[Supabase] Successfully stored webhook data for message ${message_id}`);
+      } else {
+        console.error(`[Supabase] Failed to store webhook data for message ${message_id}`);
+      }
+      
+      // Check if this is a new thread in the database
+      const thread = await adapter.getThread(thread_id);
+      if (!thread) {
+        shouldTriggerOnboarding = true;
+        console.log(`[WhatsApp] New thread detected: ${thread_id}. Will trigger onboarding.`);
+      }
+    } catch (error) {
+      console.error('[Supabase] Error processing webhook data:', error);
     }
   } else {
     // Using in-memory storage

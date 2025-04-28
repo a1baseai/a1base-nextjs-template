@@ -6,7 +6,9 @@ CREATE TABLE public.conversation_users (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     created_at timestamptz NOT NULL DEFAULT now(),
     name text NULL,
-    phone_number text NULL  -- Changed to text for international format support
+    phone_number text NULL,  -- Changed to text for international format support
+    service TEXT NULL,       -- Service identifier (e.g., 'whatsapp', 'telegram')
+    metadata JSONB NULL      -- Additional user metadata from service
 );
 
 -- Table: chats (no dependencies)
@@ -14,7 +16,10 @@ CREATE TABLE public.chats (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     created_at timestamptz NOT NULL DEFAULT now(),
     type text NOT NULL CHECK (type IN ('individual', 'group')),
-    name text NULL  -- Optional name for group chats
+    name text NULL,        -- Optional name for group chats
+    external_id TEXT NULL, -- External identifier (e.g., WhatsApp thread ID)
+    service TEXT NULL,     -- Service identifier (e.g., 'whatsapp', 'telegram')
+    metadata JSONB NULL    -- Additional chat metadata from service
 );
 
 -- Table: chat_participants (depends on chats and conversation_users)
@@ -30,7 +35,11 @@ CREATE TABLE public.messages (
     chat_id uuid REFERENCES public.chats(id),
     sender_id uuid REFERENCES public.conversation_users(id),  -- NULL if sent by AI
     content text NOT NULL,
-    created_at timestamptz NOT NULL DEFAULT now()
+    created_at timestamptz NOT NULL DEFAULT now(),
+    message_type TEXT NULL,      -- Type of message (text, image, video, etc.)
+    external_id TEXT NULL,       -- External message ID from the service
+    rich_content JSONB NULL,     -- Rich content data (images, media, etc.)
+    service TEXT NULL            -- Service the message came from
 );
 
 -- Table: cron_jobs (no dependencies)
@@ -66,6 +75,11 @@ CREATE TABLE public.project_history (
     details text NULL,
     created_at timestamptz NOT NULL DEFAULT now()
 );
+
+-- Create indexes for webhook data performance
+CREATE INDEX idx_messages_external_id ON public.messages(external_id);
+CREATE INDEX idx_chats_external_id ON public.chats(external_id);
+CREATE INDEX idx_users_phone ON public.conversation_users(phone_number);
 
 -- Enable Row-Level Security (RLS) on all tables
 ALTER TABLE public.conversation_users   ENABLE ROW LEVEL SECURITY;

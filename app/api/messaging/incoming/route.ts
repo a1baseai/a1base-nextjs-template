@@ -33,7 +33,7 @@ export interface ExtendedWhatsAppIncomingData {
 }
 
 // Define webhook payload type based on new A1Base documentation
-interface WebhookPayload {
+export interface WebhookPayload {
   thread_id: string;
   message_id: string;
   thread_type: 'group' | 'individual' | 'broadcast';
@@ -88,23 +88,8 @@ export async function POST(request: Request) {
       body.sender_number = process.env.A1BASE_AGENT_NUMBER!;
     }
 
-    // Cast to WhatsAppIncomingData with all required fields
-    const whatsappData: ExtendedWhatsAppIncomingData = {
-      thread_id: body.thread_id,
-      message_id: body.message_id,
-      content: body.message_content.text || '',
-      message_type: body.message_type,
-      message_content: body.message_content,
-      sender_name: body.sender_name,
-      sender_number: body.sender_number,
-      thread_type: body.thread_type,
-      timestamp: body.timestamp,
-      a1_account_id: body.a1_account_id,
-      service: "whatsapp",
-      is_from_agent: body.is_from_agent || body.sender_number === process.env.A1BASE_AGENT_NUMBER
-    };
-
-    await handleWhatsAppIncoming(whatsappData);
+    // Just pass the WebhookPayload directly
+    await handleWhatsAppIncoming(body);
 
     return NextResponse.json({ success: true });
   } catch (error) {
