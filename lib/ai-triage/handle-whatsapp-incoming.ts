@@ -81,7 +81,8 @@ async function saveMessage(
     sender_number: string;
     sender_name: string;
     timestamp: string;
-  }
+  },
+  thread_type: string
 ) {
   const adapter = await getInitializedAdapter();
 
@@ -166,7 +167,8 @@ async function saveMessage(
         const newThreadId = await adapter.createThread(
           threadId,
           [newMessage],
-          participants.map(number => ({ number }))
+          participants.map(number => ({ number })),
+          thread_type
         );
         if (!newThreadId) throw new Error("Failed to create new thread");
       }
@@ -288,7 +290,7 @@ export async function handleWhatsAppIncoming(webhookData: WebhookPayload) {
     sender_number,
     sender_name,
     timestamp,
-  });
+  }, thread_type);
 
   // Only respond to user messages
   if (sender_number === process.env.A1BASE_AGENT_NUMBER!) {
@@ -297,43 +299,6 @@ export async function handleWhatsAppIncoming(webhookData: WebhookPayload) {
   
   // If this is a new thread/user, trigger agentic onboarding flow
   if (shouldTriggerOnboarding) {
-    console.log(`[WhatsApp] Triggering agentic onboarding flow for thread ${thread_id}`);
-    // Use direct agentic onboarding workflow instead of static onboarding flow
-    
-    // Create a thread message structure expected by StartOnboarding
-    const threadMessages = [
-      {
-        content,
-        message_id,
-        message_type,
-        message_content,
-        sender_name,
-        sender_number,
-        timestamp
-      }
-    ];
-    
-    await StartOnboarding(
-      threadMessages, 
-      thread_type as "individual" | "group",
-      thread_id,
-      sender_number,
-      service
-    );
-  } else {
-    // Otherwise process as normal message
-    await triageMessage({
-      thread_id,
-      message_id,
-      content,
-      message_type,
-      message_content,
-      sender_name,
-      sender_number,
-      thread_type,
-      timestamp,
-      messagesByThread,
-      service,
-    });
+    console.log(`[WhatsApp] Triggering onboarding flow for thread ${thread_id}`);
   }
 }

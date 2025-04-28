@@ -13,8 +13,8 @@ const supabaseKey = process.env.SUPABASE_KEY
  * Export table names as constants to maintain consistency
  * across the application
  */
-export const USERS_TABLE = 'users' as const
-export const THREADS_TABLE = 'threads' as const
+export const CONVERSATION_USERS_TABLE = 'conversation_users' as const
+export const CHATS_TABLE = 'chats' as const
 
 // Track the initialized adapter instance
 let initializedAdapter: SupabaseAdapter | null = null

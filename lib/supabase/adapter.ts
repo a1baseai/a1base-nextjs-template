@@ -1,6 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { Database } from './types'
-import { USERS_TABLE, THREADS_TABLE } from './config'
+import { CONVERSATION_USERS_TABLE, CHATS_TABLE } from './config'
 
 /**
  * SupabaseAdapter class provides an interface for database operations
@@ -23,7 +23,7 @@ export class SupabaseAdapter {
   async init(): Promise<void> {
     try {
       const { error: userTableError } = await this.supabase
-        .from(USERS_TABLE)
+        .from(CONVERSATION_USERS_TABLE)
         .select('id')
         .limit(1);
 
@@ -33,7 +33,7 @@ export class SupabaseAdapter {
       }
 
       const { error: threadsTableError } = await this.supabase
-        .from(THREADS_TABLE)
+        .from(CHATS_TABLE)
         .select('id')
         .limit(1);
 
@@ -83,7 +83,7 @@ export class SupabaseAdapter {
     this.ensureInitialized()
     try {
       const { data, error } = await this.supabase
-        .from(USERS_TABLE)
+        .from(CONVERSATION_USERS_TABLE)
         .insert({ name, phone_number: phoneNumber })
         .select('id')
         .single()
@@ -115,7 +115,7 @@ export class SupabaseAdapter {
     try {
       // First try to find existing user
       const { data: existingUser, error: findError } = await this.supabase
-        .from(USERS_TABLE)
+        .from(CONVERSATION_USERS_TABLE)
         .select('id')
         .eq('phone_number', normalizedNumber)
         .single();
@@ -126,7 +126,7 @@ export class SupabaseAdapter {
       
       // Create new user if not found
       const { data: newUser, error: insertError } = await this.supabase
-        .from(USERS_TABLE)
+        .from(CONVERSATION_USERS_TABLE)
         .insert({
           name: senderName,
           phone_number: normalizedNumber,
@@ -149,7 +149,7 @@ export class SupabaseAdapter {
     this.ensureInitialized()
     try {
       const { error } = await this.supabase
-        .from(USERS_TABLE)
+        .from(CONVERSATION_USERS_TABLE)
         .update(updates)
         .eq('phone_number', phoneNumber)
 
@@ -165,7 +165,7 @@ export class SupabaseAdapter {
     this.ensureInitialized()
     try {
       const { data, error } = await this.supabase
-        .from(USERS_TABLE)
+        .from(CONVERSATION_USERS_TABLE)
         .select('*')
         .eq('phone_number', phoneNumber)
         .single()
@@ -182,23 +182,42 @@ export class SupabaseAdapter {
   }
 
   /**
-   * Thread Operations 
+   * Thread/Chat Operations
    */
 
-  async createThread(threadId: string, messages: Record<string, unknown>[], participants: Record<string, unknown>[]): Promise<string | null> {
+  async createThread(threadId: string, messages: Record<string, unknown>[] = [], participants: Record<string, unknown>[] = [], threadType: string = 'chat'): Promise<string | null> {
     this.ensureInitialized()
     try {
+      // First create the chat entry
       const { data, error } = await this.supabase
-        .from(THREADS_TABLE)
+        .from(CHATS_TABLE)
         .insert({
           id: threadId,
-          messages,
-          participants
+          type: threadType,
+          name: '', // Default name
+          external_id: threadId, // Use threadId as external_id for consistency
+          created_at: new Date().toISOString()
         })
         .select('id')
         .single()
 
       if (error) throw error
+      
+      // Then add any messages to the messages table
+      if (messages.length > 0) {
+        const messagesWithChatId = messages.map(message => ({
+          chat_id: data.id,
+          content: typeof message.text === 'string' ? message.text : JSON.stringify(message),
+          created_at: new Date().toISOString()
+        }))
+        
+        const { error: messagesError } = await this.supabase
+          .from('messages')
+          .insert(messagesWithChatId)
+        
+        if (messagesError) throw messagesError
+      }
+
       return data.id
     } catch (error) {
       console.error('Error creating thread:', error)
@@ -209,17 +228,29 @@ export class SupabaseAdapter {
   async getThread(threadId: string) {
     this.ensureInitialized()
     try {
-      const { data, error } = await this.supabase
-        .from(THREADS_TABLE)
+      // Get the chat data
+      const { data: chatData, error: chatError } = await this.supabase
+        .from(CHATS_TABLE)
         .select('*')
         .eq('id', threadId)
         .single()
 
-      if (error) {
-        if (error.code === 'PGRST116') return null // Not found
-        throw error
+      if (chatError) throw chatError
+      
+      // Get the messages for this chat
+      const { data: messagesData, error: messagesError } = await this.supabase
+        .from('messages')
+        .select('*')
+        .eq('chat_id', threadId)
+        .order('created_at', { ascending: true })
+      
+      if (messagesError) throw messagesError
+      
+      // Combine the data
+      return {
+        ...chatData,
+        messages: messagesData || []
       }
-      return data
     } catch (error) {
       console.error('Error getting thread:', error)
       return null
@@ -229,15 +260,29 @@ export class SupabaseAdapter {
   async updateThreadMessages(threadId: string, messages: Record<string, unknown>[]): Promise<boolean> {
     this.ensureInitialized()
     try {
-      const { error } = await this.supabase
-        .from(THREADS_TABLE)
-        .update({ 
-          messages,
+      // Delete existing messages for this thread
+      const { error: deleteError } = await this.supabase
+        .from('messages')
+        .delete()
+        .eq('chat_id', threadId)
+      
+      if (deleteError) throw deleteError
+      
+      // Insert new messages
+      if (messages.length > 0) {
+        const messagesWithChatId = messages.map(message => ({
+          chat_id: threadId,
+          content: typeof message.text === 'string' ? message.text : JSON.stringify(message),
           created_at: new Date().toISOString()
-        })
-        .eq('id', threadId)
+        }))
+        
+        const { error: insertError } = await this.supabase
+          .from('messages')
+          .insert(messagesWithChatId)
+        
+        if (insertError) throw insertError
+      }
 
-      if (error) throw error
       return true
     } catch (error) {
       console.error('Error updating thread messages:', error)
@@ -248,15 +293,30 @@ export class SupabaseAdapter {
   async updateThreadParticipants(threadId: string, participants: Record<string, unknown>[]): Promise<boolean> {
     this.ensureInitialized()
     try {
-      const { error } = await this.supabase
-        .from(THREADS_TABLE)
-        .update({ 
-          participants,
-          created_at: new Date().toISOString()
-        })
-        .eq('id', threadId)
+      // Delete existing participants for this thread
+      const { error: deleteError } = await this.supabase
+        .from('chat_participants')
+        .delete()
+        .eq('chat_id', threadId)
+      
+      if (deleteError) throw deleteError
+      
+      // Insert new participants
+      if (participants.length > 0) {
+        const participantsWithChatId = participants.map(participant => ({
+          chat_id: threadId,
+          user_id: participant.id || participant.user_id || null
+        })).filter(p => p.user_id) // Filter out entries without user_id
+        
+        if (participantsWithChatId.length > 0) {
+          const { error: insertError } = await this.supabase
+            .from('chat_participants')
+            .insert(participantsWithChatId)
+          
+          if (insertError) throw insertError
+        }
+      }
 
-      if (error) throw error
       return true
     } catch (error) {
       console.error('Error updating thread participants:', error)
