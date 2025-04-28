@@ -151,11 +151,16 @@ async function saveMessage(
           if (!participantsSuccess) {
             console.error("Failed to update thread participants");
           }
-        }
 
-        // Update thread with new messages
-        const success = await adapter.updateThreadMessages(threadId, messages);
-        if (!success) throw new Error("Failed to update thread messages");
+          // Don't update messages here since processWebhookPayload will handle this
+          // Just update in-memory storage
+          const updatedMessages = [...messages, newMessage];
+          messagesByThread.set(threadId, updatedMessages);
+        } else {
+          // Update in-memory storage
+          const updatedMessages = [...messages, newMessage];
+          messagesByThread.set(threadId, updatedMessages);
+        }
       } else {
         // Create new thread with first message
         const participants = [normalizedSenderNumber];
@@ -173,9 +178,6 @@ async function saveMessage(
         if (!newThreadId) throw new Error("Failed to create new thread");
       }
 
-      // Update in-memory storage
-      const messages = thread?.messages || [newMessage];
-      messagesByThread.set(threadId, messages);
       console.log("Successfully saved message to database");
     } catch (error) {
       console.error("Error saving message to database:", error);
@@ -254,7 +256,7 @@ export async function handleWhatsAppIncoming(webhookData: WebhookPayload) {
   
   if (adapter) {
     try {
-      // Process and store the webhook data in Supabase
+      // Process and store the webhook data in Supabase - this already saves the message to the database
       const success = await adapter.processWebhookPayload(webhookData);
       if (success) {
         console.log(`[Supabase] Successfully stored webhook data for message ${message_id}`);
@@ -268,11 +270,43 @@ export async function handleWhatsAppIncoming(webhookData: WebhookPayload) {
         shouldTriggerOnboarding = true;
         console.log(`[WhatsApp] New thread detected: ${thread_id}. Will trigger onboarding.`);
       }
+
+      // Store in memory only (skip database save since processWebhookPayload already did it)
+      await saveToMemory(thread_id, {
+        message_id,
+        content,
+        message_type,
+        message_content,
+        sender_number,
+        sender_name,
+        timestamp,
+      });
+
     } catch (error) {
       console.error('[Supabase] Error processing webhook data:', error);
+      // Fallback to in-memory storage if database fails
+      await saveMessage(thread_id, {
+        message_id,
+        content,
+        message_type,
+        message_content,
+        sender_number,
+        sender_name,
+        timestamp,
+      }, thread_type);
     }
   } else {
-    // Using in-memory storage
+    // No database adapter available, use in-memory storage only
+    await saveMessage(thread_id, {
+      message_id,
+      content,
+      message_type,
+      message_content,
+      sender_number,
+      sender_name,
+      timestamp,
+    }, thread_type);
+    
     // Check if this is the first message in this thread
     const threadMessages = messagesByThread.get(thread_id) || [];
     if (threadMessages.length === 0) {
@@ -280,17 +314,6 @@ export async function handleWhatsAppIncoming(webhookData: WebhookPayload) {
       console.log(`[WhatsApp] First message in thread: ${thread_id}. Will trigger onboarding.`);
     }
   }
-
-  // Store message with new structure
-  await saveMessage(thread_id, {
-    message_id,
-    content,
-    message_type,
-    message_content,
-    sender_number,
-    sender_name,
-    timestamp,
-  }, thread_type);
 
   // Only respond to user messages
   if (sender_number === process.env.A1BASE_AGENT_NUMBER!) {

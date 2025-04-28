@@ -188,7 +188,26 @@ export class SupabaseAdapter {
   async createThread(threadId: string, messages: Record<string, unknown>[] = [], participants: Record<string, unknown>[] = [], threadType: string = 'chat'): Promise<string | null> {
     this.ensureInitialized()
     try {
-      // First create the chat entry
+      // First check if a thread with this ID already exists
+      const { data: existingThread, error: findError } = await this.supabase
+        .from(CHATS_TABLE)
+        .select('id')
+        .eq('id', threadId)
+        .single()
+      
+      // If thread already exists, just return its ID
+      if (!findError && existingThread) {
+        console.log(`Thread ${threadId} already exists, skipping creation`);
+        return existingThread.id;
+      }
+      
+      // If error is not a "not found" error, it's a real error
+      if (findError && findError.code !== 'PGRST116') {
+        throw findError;
+      }
+
+      // Create the chat entry since it doesn't exist
+      console.log(`Creating new thread with ID ${threadId}`);
       const { data, error } = await this.supabase
         .from(CHATS_TABLE)
         .insert({
@@ -270,11 +289,21 @@ export class SupabaseAdapter {
       
       // Insert new messages
       if (messages.length > 0) {
-        const messagesWithChatId = messages.map(message => ({
-          chat_id: threadId,
-          content: typeof message.text === 'string' ? message.text : JSON.stringify(message),
-          created_at: new Date().toISOString()
-        }))
+        const messagesWithChatId = messages.map(message => {
+          // Extract message content
+          const messageContent = message.message_content || message;
+          
+          return {
+            chat_id: threadId,
+            content: JSON.stringify(messageContent), // Store full message content as JSON string
+            message_type: message.message_type || 'text',
+            service: message.service || '',
+            external_id: message.message_id || `${Date.now()}-${Math.random().toString(36).substring(2, 10)}`,
+            sender_id: message.sender_id || null,
+            rich_content: messageContent,
+            created_at: message.timestamp || new Date().toISOString()
+          };
+        });
         
         const { error: insertError } = await this.supabase
           .from('messages')
@@ -293,15 +322,54 @@ export class SupabaseAdapter {
   async updateThreadParticipants(threadId: string, participants: Record<string, unknown>[]): Promise<boolean> {
     this.ensureInitialized()
     try {
-      const { error } = await this.supabase
-        .from(CHATS_TABLE)
-        .update({ 
-          participants,
-          created_at: new Date().toISOString()
-        })
-        .eq('id', threadId)
+      // First delete all existing participants for this chat
+      const { error: deleteError } = await this.supabase
+        .from('chat_participants')
+        .delete()
+        .eq('chat_id', threadId)
+      
+      if (deleteError) throw deleteError
+      
+      // If we have participants to add, insert them
+      if (participants.length > 0) {
+        // We need to find the user IDs for these participants
+        const participantPromises = participants.map(async (participant) => {
+          // If we already have a user_id, use it
+          if (participant.user_id) {
+            return { chat_id: threadId, user_id: participant.user_id };
+          }
           
-      if (error) throw error
+          // Otherwise, try to find by phone number
+          if (participant.number) {
+            const normalizedNumber = String(participant.number).replace(/\+/g, '');
+            const { data, error } = await this.supabase
+              .from(CONVERSATION_USERS_TABLE)
+              .select('id')
+              .eq('phone_number', normalizedNumber)
+              .single();
+              
+            if (!error && data) {
+              return { chat_id: threadId, user_id: data.id };
+            }
+          }
+          
+          return null;
+        });
+        
+        // Wait for all participant lookups to complete
+        const participantsToAdd = (await Promise.all(participantPromises))
+          .filter(p => p !== null);
+        
+        // Add all participants if we found any
+        if (participantsToAdd.length > 0) {
+          const { error: insertError } = await this.supabase
+            .from('chat_participants')
+            .insert(participantsToAdd);
+          
+          if (insertError) throw insertError;
+        }
+      }
+      
       return true
     } catch (error) {
       console.error('Error updating thread participants:', error)
@@ -328,11 +396,20 @@ export class SupabaseAdapter {
         .eq('external_id', threadId)
         .single();
       
+      // If we found an existing chat, return its ID
       if (!findError && existingChat) {
+        console.log(`Found existing chat for thread_id ${threadId}:`, existingChat.id);
         return existingChat.id;
       }
       
-      // Create new chat if not found
+      // If the error is not a "not found" error, it's an actual error
+      if (findError && findError.code !== 'PGRST116') {
+        console.error(`Error finding chat for thread_id ${threadId}:`, findError);
+        throw findError;
+      }
+      
+      // At this point, we know the chat doesn't exist, so create a new one
+      console.log(`Creating new chat for thread_id ${threadId}`);
       const { data: newChat, error: insertError } = await this.supabase
         .from('chats')
         .insert({
@@ -396,10 +473,10 @@ export class SupabaseAdapter {
     chatId: string,
     senderId: string | null,
     messageId: string,
-    content: string,
+    content: Record<string, any>,
     messageType: string,
     service: string,
-    richContent: Record<string, any>
+    richContent?: Record<string, any>
   ): Promise<string | null> {
     this.ensureInitialized();
     
@@ -410,10 +487,10 @@ export class SupabaseAdapter {
           chat_id: chatId,
           sender_id: senderId,
           external_id: messageId,
-          content: content,
+          content: JSON.stringify(content),
           message_type: messageType,
           service: service,
-          rich_content: richContent,
+          rich_content: richContent || content,
           created_at: new Date().toISOString()
         })
         .select('id')
@@ -457,15 +534,13 @@ export class SupabaseAdapter {
       if (!participantAdded) throw new Error("Failed to add participant to chat");
       
       // 4. Store the message
-      const textContent = payload.message_content.text || '';
       const messageId = await this.storeMessage(
         chatId,
         userId,
         payload.message_id,
-        textContent,
+        payload.message_content,
         payload.message_type,
-        payload.service,
-        payload.message_content
+        payload.service
       );
       
       if (!messageId) throw new Error("Failed to store message");
