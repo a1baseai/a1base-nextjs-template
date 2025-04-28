@@ -33,12 +33,14 @@ export default function OnboardingFlowBuilder() {
         setIsLoading(true);
         const flow = await loadOnboardingFlow();
         
-        // Ensure flow is in agentic mode with agentic settings
-        if (flow.mode !== 'agentic' || !flow.agenticSettings) {
+        // Ensure flow is in agentic mode with agentic settings and has enabled property
+        if (flow.mode !== 'agentic' || !flow.agenticSettings || flow.enabled === undefined) {
           // Initialize agentic settings if needed
           const updatedFlow = {
             ...flow,
             mode: 'agentic' as const,
+            // Ensure enabled property is set (default to true if missing)
+            enabled: flow.enabled !== undefined ? flow.enabled : true,
             agenticSettings: flow.agenticSettings || {
               systemPrompt: 'You are conducting an onboarding conversation with a new user. Your goal is to make them feel welcome and collect some basic information that will help you assist them better in the future. Be friendly, professional, and conversational.',
               userFields: [
@@ -91,6 +93,24 @@ export default function OnboardingFlowBuilder() {
       setIsSaving(false);
     }
   };
+
+  // Add event listener for global save button from the layout navbar
+  useEffect(() => {
+    // Create an event handler for the save event
+    const handleGlobalSave = () => {
+      if (hasChanges && !isSaving && onboardingFlow) {
+        handleSave();
+      }
+    };
+    
+    // Add the event listener
+    document.addEventListener('save-profile-settings', handleGlobalSave);
+    
+    // Clean up the event listener when component unmounts
+    return () => {
+      document.removeEventListener('save-profile-settings', handleGlobalSave);
+    };
+  }, [hasChanges, isSaving, onboardingFlow, handleSave]);
 
   // Add a new user field
   const addUserField = () => {
@@ -147,12 +167,20 @@ export default function OnboardingFlowBuilder() {
   const toggleEnabled = (enabled: boolean) => {
     if (!onboardingFlow) return;
     
-    setOnboardingFlow({
+    // Update the flow with the new enabled state
+    const updatedFlow = {
       ...onboardingFlow,
       enabled
-    });
+    };
     
+    // Set the updated flow in state
+    setOnboardingFlow(updatedFlow);
+    
+    // Mark changes
     setHasChanges(true);
+    
+    // Log the change
+    console.log(`Onboarding flow ${enabled ? 'enabled' : 'disabled'}`);
   };
 
   // If onboarding flow hasn't loaded yet, show loading state
