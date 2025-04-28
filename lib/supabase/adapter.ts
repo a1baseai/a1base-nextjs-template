@@ -293,30 +293,15 @@ export class SupabaseAdapter {
   async updateThreadParticipants(threadId: string, participants: Record<string, unknown>[]): Promise<boolean> {
     this.ensureInitialized()
     try {
-      // Delete existing participants for this thread
-      const { error: deleteError } = await this.supabase
-        .from('chat_participants')
-        .delete()
-        .eq('chat_id', threadId)
-      
-      if (deleteError) throw deleteError
-      
-      // Insert new participants
-      if (participants.length > 0) {
-        const participantsWithChatId = participants.map(participant => ({
-          chat_id: threadId,
-          user_id: participant.id || participant.user_id || null
-        })).filter(p => p.user_id) // Filter out entries without user_id
-        
-        if (participantsWithChatId.length > 0) {
-          const { error: insertError } = await this.supabase
-            .from('chat_participants')
-            .insert(participantsWithChatId)
+      const { error } = await this.supabase
+        .from(CHATS_TABLE)
+        .update({ 
+          participants,
+          created_at: new Date().toISOString()
+        })
+        .eq('id', threadId)
           
-          if (insertError) throw insertError
-        }
-      }
-
+      if (error) throw error
       return true
     } catch (error) {
       console.error('Error updating thread participants:', error)

@@ -3,11 +3,9 @@ import { getInitializedAdapter } from "../supabase/config";
 import {
   DefaultReplyToMessage,
   ConstructEmail,
-  SendEmailFromAgent,
 } from "../workflows/basic_workflow";
 import { triageMessageIntent } from "../services/openai";
 import { A1BaseAPI } from "a1base-node";
-import fetch from "node-fetch";
 
 const client = new A1BaseAPI({
   credentials: {

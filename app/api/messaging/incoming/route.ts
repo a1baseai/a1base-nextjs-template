@@ -1,7 +1,5 @@
 import { handleWhatsAppIncoming } from "@/lib/ai-triage/handle-whatsapp-incoming";
-import { WhatsAppIncomingData as BaseWhatsAppIncomingData } from "a1base-node";
 import { NextResponse } from "next/server";
-import { dynamic, runtime, maxDuration } from "../../route-config";
 
 // Define our own complete interface to avoid type compatibility issues
 export interface ExtendedWhatsAppIncomingData {
