@@ -91,6 +91,87 @@ type TriageResult = {
   data?: string[] | { subject?: string; body?: string };
 };
 
+// ======================== PROJECT TRIAGE LOGIC ========================
+// Analyzes the last 10 messages in a chat to determine if they relate to an
+// existing project. If not, creates a new project.
+// ===================================================================
+
+export async function projectTriage(
+  threadMessages: MessageRecord[],
+  thread_id: string,
+  chatId: string,
+  service: string
+): Promise<string | null> {
+  console.log("[projectTriage] Starting project triage");
+
+  try {
+    // Get the adapter
+    const adapter = await getInitializedAdapter();
+    if (!adapter) {
+      console.log("[projectTriage] No adapter available, skipping project triage");
+      return null;
+    }
+
+    // Get existing projects for this chat
+    const existingProjects = await adapter.getProjectsByChat(chatId);
+    
+    // If there are no messages, skip project triage
+    if (!threadMessages || threadMessages.length === 0) {
+      console.log("[projectTriage] No messages to analyze, skipping project triage");
+      return null;
+    }
+
+    // If we already have a project for this chat, return the first one
+    if (existingProjects.length > 0) {
+      console.log(`[projectTriage] Found existing project: ${existingProjects[0].name}`);
+      return existingProjects[0].id;
+    }
+
+    // Format messages for analysis
+    const messages = threadMessages.map(msg => ({
+      content: msg.content,
+      sender_number: msg.sender_number,
+      sender_name: msg.sender_name,
+    }));
+
+    // Use latest message to derive a project name
+    const latestMessage = threadMessages[threadMessages.length - 1];
+    
+    // Default project name is based on first few words of the latest message
+    const defaultName = latestMessage.content
+      .split(" ")
+      .slice(0, 3)
+      .join(" ")
+      .trim()
+      .substring(0, 30) + "...";
+    
+    // Default description includes the sender and a snippet of the message
+    const defaultDescription = `Project started by ${latestMessage.sender_name}. Initial message: ${latestMessage.content.substring(0, 100)}${latestMessage.content.length > 100 ? '...' : ''}`;
+
+    // Create a new project
+    const projectId = await adapter.createProject(
+      defaultName,
+      defaultDescription,
+      chatId
+    );
+
+    if (projectId) {
+      // Log project creation
+      await adapter.logProjectEvent(
+        projectId,
+        "project_created",
+        `Project created from thread ${thread_id}`
+      );
+      console.log(`[projectTriage] Created new project: ${defaultName} with ID: ${projectId}`);
+    }
+
+    return projectId;
+  } catch (error) {
+    console.error("[projectTriage] Error:", error);
+    return null;
+  }
+}
+
 // ======================== MAIN TRIAGE LOGIC ========================
 // Processes incoming messages and routes them to appropriate workflows
 // in basic_workflow.ts. Currently triages for:

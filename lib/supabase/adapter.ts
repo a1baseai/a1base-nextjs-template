@@ -505,6 +505,95 @@ export class SupabaseAdapter {
   }
   
   /**
+   * Project Operations
+   */
+  
+  // Get projects for a chat
+  async getProjectsByChat(chatId: string): Promise<any[]> {
+    this.ensureInitialized();
+    
+    try {
+      const { data, error } = await this.supabase
+        .from('projects')
+        .select('*')
+        .eq('chat_id', chatId);
+      
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('Error getting projects by chat:', error);
+      return [];
+    }
+  }
+  
+  // Create a new project
+  async createProject(name: string, description: string, chatId: string): Promise<string | null> {
+    this.ensureInitialized();
+    
+    try {
+      const { data, error } = await this.supabase
+        .from('projects')
+        .insert({
+          name,
+          description,
+          chat_id: chatId,
+          created_at: new Date().toISOString(),
+          is_live: true
+        })
+        .select('id')
+        .single();
+      
+      if (error) throw error;
+      return data.id;
+    } catch (error) {
+      console.error('Error creating project:', error);
+      return null;
+    }
+  }
+  
+  // Get all projects
+  async getAllProjects(): Promise<any[]> {
+    this.ensureInitialized();
+    
+    try {
+      const { data, error } = await this.supabase
+        .from('projects')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('Error getting all projects:', error);
+      return [];
+    }
+  }
+  
+  // Log project history event
+  async logProjectEvent(projectId: string, eventType: string, details: string): Promise<string | null> {
+    this.ensureInitialized();
+    
+    try {
+      const { data, error } = await this.supabase
+        .from('project_history')
+        .insert({
+          project_id: projectId,
+          event_type: eventType,
+          details,
+          created_at: new Date().toISOString()
+        })
+        .select('id')
+        .single();
+      
+      if (error) throw error;
+      return data.id;
+    } catch (error) {
+      console.error('Error logging project event:', error);
+      return null;
+    }
+  }
+
+  /**
    * Process entire webhook payload
    */
   async processWebhookPayload(payload: WebhookPayload): Promise<boolean> {

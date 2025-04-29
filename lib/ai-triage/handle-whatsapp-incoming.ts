@@ -1,6 +1,6 @@
 // import { WhatsAppIncomingData } from "a1base-node";
 import { MessageRecord } from "@/types/chat";
-import { triageMessage } from "./triage-logic";
+import { triageMessage, projectTriage } from "./triage-logic";
 import { initializeDatabase, getInitializedAdapter } from "../supabase/config";
 import { WebhookPayload } from "@/app/api/messaging/incoming/route";
 import { StartOnboarding } from "../workflows/basic_workflow";
@@ -253,6 +253,7 @@ export async function handleWhatsAppIncoming(webhookData: WebhookPayload) {
   // Check if this is a new user/thread and should trigger onboarding
   const adapter = await getInitializedAdapter();
   let shouldTriggerOnboarding = false;
+  let chatId: string | null = null;
   
   if (adapter) {
     try {
@@ -269,6 +270,8 @@ export async function handleWhatsAppIncoming(webhookData: WebhookPayload) {
       if (!thread) {
         shouldTriggerOnboarding = true;
         console.log(`[WhatsApp] New thread detected: ${thread_id}. Will trigger onboarding.`);
+      } else {
+        chatId = thread.id;
       }
 
       // Store in memory only (skip database save since processWebhookPayload already did it)
@@ -281,6 +284,18 @@ export async function handleWhatsAppIncoming(webhookData: WebhookPayload) {
         sender_name,
         timestamp,
       });
+
+      // Get the current messages from the thread for project triage
+      if (chatId && sender_number !== process.env.A1BASE_AGENT_NUMBER) {
+        // Get the latest 10 messages to analyze for project triage
+        const threadMessages = thread?.messages ? thread.messages.slice(-10) : [];
+        
+        // Run project triage on the messages
+        const projectId = await projectTriage(threadMessages, thread_id, chatId, service);
+        if (projectId) {
+          console.log(`[WhatsApp] Message associated with project ID: ${projectId}`);
+        }
+      }
 
     } catch (error) {
       console.error('[Supabase] Error processing webhook data:', error);
