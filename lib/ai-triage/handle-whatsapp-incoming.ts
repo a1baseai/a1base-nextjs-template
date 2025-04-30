@@ -10,9 +10,9 @@ const messagesByThread = new Map();
 const MAX_CONTEXT_MESSAGES = 10;
 
 interface DatabaseAdapterInterface {
-  createUser: (name: string, phoneNumber: number) => Promise<string | null>;
-  updateUser: (phoneNumber: number, updates: { name?: string }) => Promise<boolean>;
-  getUserByPhone: (phoneNumber: number) => Promise<{ name: string } | null>;
+  createUser: (name: string, phoneNumber: string) => Promise<string | null>;
+  updateUser: (phoneNumber: string, updates: { name?: string }) => Promise<boolean>;
+  getUserByPhone: (phoneNumber: string) => Promise<{ name: string } | null>;
 }
 
 /**
@@ -24,16 +24,16 @@ async function userCheck(
   adapter: DatabaseAdapterInterface
 ): Promise<void> {
   try {
-    // Convert phone number to numeric format (remove '+' and any spaces)
-    const numericPhone = parseInt(phoneNumber.replace(/\D/g, ""));
+    // Normalize phone number (remove '+' and spaces)
+    const normalizedPhone = phoneNumber.replace(/\+|\s/g, "");
 
-  // Check if user exists
-    const existingUser = await adapter.getUserByPhone(numericPhone);
+    // Check if user exists
+    const existingUser = await adapter.getUserByPhone(normalizedPhone);
 
     if (!existingUser) {
       // Create new user if they don't exist
       console.log("Creating new user:", { name, phoneNumber });
-      const userId = await adapter.createUser(name, numericPhone);
+      const userId = await adapter.createUser(name, normalizedPhone);
       if (!userId) {
         throw new Error("Failed to create user");
       }
@@ -44,7 +44,7 @@ async function userCheck(
         oldName: existingUser.name,
         newName: name,
       });
-      const success = await adapter.updateUser(numericPhone, { name });
+      const success = await adapter.updateUser(normalizedPhone, { name });
       if (!success) {
         console.error("Failed to update user name");
       }
@@ -122,60 +122,47 @@ async function saveMessage(
 
         // Check if sender is already in participants (using normalized numbers)
         let participants = thread.participants || [];
-        
-        // Safely normalize participant numbers, handling both string and object formats
-        participants = participants.map((p: any) => {
-          if (typeof p === 'string') {
-            return p.replace(/\+/g, "");
-          } else if (p && typeof p === 'object' && p.number) {
-            return String(p.number).replace(/\+/g, "");
-          }
-          return p; // Keep as is if we can't normalize
+        const senderIsParticipant = participants.some((p: any) => {
+          // Handle both string and object formats for backward compatibility
+          const participantNumber = typeof p === 'string'
+            ? p
+            : (p.phone_number || '');
+            
+          // Normalize the participant number for comparison
+          const normalizedParticipantNumber = participantNumber.replace(/\+/g, "");
+          return normalizedParticipantNumber === normalizedSenderNumber;
         });
-        
-        const senderExists = participants.includes(normalizedSenderNumber);
 
-        if (!senderExists) {
-          // Add new participant (normalized)
-          console.log(
-            "Adding new participant to thread:",
-            normalizedSenderNumber
-          );
-          participants = [...participants, normalizedSenderNumber];
+        // If sender is not a participant, add them
+        if (!senderIsParticipant && message.sender_number !== process.env.A1BASE_AGENT_NUMBER) {
+          // Create new participant object with consistent format
+          const newParticipant = {
+            user_id: '', // Will be filled by adapter
+            phone_number: normalizedSenderNumber,
+            name: message.sender_name
+          };
+          participants = [...participants, newParticipant];
+        }
 
-          // Update thread participants
-          const participantsSuccess = await adapter.updateThreadParticipants(
-            threadId,
-            participants
-          );
-          if (!participantsSuccess) {
-            console.error("Failed to update thread participants");
-          }
-
-          // Don't update messages here since processWebhookPayload will handle this
-          // Just update in-memory storage
-          const updatedMessages = [...messages, newMessage];
-          messagesByThread.set(threadId, updatedMessages);
-        } else {
-          // Update in-memory storage
-          const updatedMessages = [...messages, newMessage];
-          messagesByThread.set(threadId, updatedMessages);
+        // Update thread with new messages and participants
+        await adapter.updateThreadMessages(threadId, messages);
+        if (participants.length > 0) {
+          await adapter.updateThreadParticipants(threadId, participants);
         }
       } else {
-        // Create new thread with first message
-        const participants = [normalizedSenderNumber];
-        if (process.env.A1BASE_AGENT_NUMBER) {
-          // Add normalized agent number
-          participants.push(process.env.A1BASE_AGENT_NUMBER.replace(/\+/g, ""));
+        // Create new thread with message
+        const participants = [];
+        
+        // Only add sender as participant if not the agent
+        if (message.sender_number !== process.env.A1BASE_AGENT_NUMBER) {
+          participants.push({
+            user_id: '', // Will be filled by adapter
+            phone_number: normalizedSenderNumber,
+            name: message.sender_name
+          });
         }
 
-        const newThreadId = await adapter.createThread(
-          threadId,
-          [newMessage],
-          participants.map(number => ({ number })),
-          thread_type
-        );
-        if (!newThreadId) throw new Error("Failed to create new thread");
+        await adapter.createThread(threadId, [newMessage], participants, thread_type);
       }
 
       console.log("Successfully saved message to database");

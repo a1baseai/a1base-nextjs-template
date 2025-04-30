@@ -79,12 +79,16 @@ export class SupabaseAdapter {
    * User Operations
    */
 
-  async createUser(name: string, phoneNumber: number): Promise<string | null> {
+  async createUser(name: string, phoneNumber: string): Promise<string | null> {
     this.ensureInitialized()
     try {
       const { data, error } = await this.supabase
         .from(CONVERSATION_USERS_TABLE)
-        .insert({ name, phone_number: phoneNumber })
+        .insert({ 
+          name, 
+          phone_number: phoneNumber,
+          created_at: new Date().toISOString()
+        })
         .select('id')
         .single()
 
@@ -120,10 +124,13 @@ export class SupabaseAdapter {
         .eq('phone_number', normalizedNumber)
         .single();
       
+      // Check if user exists - note single() throws error if no results
       if (!findError && existingUser) {
+        console.log(`Found existing user with ID: ${existingUser.id}`);
         return existingUser.id;
       }
       
+      console.log(`Creating new user with phone: ${normalizedNumber}`);
       // Create new user if not found
       const { data: newUser, error: insertError } = await this.supabase
         .from(CONVERSATION_USERS_TABLE)
@@ -137,7 +144,11 @@ export class SupabaseAdapter {
         .select('id')
         .single();
       
-      if (insertError) throw insertError;
+      if (insertError) {
+        console.error('Error inserting new user:', insertError);
+        throw insertError;
+      }
+      console.log(`Created new user with ID: ${newUser.id}`);
       return newUser.id;
     } catch (error) {
       console.error('Error in getUserFromWebhook:', error);
@@ -145,24 +156,25 @@ export class SupabaseAdapter {
     }
   }
 
-  async updateUser(phoneNumber: number, updates: { name?: string }): Promise<boolean> {
+  async updateUser(phoneNumber: string, updates: { name?: string }): Promise<boolean> {
     this.ensureInitialized()
+
     try {
       const { error } = await this.supabase
         .from(CONVERSATION_USERS_TABLE)
         .update(updates)
         .eq('phone_number', phoneNumber)
 
-      if (error) throw error
-      return true
+      return !error
     } catch (error) {
       console.error('Error updating user:', error)
       return false
     }
   }
 
-  async getUserByPhone(phoneNumber: number) {
+  async getUserByPhone(phoneNumber: string) {
     this.ensureInitialized()
+
     try {
       const { data, error } = await this.supabase
         .from(CONVERSATION_USERS_TABLE)
@@ -171,9 +183,13 @@ export class SupabaseAdapter {
         .single()
 
       if (error) {
-        if (error.code === 'PGRST116') return null // Not found
+        if (error.code === 'PGRST116') {
+          // No rows returned
+          return null
+        }
         throw error
       }
+
       return data
     } catch (error) {
       console.error('Error getting user by phone:', error)
@@ -246,32 +262,79 @@ export class SupabaseAdapter {
 
   async getThread(threadId: string) {
     this.ensureInitialized()
+
     try {
-      // Get the chat data
-      const { data: chatData, error: chatError } = await this.supabase
-        .from(CHATS_TABLE)
-        .select('*')
-        .eq('id', threadId)
+      // First, find the chat by external_id
+      const { data: chat, error: chatError } = await this.supabase
+        .from('chats')
+        .select('id')
+        .eq('external_id', threadId)
         .single()
 
-      if (chatError) throw chatError
-      
-      // Get the messages for this chat
-      const { data: messagesData, error: messagesError } = await this.supabase
-        .from('messages')
-        .select('*')
-        .eq('chat_id', threadId)
-        .order('created_at', { ascending: true })
-      
-      if (messagesError) throw messagesError
-      
-      // Combine the data
-      return {
-        ...chatData,
-        messages: messagesData || []
+      // If chat not found, return null (it's a new thread)
+      if (chatError) {
+        if (chatError.code === 'PGRST116') {
+          // No rows returned - this is a new thread, not an error
+          return null;
+        }
+        throw chatError
       }
-    } catch (error) {
-      console.error('Error getting thread:', error)
+
+      // Get all messages for the thread
+      const { data: messages, error: messagesError } = await this.supabase
+        .from('messages')
+        .select(`
+          id, content, sender_id, message_type, rich_content, created_at,
+          conversation_users:sender_id(name, phone_number)
+        `)
+        .eq('chat_id', chat.id)
+        .order('created_at', { ascending: true })
+
+      if (messagesError) throw messagesError
+
+      // Get participants for the thread
+      const { data: participants, error: participantsError } = await this.supabase
+        .from('chat_participants')
+        .select(`
+          user_id,
+          conversation_users:user_id(name, phone_number)
+        `)
+        .eq('chat_id', chat.id)
+
+      if (participantsError) throw participantsError
+
+      // Format the messages and participants
+      const formattedMessages = messages.map((msg: any) => {
+        return {
+          message_id: msg.id,
+          content: msg.content,
+          message_type: msg.message_type,
+          message_content: msg.rich_content,
+          sender_number: msg.conversation_users ? msg.conversation_users.phone_number || '' : '',
+          sender_name: msg.conversation_users ? msg.conversation_users.name || '' : '',
+          timestamp: msg.created_at,
+        }
+      })
+
+      const formattedParticipants = participants.map((p: any) => {
+        return {
+          user_id: p.user_id,
+          phone_number: p.conversation_users ? p.conversation_users.phone_number || '' : '',
+          name: p.conversation_users ? p.conversation_users.name || '' : '',
+        }
+      })
+
+      return {
+        id: chat.id,
+        external_id: threadId,
+        messages: formattedMessages,
+        participants: formattedParticipants,
+      }
+    } catch (error: any) { // Type error as any to access code property
+      // Log errors, but don't log PGRST116 as an error since it's expected for new threads
+      if (error.code !== 'PGRST116') {
+        console.error('Error getting thread:', error)
+      }
       return null
     }
   }
@@ -390,31 +453,35 @@ export class SupabaseAdapter {
     
     try {
       // First try to find existing chat by external_id
+      console.log(`Looking for chat with external_id ${threadId}`);
       const { data: existingChat, error: findError } = await this.supabase
         .from('chats')
         .select('id')
         .eq('external_id', threadId)
         .single();
       
-      // If we found an existing chat, return its ID
       if (!findError && existingChat) {
-        console.log(`Found existing chat for thread_id ${threadId}:`, existingChat.id);
+        console.log(`Found existing chat with ID ${existingChat.id}`);
         return existingChat.id;
       }
       
-      // If the error is not a "not found" error, it's an actual error
       if (findError && findError.code !== 'PGRST116') {
+        // This is an error other than "not found"
         console.error(`Error finding chat for thread_id ${threadId}:`, findError);
         throw findError;
       }
       
       // At this point, we know the chat doesn't exist, so create a new one
-      console.log(`Creating new chat for thread_id ${threadId}`);
+      console.log(`Creating new chat for thread_id ${threadId}, type ${threadType}`);
+      
+      // Ensure thread type is one of the acceptable values for the CHECK constraint
+      const validatedThreadType = ['individual', 'group'].includes(threadType) ? threadType : 'individual';
+      
       const { data: newChat, error: insertError } = await this.supabase
         .from('chats')
         .insert({
           external_id: threadId,
-          type: threadType,
+          type: validatedThreadType,
           service: service,
           metadata: metadata || {},
           created_at: new Date().toISOString()
@@ -422,7 +489,12 @@ export class SupabaseAdapter {
         .select('id')
         .single();
       
-      if (insertError) throw insertError;
+      if (insertError) {
+        console.error(`Error creating new chat: ${insertError.message}`);
+        throw insertError;
+      }
+      
+      console.log(`Successfully created new chat with ID ${newChat.id}`);
       return newChat.id;
     } catch (error) {
       console.error('Error in getChatFromWebhook:', error);
@@ -437,20 +509,22 @@ export class SupabaseAdapter {
     this.ensureInitialized();
     
     try {
-      // Check if participant already exists
+      // Check if participant already exists to avoid unique constraint violation
+      console.log(`Checking if user ${userId} is already in chat ${chatId}`);
       const { data: existingParticipant, error: findError } = await this.supabase
         .from('chat_participants')
         .select('*')
         .eq('chat_id', chatId)
-        .eq('user_id', userId)
-        .single();
+        .eq('user_id', userId);
       
-      if (!findError && existingParticipant) {
+      if (!findError && existingParticipant && existingParticipant.length > 0) {
         // Already exists
+        console.log(`User ${userId} is already a participant in chat ${chatId}`);
         return true;
       }
       
       // Add participant
+      console.log(`Adding user ${userId} to chat ${chatId}`);
       const { error: insertError } = await this.supabase
         .from('chat_participants')
         .insert({
@@ -458,7 +532,12 @@ export class SupabaseAdapter {
           user_id: userId
         });
       
-      if (insertError) throw insertError;
+      if (insertError) {
+        console.error(`Error adding participant: ${insertError.message}`);
+        throw insertError;
+      }
+      
+      console.log(`Successfully added user ${userId} to chat ${chatId}`);
       return true;
     } catch (error) {
       console.error('Error in addParticipantToChat:', error);
@@ -481,22 +560,46 @@ export class SupabaseAdapter {
     this.ensureInitialized();
     
     try {
+      // Extract text content from the content object for the content field
+      let textContent = content.text || '';
+      if (typeof content === 'object' && Object.keys(content).length > 0) {
+        // If it's an object with no text property, take first non-empty value or stringify
+        if (!textContent) {
+          for (const key in content) {
+            if (content[key] && typeof content[key] === 'string') {
+              textContent = content[key];
+              break;
+            }
+          }
+          
+          // If still no text found, stringify the whole object
+          if (!textContent) {
+            textContent = JSON.stringify(content);
+          }
+        }
+      }
+      
+      console.log(`Storing message in chat ${chatId} from sender ${senderId || 'unknown'}`);
+      
       const { data, error } = await this.supabase
         .from('messages')
         .insert({
           chat_id: chatId,
           sender_id: senderId,
           external_id: messageId,
-          content: JSON.stringify(content),
+          content: textContent, // Store as plain text string
           message_type: messageType,
           service: service,
-          rich_content: richContent || content,
+          rich_content: richContent || content, // Store JSON in rich_content
           created_at: new Date().toISOString()
         })
         .select('id')
         .single();
       
-      if (error) throw error;
+      if (error) {
+        console.error('Database error storing message:', error);
+        throw error;
+      }
       return data.id;
     } catch (error) {
       console.error('Error in storeMessage:', error);
@@ -598,6 +701,8 @@ export class SupabaseAdapter {
    */
   async processWebhookPayload(payload: WebhookPayload): Promise<boolean> {
     try {
+      console.log(`Processing webhook for thread ${payload.thread_id} from ${payload.sender_number}`);
+      
       // 1. Get or create user
       const userId = await this.getUserFromWebhook(
         payload.sender_number, 
@@ -606,7 +711,12 @@ export class SupabaseAdapter {
         { a1_account_id: payload.a1_account_id }
       );
       
-      if (!userId) throw new Error("Failed to get or create user");
+      if (!userId) {
+        console.error("Failed to get or create user");
+        throw new Error("Failed to get or create user");
+      }
+      
+      console.log(`User identified with ID: ${userId}`);
       
       // 2. Get or create chat
       const chatId = await this.getChatFromWebhook(
@@ -616,11 +726,21 @@ export class SupabaseAdapter {
         { a1_account_id: payload.a1_account_id }
       );
       
-      if (!chatId) throw new Error("Failed to get or create chat");
+      if (!chatId) {
+        console.error("Failed to get or create chat");
+        throw new Error("Failed to get or create chat");
+      }
+      
+      console.log(`Chat identified with ID: ${chatId}`);
       
       // 3. Add user as participant 
       const participantAdded = await this.addParticipantToChat(chatId, userId);
-      if (!participantAdded) throw new Error("Failed to add participant to chat");
+      if (!participantAdded) {
+        console.error("Failed to add participant to chat");
+        throw new Error("Failed to add participant to chat");
+      }
+      
+      console.log(`Added user ${userId} as participant to chat ${chatId}`);
       
       // 4. Store the message
       const messageId = await this.storeMessage(
@@ -632,7 +752,12 @@ export class SupabaseAdapter {
         payload.service
       );
       
-      if (!messageId) throw new Error("Failed to store message");
+      if (!messageId) {
+        console.error("Failed to store message");
+        throw new Error("Failed to store message");
+      }
+      
+      console.log(`Successfully stored message with ID: ${messageId}`);
       
       return true;
     } catch (error) {
