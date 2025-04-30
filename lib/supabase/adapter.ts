@@ -654,6 +654,48 @@ export class SupabaseAdapter {
     }
   }
   
+  // Update an existing project
+  async updateProject(projectId: string, updates: { is_live?: boolean, name?: string, description?: string }): Promise<boolean> {
+    this.ensureInitialized();
+    
+    try {
+      console.log(`Updating project ${projectId} with:`, updates);
+      const { error } = await this.supabase
+        .from('projects')
+        .update(updates)
+        .eq('id', projectId);
+      
+      if (error) {
+        console.error('Error updating project:', error);
+        throw error;
+      }
+      console.log(`Successfully updated project ${projectId}`);
+      return true;
+    } catch (error) {
+      console.error('Error updating project:', error);
+      return false;
+    }
+  }
+  
+  // Get a project by ID
+  async getProjectById(projectId: string): Promise<any | null> {
+    this.ensureInitialized();
+    
+    try {
+      const { data, error } = await this.supabase
+        .from('projects')
+        .select('*')
+        .eq('id', projectId)
+        .single();
+      
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error getting project by ID:', error);
+      return null;
+    }
+  }
+  
   // Get all projects
   async getAllProjects(): Promise<any[]> {
     this.ensureInitialized();
