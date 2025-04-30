@@ -5,10 +5,29 @@ import { initializeDatabase, getInitializedAdapter } from "../supabase/config";
 import { WebhookPayload } from "@/app/api/messaging/incoming/route";
 import { StartOnboarding } from "../workflows/basic_workflow";
 import { A1BaseAPI } from "a1base-node";
+import fs from "fs";
+import path from "path";
 
 // IN-MEMORY STORAGE
 const messagesByThread = new Map();
 const MAX_CONTEXT_MESSAGES = 10;
+
+/**
+ * Get message splitting setting from configuration file
+ * This determines if long messages should be split into multiple messages
+ */
+async function getSplitMessageSetting(): Promise<boolean> {
+  try {
+    const settingsFilePath = path.join(process.cwd(), "data", "message-settings.json");
+    if (fs.existsSync(settingsFilePath)) {
+      const settings = JSON.parse(fs.readFileSync(settingsFilePath, "utf-8"));
+      return settings.splitParagraphs || false;
+    }
+  } catch (error) {
+    console.error("Error loading message settings:", error);
+  }
+  return false; // Default to false if settings can't be loaded
+}
 
 // Initialize A1Base API client for sending messages
 const client = new A1BaseAPI({
@@ -376,16 +395,32 @@ export async function handleWhatsAppIncoming(webhookData: WebhookPayload) {
         if (onboardingData && onboardingData.messages && onboardingData.messages.length > 0) {
           console.log(`[TRIAGE] Got ${onboardingData.messages.length} onboarding messages to send`);
           
+          // Check if we should split messages (based on settings or defaults)
+          const splitParagraphs = await getSplitMessageSetting();
+          
           // Send onboarding messages sequentially
           for (const message of onboardingData.messages) {
-            await client.sendIndividualMessage(process.env.A1BASE_ACCOUNT_ID!, {
-              content: message.text,
-              from: process.env.A1BASE_AGENT_NUMBER!,
-              to: sender_number,
-              service: "whatsapp",
-            });
+            // Split the message content if needed
+            const messageLines = splitParagraphs
+              ? message.text.split("\n").filter(line => line.trim())
+              : [message.text];
             
-            // Add a small delay between messages
+            // Send each line as a separate message
+            for (const line of messageLines) {
+              await client.sendIndividualMessage(process.env.A1BASE_ACCOUNT_ID!, {
+                content: line,
+                from: process.env.A1BASE_AGENT_NUMBER!,
+                to: sender_number,
+                service: "whatsapp",
+              });
+              
+              // Add a small delay between split message lines
+              if (splitParagraphs && messageLines.length > 1) {
+                await new Promise(resolve => setTimeout(resolve, 500));
+              }
+            }
+            
+            // Add a larger delay between different onboarding messages
             await new Promise(resolve => setTimeout(resolve, 1000));
           }
           
@@ -421,12 +456,28 @@ export async function handleWhatsAppIncoming(webhookData: WebhookPayload) {
         
         // For web-ui service, the response is handled by the calling code
         if (service !== "web-ui") {
-          await client.sendIndividualMessage(process.env.A1BASE_ACCOUNT_ID!, {
-            content: triageResult.message,
-            from: process.env.A1BASE_AGENT_NUMBER!,
-            to: sender_number,
-            service: "whatsapp",
-          });
+          // Check if we should split messages (based on settings or defaults)
+          const splitParagraphs = await getSplitMessageSetting();
+          
+          // Split response into paragraphs if setting is enabled
+          const messages = splitParagraphs
+            ? triageResult.message.split("\n").filter((msg) => msg.trim())
+            : [triageResult.message];
+          
+          // Send each message line individually
+          for (const messageContent of messages) {
+            await client.sendIndividualMessage(process.env.A1BASE_ACCOUNT_ID!, {
+              content: messageContent,
+              from: process.env.A1BASE_AGENT_NUMBER!,
+              to: sender_number,
+              service: "whatsapp",
+            });
+            
+            // Add a small delay between messages to maintain order
+            if (splitParagraphs && messages.length > 1) {
+              await new Promise(resolve => setTimeout(resolve, 500));
+            }
+          }
         }
       }
     } else {
