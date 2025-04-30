@@ -4,10 +4,19 @@ import { triageMessage, projectTriage } from "./triage-logic";
 import { initializeDatabase, getInitializedAdapter } from "../supabase/config";
 import { WebhookPayload } from "@/app/api/messaging/incoming/route";
 import { StartOnboarding } from "../workflows/basic_workflow";
+import { A1BaseAPI } from "a1base-node";
 
 // IN-MEMORY STORAGE
 const messagesByThread = new Map();
 const MAX_CONTEXT_MESSAGES = 10;
+
+// Initialize A1Base API client for sending messages
+const client = new A1BaseAPI({
+  credentials: {
+    apiKey: process.env.A1BASE_API_KEY!,
+    apiSecret: process.env.A1BASE_API_SECRET!,
+  },
+});
 
 interface DatabaseAdapterInterface {
   createUser: (name: string, phoneNumber: string) => Promise<string | null>;
@@ -217,6 +226,10 @@ export async function handleWhatsAppIncoming(webhookData: WebhookPayload) {
   
   // Get sender name with potential override for agent
   let sender_name = webhookData.sender_name;
+  if (sender_number === process.env.A1BASE_AGENT_NUMBER) {
+    sender_name = process.env.A1BASE_AGENT_NAME || sender_name;
+  }
+  
   // Initialize database on first message
   await initializeDatabase();
 
@@ -233,18 +246,22 @@ export async function handleWhatsAppIncoming(webhookData: WebhookPayload) {
     service,
   });
 
-  if (sender_number === process.env.A1BASE_AGENT_NUMBER) {
-    sender_name = process.env.A1BASE_AGENT_NAME || sender_name;
+  // Skip processing for messages from our own agent
+  if (sender_number === process.env.A1BASE_AGENT_NUMBER!) {
+    console.log("[Message] Skipping processing for agent's own message");
+    return;
   }
   
   // Check if this is a new user/thread and should trigger onboarding
   const adapter = await getInitializedAdapter();
   let shouldTriggerOnboarding = false;
   let chatId: string | null = null;
+  let threadMessages: MessageRecord[] = [];
   
+  // Save the message to storage (either Supabase or in-memory)
   if (adapter) {
     try {
-      // Process and store the webhook data in Supabase - this already saves the message to the database
+      // Process and store the webhook data in Supabase
       const success = await adapter.processWebhookPayload(webhookData);
       if (success) {
         console.log(`[Supabase] Successfully stored webhook data for message ${message_id}`);
@@ -259,9 +276,10 @@ export async function handleWhatsAppIncoming(webhookData: WebhookPayload) {
         console.log(`[WhatsApp] New thread detected: ${thread_id}. Will trigger onboarding.`);
       } else {
         chatId = thread.id;
+        threadMessages = thread.messages || [];
       }
 
-      // Store in memory only (skip database save since processWebhookPayload already did it)
+      // Store in memory too for redundancy
       await saveToMemory(thread_id, {
         message_id,
         content,
@@ -271,18 +289,6 @@ export async function handleWhatsAppIncoming(webhookData: WebhookPayload) {
         sender_name,
         timestamp,
       });
-
-      // Get the current messages from the thread for project triage
-      if (chatId && sender_number !== process.env.A1BASE_AGENT_NUMBER) {
-        // Get the latest 10 messages to analyze for project triage
-        const threadMessages = thread?.messages ? thread.messages.slice(-10) : [];
-        
-        // Run project triage on the messages
-        const projectId = await projectTriage(threadMessages, thread_id, chatId, service);
-        if (projectId) {
-          console.log(`[WhatsApp] Message associated with project ID: ${projectId}`);
-        }
-      }
 
     } catch (error) {
       console.error('[Supabase] Error processing webhook data:', error);
@@ -296,6 +302,12 @@ export async function handleWhatsAppIncoming(webhookData: WebhookPayload) {
         sender_name,
         timestamp,
       }, thread_type);
+      
+      // Get messages from memory instead
+      threadMessages = messagesByThread.get(thread_id) || [];
+      if (threadMessages.length === 0) {
+        shouldTriggerOnboarding = true;
+      }
     }
   } else {
     // No database adapter available, use in-memory storage only
@@ -309,21 +321,127 @@ export async function handleWhatsAppIncoming(webhookData: WebhookPayload) {
       timestamp,
     }, thread_type);
     
-    // Check if this is the first message in this thread
-    const threadMessages = messagesByThread.get(thread_id) || [];
+    // Get messages from memory
+    threadMessages = messagesByThread.get(thread_id) || [];
     if (threadMessages.length === 0) {
       shouldTriggerOnboarding = true;
       console.log(`[WhatsApp] First message in thread: ${thread_id}. Will trigger onboarding.`);
     }
   }
 
-  // Only respond to user messages
-  if (sender_number === process.env.A1BASE_AGENT_NUMBER!) {
-    return;
+  // Always run project triage for every message (if we have a chat ID)
+  let projectId: string | null = null;
+  if (chatId) {
+    try {
+      // Run project triage on the messages
+      projectId = await projectTriage(threadMessages, thread_id, chatId, service);
+      if (projectId) {
+        console.log(`[WhatsApp] Message associated with project ID: ${projectId}`);
+      }
+    } catch (error) {
+      console.error('[WhatsApp] Error in project triage:', error);
+    }
   }
   
-  // If this is a new thread/user, trigger agentic onboarding flow
-  if (shouldTriggerOnboarding) {
-    console.log(`[WhatsApp] Triggering onboarding flow for thread ${thread_id}`);
+  // Always run message triage to generate a response
+  try {
+    console.log(`[WhatsApp] Running message triage for thread ${thread_id}`);
+    
+    // Special handling for brand new threads that need onboarding
+    if (shouldTriggerOnboarding) {
+      console.log(`[WhatsApp] Triggering onboarding flow for thread ${thread_id}`);
+      try {
+        // Create an array of thread messages in the correct format
+        const formattedThreadMessages = threadMessages.map(msg => ({
+          message_id: msg.message_id,
+          content: msg.content,
+          message_type: (msg.message_type || 'text') as 'text' | 'rich_text' | 'image' | 'video' | 'audio' | 'location' | 'reaction' | 'group_invite' | 'unsupported_message_type',
+          message_content: msg.message_content || { text: msg.content },
+          sender_number: msg.sender_number,
+          sender_name: msg.sender_name,
+          timestamp: msg.timestamp,
+          role: (msg.sender_number === process.env.A1BASE_AGENT_NUMBER ? 'assistant' : 'user') as 'user' | 'assistant' | 'system'
+        }));
+        
+        // For onboarding, we only generate the messages and let the workflow handle sending them
+        // We just pass a special marker to the service parameter to prevent double-sending
+        const onboardingData = await StartOnboarding(
+          formattedThreadMessages,
+          thread_type as "individual" | "group",
+          thread_id,
+          sender_number,
+          "__skip_send" // Special marker to avoid double-sending
+        );
+        
+        if (onboardingData && onboardingData.messages && onboardingData.messages.length > 0) {
+          console.log(`[TRIAGE] Got ${onboardingData.messages.length} onboarding messages to send`);
+          
+          // Send onboarding messages sequentially
+          for (const message of onboardingData.messages) {
+            await client.sendIndividualMessage(process.env.A1BASE_ACCOUNT_ID!, {
+              content: message.text,
+              from: process.env.A1BASE_AGENT_NUMBER!,
+              to: sender_number,
+              service: "whatsapp",
+            });
+            
+            // Add a small delay between messages
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+          
+          return;
+        }
+      } catch (error) {
+        console.error(`[WhatsApp] Error in onboarding flow:`, error);
+        // Fall through to standard message triage
+      }
+    }
+    
+    // For all other messages, run standard message triage
+    const triageResult = await triageMessage({
+      thread_id,
+      message_id,
+      content,
+      message_type,
+      message_content,
+      sender_name,
+      sender_number,
+      thread_type,
+      timestamp,
+      messagesByThread,
+      service: "__skip_send", // Special marker to avoid double-sending
+    });
+    
+    if (triageResult.success) {
+      console.log(`[WhatsApp] Successfully triaged message with type: ${triageResult.type}`);
+      
+      // Send the response if the triage was successful and we have a message to send
+      if (triageResult.message) {
+        console.log(`[WhatsApp] Sending response to ${sender_number}`);
+        
+        // For web-ui service, the response is handled by the calling code
+        if (service !== "web-ui") {
+          await client.sendIndividualMessage(process.env.A1BASE_ACCOUNT_ID!, {
+            content: triageResult.message,
+            from: process.env.A1BASE_AGENT_NUMBER!,
+            to: sender_number,
+            service: "whatsapp",
+          });
+        }
+      }
+    } else {
+      console.error(`[WhatsApp] Triage failed: ${triageResult.message}`);
+      // Optionally send an error message
+      if (service !== "web-ui") {
+        await client.sendIndividualMessage(process.env.A1BASE_ACCOUNT_ID!, {
+          content: "Sorry, I'm having trouble processing your request right now. Please try again later.",
+          from: process.env.A1BASE_AGENT_NUMBER!,
+          to: sender_number,
+          service: "whatsapp",
+        });
+      }
+    }
+  } catch (error) {
+    console.error('[WhatsApp] Error in message triage:', error);
   }
 }

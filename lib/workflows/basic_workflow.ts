@@ -78,8 +78,35 @@ export async function DefaultReplyToMessage(
         return JSON.stringify(onboardingResult);
       }
       
-      // For other services, StartOnboarding already sent the messages, so we just return a placeholder
-      return "Onboarding started.";
+      // For other services, we'll only send messages if service is NOT the special skip marker
+      if (service !== "__skip_send") {
+        // Send the first onboarding message
+        if (onboardingResult.messages && onboardingResult.messages.length > 0) {
+          const messageContent = onboardingResult.messages[0].text;
+          const messageData = {
+            content: messageContent,
+            from: process.env.A1BASE_AGENT_NUMBER!,
+            service: "whatsapp" as const,
+          };
+
+          if (thread_type === "group" && thread_id) {
+            await client.sendGroupMessage(process.env.A1BASE_ACCOUNT_ID!, {
+              ...messageData,
+              thread_id,
+            });
+          } else if (thread_type === "individual" && sender_number) {
+            await client.sendIndividualMessage(process.env.A1BASE_ACCOUNT_ID!, {
+              ...messageData,
+              to: sender_number,
+            });
+          }
+        }
+      }
+      
+      // Return the first message or a placeholder
+      return onboardingResult.messages && onboardingResult.messages.length > 0 
+        ? onboardingResult.messages[0].text 
+        : "Onboarding started.";
     }
     
     // Load current settings
@@ -95,6 +122,12 @@ export async function DefaultReplyToMessage(
 
     // For web UI, we just return the response without sending through A1Base
     if (service === "web-ui") {
+      return response;
+    }
+    
+    // Skip sending if we're using the special skip marker
+    if (service === "__skip_send") {
+      console.log("Skipping message sending as requested by __skip_send marker");
       return response;
     }
     
@@ -122,49 +155,39 @@ export async function DefaultReplyToMessage(
           ...messageData,
           to: sender_number,
         });
-      } else {
-        console.log("No group_id or sender_number provided, skipping message send");
-      }
-      
-      // Add a small delay between messages to maintain order
-      if (splitParagraphs && messages.length > 1) {
-        await new Promise(resolve => setTimeout(resolve, 500));
       }
     }
 
-    // Make sure to return the response
     return response;
   } catch (error) {
-    console.error("[Basic Workflow] Error:", error);
+    console.error("[DefaultReplyToMessage] Error:", error);
+    const errorMessage = "I'm sorry, but I encountered an error while processing your message.";
 
-    const errorMessage = "Sorry, I encountered an error processing your message.";
+    // Don't send error message if this is a web UI request or using the skip marker
+    if (service !== "web-ui" && service !== "__skip_send") {
+      const messageData = {
+        content: errorMessage,
+        from: process.env.A1BASE_AGENT_NUMBER!,
+        service: "whatsapp" as const,
+      };
 
-    // Skip error message sending for web chat
-    if (service === "web-ui") {
-      return errorMessage;
+      try {
+        if (thread_type === "group" && thread_id) {
+          await client.sendGroupMessage(process.env.A1BASE_ACCOUNT_ID!, {
+            ...messageData,
+            thread_id,
+          });
+        } else if (thread_type === "individual" && sender_number) {
+          await client.sendIndividualMessage(process.env.A1BASE_ACCOUNT_ID!, {
+            ...messageData,
+            to: sender_number,
+          });
+        }
+      } catch (sendError) {
+        console.error("[DefaultReplyToMessage] Error sending error message:", sendError);
+      }
     }
 
-    // Prepare error message for WhatsApp
-    const errorMessageData = {
-      content: errorMessage,
-      from: process.env.A1BASE_AGENT_NUMBER!,
-      service: "whatsapp" as const,
-    };
-
-    // Send error message
-    if (thread_type === "group" && thread_id) {
-      await client.sendGroupMessage(process.env.A1BASE_ACCOUNT_ID!, {
-        ...errorMessageData,
-        thread_id,
-      });
-    } else if (thread_type === "individual" && sender_number) {
-      await client.sendIndividualMessage(process.env.A1BASE_ACCOUNT_ID!, {
-        ...errorMessageData,
-        to: sender_number,
-      });
-    }
-    
-    // Make sure to return the error message
     return errorMessage;
   }
 }
@@ -337,7 +360,12 @@ export async function StartOnboarding(
     const agenticMessage = { text: aiPrompt, waitForResponse: true };
     
     // For WhatsApp or other channels, send the message through A1Base
-    if ((thread_type === "group" || thread_type === "individual") && service !== "web-ui") {
+    // Skip sending if we're using the special skip marker
+    if ((thread_type === "group" || thread_type === "individual") && 
+        service !== "web-ui" && 
+        service !== "__skip_send") {
+      
+      console.log("Sending onboarding message(s) via A1Base API");
       const messageData = {
         content: agenticMessage.text,
         from: process.env.A1BASE_AGENT_NUMBER!,
@@ -355,6 +383,8 @@ export async function StartOnboarding(
           to: sender_number,
         });
       }
+    } else if (service === "__skip_send") {
+      console.log("Skipping onboarding message sending as requested by __skip_send marker");
     }
     
     // Return the agentic message for the web UI or other channels
@@ -364,7 +394,7 @@ export async function StartOnboarding(
     const errorMessage = "Sorry, I encountered an error starting the onboarding process.";
     
     // Handle error similarly to DefaultReplyToMessage
-    if (service !== "web-ui") {
+    if (service !== "web-ui" && service !== "__skip_send") {
       const errorMessageData = {
         content: errorMessage,
         from: process.env.A1BASE_AGENT_NUMBER!,
