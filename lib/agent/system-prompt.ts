@@ -101,18 +101,18 @@ ${getFormattedInformation(baseInfo)}
 }
 
 export const getSystemPrompt = async (): Promise<string> => {
-  console.log('[SYSTEM PROMPT] Getting system prompt, starting to load profile settings...');
+  // console.log('[SYSTEM PROMPT] Getting system prompt, starting to load profile settings...');
   
   try {
     // Get the most up-to-date profile settings (from file storage, localStorage, or defaults)
     const profileSettings = await getAgentProfileSettings();
-    console.log(`[SYSTEM PROMPT] Loaded profile settings for "${profileSettings.name}" from ${profileSettings.companyName}`);
-    console.log(`[SYSTEM PROMPT] Profile source: ${profileSettings._source || 'unknown'}`);
+    // console.log(`[SYSTEM PROMPT] Loaded profile settings for "${profileSettings.name}" from ${profileSettings.companyName}`);
+    // console.log(`[SYSTEM PROMPT] Profile source: ${profileSettings._source || 'unknown'}`);
 
     // Get the formatted base information
-    console.log('[SYSTEM PROMPT] Loading base information...');
+    // console.log('[SYSTEM PROMPT] Loading base information...');
     const baseInfoSnippet = await getAgentBaseInformationSnippet();
-    console.log(`[SYSTEM PROMPT] Base information loaded, length: ${baseInfoSnippet.length} characters`);
+    // console.log(`[SYSTEM PROMPT] Base information loaded, length: ${baseInfoSnippet.length} characters`);
     
     if (baseInfoSnippet.length < 50) {
       console.warn('[SYSTEM PROMPT] WARNING: Base information seems too short, might be missing or incomplete');
@@ -134,8 +134,8 @@ ${getSafetyPrompt(safetySettings)}
 
 `;
   
-    console.log(`[SYSTEM PROMPT] Generated complete system prompt (${finalPrompt.length} chars)`);
-    console.log('[SYSTEM PROMPT] First 100 chars: ' + finalPrompt.substring(0, 100));
+    // console.log(`[SYSTEM PROMPT] Generated complete system prompt (${finalPrompt.length} chars)`);
+    // console.log('[SYSTEM PROMPT] First 100 chars: ' + finalPrompt.substring(0, 100));
     
     return finalPrompt;
   } catch (error) {

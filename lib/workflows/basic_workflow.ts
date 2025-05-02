@@ -326,6 +326,12 @@ export async function CustomApiWorkflow(
 
 import { loadOnboardingFlow } from "../onboarding-flow/onboarding-storage";
 import { createAgenticOnboardingPrompt } from "./agentic-onboarding-workflows";
+import {
+  checkOnboardingStatus,
+  processOnboardingMessage,
+  updateUserOnboardingMetadata,
+  createOnboardingPrompt
+} from '../onboarding-flow/onboarding-manager';
 
 /**
  * Handles the onboarding flow when triggered by "Start onboarding"
