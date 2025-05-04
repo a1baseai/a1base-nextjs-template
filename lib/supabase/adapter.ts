@@ -264,10 +264,10 @@ export class SupabaseAdapter {
     this.ensureInitialized()
 
     try {
-      // First, find the chat by external_id
+      // First, find the chat by external_id with all its information
       const { data: chat, error: chatError } = await this.supabase
         .from('chats')
-        .select('id')
+        .select('id, created_at, type, name, external_id, service, metadata')
         .eq('external_id', threadId)
         .single()
 
@@ -280,56 +280,151 @@ export class SupabaseAdapter {
         throw chatError
       }
 
-      // Get all messages for the thread
+      // Get all messages for the thread with complete user information
       const { data: messages, error: messagesError } = await this.supabase
         .from('messages')
         .select(`
-          id, content, sender_id, message_type, rich_content, created_at,
-          conversation_users:sender_id(name, phone_number)
+          id, chat_id, sender_id, content, created_at, message_type, external_id, rich_content, service,
+          conversation_users:sender_id(id, created_at, name, phone_number, service, metadata)
         `)
         .eq('chat_id', chat.id)
-        .order('created_at', { ascending: true })
+        .order('created_at', { ascending: false })
+        .limit(40)
+        .then(result => {
+          // Reverse back to ascending order after getting the most recent 40
+          if (result.data) {
+            result.data = result.data.reverse();
+          }
+          return result;
+        })
 
       if (messagesError) throw messagesError
 
-      // Get participants for the thread
+      // Get participants for the thread with complete user information
       const { data: participants, error: participantsError } = await this.supabase
         .from('chat_participants')
         .select(`
-          user_id,
-          conversation_users:user_id(name, phone_number)
+          chat_id, user_id,
+          conversation_users:user_id(id, created_at, name, phone_number, service, metadata)
         `)
         .eq('chat_id', chat.id)
 
       if (participantsError) throw participantsError
 
-      // Format the messages and participants
+      // Get any projects associated with this chat
+      const { data: projects, error: projectsError } = await this.supabase
+        .from('projects')
+        .select('id, name, description, created_at, is_live')
+        .eq('chat_id', chat.id)
+
+      if (projectsError) throw projectsError
+    
+      // Get user preferences for all participants
+      const participantUserIds = participants.map((p: any) => p.user_id);
+      let userPreferences: Array<{user_id: string, preferences: Record<string, any>}> = [];
+      
+      if (participantUserIds.length > 0) {
+        const { data: preferences, error: preferencesError } = await this.supabase
+          .from('user_preferences')
+          .select('user_id, preferences')
+          .in('user_id', participantUserIds)
+        
+        if (!preferencesError) {
+          userPreferences = preferences || [];
+        }
+      }
+
+      // Format the messages and participants with enhanced data
       const formattedMessages = messages.map((msg: any) => {
-        return {
+        // Log the raw message data for debugging
+        console.log(`[DB Data Debug] Message raw data:`, JSON.stringify({
+          id: msg.id,
+          chat_id: msg.chat_id,
+          sender_id: msg.sender_id,
+          content: msg.content,
+          created_at: msg.created_at,
+          message_type: msg.message_type,
+          external_id: msg.external_id,
+          rich_content: msg.rich_content,
+          service: msg.service,
+          conversation_users: msg.conversation_users
+        }, null, 2));
+        
+        const formattedMsg = {
           message_id: msg.id,
+          external_id: msg.external_id,
           content: msg.content,
           message_type: msg.message_type,
           message_content: msg.rich_content,
-          sender_number: msg.conversation_users ? msg.conversation_users.phone_number || '' : '',
-          sender_name: msg.conversation_users ? msg.conversation_users.name || '' : '',
+          service: msg.service,
+          sender_id: msg.sender_id,
+          sender_number: msg.conversation_users?.phone_number || '',
+          sender_name: msg.conversation_users?.name || '',
+          sender_service: msg.conversation_users?.service || '',
+          sender_metadata: msg.conversation_users?.metadata || {},
           timestamp: msg.created_at,
-        }
+        };
+        
+        // Log the formatted message for comparison
+        console.log(`[DB Data Debug] Formatted message data:`, JSON.stringify(formattedMsg, null, 2));
+        
+        return formattedMsg;
       })
 
       const formattedParticipants = participants.map((p: any) => {
-        return {
+        // Find preferences for this user if any
+        const userPref = userPreferences.find((pref: any) => pref.user_id === p.user_id);
+        
+        // Log the raw participant data for debugging
+        console.log(`[DB Data Debug] Participant raw data:`, JSON.stringify({
+          chat_id: p.chat_id,
           user_id: p.user_id,
-          phone_number: p.conversation_users ? p.conversation_users.phone_number || '' : '',
-          name: p.conversation_users ? p.conversation_users.name || '' : '',
-        }
+          conversation_users: p.conversation_users,
+          preferences: userPref
+        }, null, 2));
+        
+        const formattedParticipant = {
+          user_id: p.user_id,
+          phone_number: p.conversation_users?.phone_number || '',
+          name: p.conversation_users?.name || '',
+          service: p.conversation_users?.service || '',
+          metadata: p.conversation_users?.metadata || {},
+          created_at: p.conversation_users?.created_at,
+          preferences: userPref?.preferences || {}
+        };
+        
+        // Log the formatted participant for comparison
+        console.log(`[DB Data Debug] Formatted participant data:`, JSON.stringify(formattedParticipant, null, 2));
+        
+        return formattedParticipant;
       })
 
-      return {
+      // Create the final thread object with all data
+      const threadData = {
         id: chat.id,
-        external_id: threadId,
+        external_id: chat.external_id,
+        type: chat.type,
+        name: chat.name,
+        service: chat.service,
+        created_at: chat.created_at,
+        metadata: chat.metadata,
         messages: formattedMessages,
         participants: formattedParticipants,
-      }
+        projects: projects || []
+      };
+      
+      // Log the complete thread data being returned
+      console.log(`[DB Data Debug] Complete thread data overview:`);
+      console.log(threadData)
+      // console.log(`- Chat ID: ${threadData.id}`);
+      // console.log(`- External ID: ${threadData.external_id}`);
+      // console.log(`- Type: ${threadData.type}`);
+      // console.log(`- Service: ${threadData.service}`);
+      // console.log(`- Message count: ${threadData.messages.length}`);
+      // console.log(`- Participant count: ${threadData.participants.length}`);
+      // console.log(`- Projects count: ${threadData.projects.length}`);
+      
+      return threadData;
     } catch (error: any) { // Type error as any to access code property
       // Log errors, but don't log PGRST116 as an error since it's expected for new threads
       if (error.code !== 'PGRST116') {

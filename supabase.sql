@@ -54,6 +54,9 @@ CREATE TABLE public.messages (
   CONSTRAINT messages_sender_id_fkey FOREIGN KEY (sender_id) REFERENCES public.conversation_users(id)
 ) WITH (OIDS=FALSE);
 CREATE INDEX IF NOT EXISTS idx_messages_external_id ON public.messages USING btree (external_id);
+CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON public.messages USING btree (chat_id);
+CREATE INDEX IF NOT EXISTS idx_messages_sender_id ON public.messages USING btree (sender_id);
+CREATE INDEX IF NOT EXISTS idx_messages_created_at ON public.messages USING btree (created_at);
 
 CREATE TABLE public.cron_jobs (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -82,6 +85,7 @@ CREATE TABLE public.projects (
   CONSTRAINT projects_pkey PRIMARY KEY (id),
   CONSTRAINT projects_chat_id_fkey FOREIGN KEY (chat_id) REFERENCES public.chats(id)
 ) WITH (OIDS=FALSE);
+CREATE INDEX IF NOT EXISTS idx_projects_chat_id ON public.projects USING btree (chat_id);
 
 CREATE TABLE public.project_history (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -92,3 +96,4 @@ CREATE TABLE public.project_history (
   CONSTRAINT project_history_pkey PRIMARY KEY (id),
   CONSTRAINT project_history_project_id_fkey FOREIGN KEY (project_id) REFERENCES public.projects(id)
 ) WITH (OIDS=FALSE);
+CREATE INDEX IF NOT EXISTS idx_project_history_project_id ON public.project_history USING btree (project_id);

@@ -26,6 +26,7 @@ export interface ThreadMessage {
 
 export interface MessageRecord {
   message_id: string
+  external_id?: string
   content: string
   message_type: string
   message_content: {
@@ -41,8 +42,13 @@ export interface MessageRecord {
     groupName?: string
     inviteCode?: string
     error?: string
+    [key: string]: any
   }
+  service?: string
+  sender_id?: string
   sender_number: string
   sender_name: string
+  sender_service?: string
+  sender_metadata?: Record<string, any>
   timestamp: string
 }

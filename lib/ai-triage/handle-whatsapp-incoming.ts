@@ -124,14 +124,19 @@ async function saveMessage(
       // Get existing thread
       const thread = await adapter.getThread(threadId);
 
-      // Format the new message
+      // Format the new message with enhanced fields matching our updated data model
       const newMessage = {
         message_id: message.message_id,
+        external_id: message.message_id, // Use message_id as external_id for consistency
         content: message.content,
         message_type: message.message_type,
         message_content: message.message_content,
+        service: thread_type || 'whatsapp', // Use thread_type as service or default to whatsapp
+        sender_id: '', // Will be populated by Supabase
         sender_number: message.sender_number,
         sender_name: message.sender_name,
+        sender_service: thread_type || 'whatsapp',
+        sender_metadata: {},
         timestamp: message.timestamp,
       };
 
@@ -163,11 +168,15 @@ async function saveMessage(
 
         // If sender is not a participant, add them
         if (!senderIsParticipant && message.sender_number !== process.env.A1BASE_AGENT_NUMBER) {
-          // Create new participant object with consistent format
+          // Create new participant object with enhanced fields matching our updated data model
           const newParticipant = {
             user_id: '', // Will be filled by adapter
             phone_number: normalizedSenderNumber,
-            name: message.sender_name
+            name: message.sender_name,
+            service: thread_type || 'whatsapp', // Use thread_type as service or default to whatsapp
+            metadata: {},
+            created_at: new Date().toISOString(),
+            preferences: {}
           };
           participants = [...participants, newParticipant];
         }
