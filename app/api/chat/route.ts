@@ -4,7 +4,6 @@ import { triageMessage } from "../../../lib/ai-triage/triage-logic";
 import { dynamic, runtime, maxDuration } from "../route-config";
 import { streamText } from "ai";
 import { openai } from "@ai-sdk/openai";
-import { handleAgenticOnboarding } from "../../../lib/workflows/agentic-onboarding-workflows";
 
 // Export the route configuration to prevent Next.js from trying
 // to access file system during build time
@@ -81,14 +80,31 @@ export async function POST(req: Request) {
       console.log('[CHAT-API] Creating direct stream for non-default triage response');
       const responseMessage = triageResponse.message || 'No response message available';
       
-      // Check if this is an agentic onboarding message (contains "Collect the following information:")
-      const isAgenticOnboarding = responseMessage.includes('Collect the following information:');
+      // Check if this is an onboarding message (contains "Collect the following information:")
+      const isOnboardingMessage = responseMessage.includes('Collect the following information:');
       
-      if (isAgenticOnboarding) {
-        console.log('[CHAT-API] Detected agentic onboarding message, delegating to dedicated module');
+      if (isOnboardingMessage) {
+        console.log('[CHAT-API] Detected onboarding message');
         
-        // Use our dedicated agentic onboarding handler
-        return await handleAgenticOnboarding(responseMessage);
+        // Use a standard approach for onboarding messages
+        const result = streamText({
+          model: openai('gpt-4'),
+          system: "You are an assistant helping with onboarding. Guide the user through the onboarding process, asking one question at a time.",
+          messages: [
+            {
+              role: "assistant",
+              content: "Hello! I'm here to help you get set up. Let me ask you a few questions to personalize your experience."
+            },
+            {
+              role: "user",
+              content: "Start onboarding"
+            }
+          ],
+          temperature: 0.7,
+          maxTokens: 1000,
+        });
+        
+        return result.toDataStreamResponse();
       }
       
       // For regular non-agentic responses, just stream the message directly

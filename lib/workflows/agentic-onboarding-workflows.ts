@@ -1,40 +1,4 @@
 import { OnboardingFlow } from "../onboarding-flow/types";
-import { streamText } from "ai";
-import { openai } from "@ai-sdk/openai";
-
-/**
- * Handles the agentic onboarding flow processing
- * Takes the onboarding settings and returns a streaming response with AI-guided conversation
- * 
- * @param onboardingPrompt The system prompt for agentic onboarding
- * @returns A streaming response with the AI-guided onboarding
- */
-export async function handleAgenticOnboarding(onboardingPrompt: string) {
-  console.log('[AGENTIC-ONBOARDING] Starting agentic onboarding flow');
-  
-  try {
-    // For agentic onboarding, we use the message as the system prompt
-    // and let the AI handle the conversation naturally
-    const result = streamText({
-      model: openai('gpt-4'), // Using GPT-4 for better understanding of complex instructions
-      system: onboardingPrompt, // Use the agentic prompt as the system message
-      messages: [
-        {
-          role: "assistant",
-          content: "Hello! I'm here to help you get set up. Let me ask you a few questions to personalize your experience."
-        }
-      ],
-      temperature: 0.7, // Slightly higher temperature for more natural conversation
-      maxTokens: 1000,
-    });
-    
-    console.log('[AGENTIC-ONBOARDING] Created streaming response for agentic onboarding');
-    return result.toDataStreamResponse();
-  } catch (error) {
-    console.error('[AGENTIC-ONBOARDING] Error creating agentic onboarding stream:', error);
-    throw error;
-  }
-}
 
 /**
  * Creates a system prompt for agentic onboarding based on the onboarding settings

@@ -1,25 +1,6 @@
 {
   "enabled": true,
-  "messages": [
-    {
-      "id": "1",
-      "text": "Hi there! 👋 I'm your new AI assistant. Welcome!!! I'm a BOSS",
-      "waitForResponse": false,
-      "order": 1
-    },
-    {
-      "id": "2",
-      "text": "I'm here to help with answering your questions and supporting your business needs.",
-      "waitForResponse": false,
-      "order": 2
-    },
-    {
-      "id": "3",
-      "text": "Before I go on, whats your name:",
-      "waitForResponse": true,
-      "order": 3
-    }
-  ],
+
   "mode": "agentic",
   "agenticSettings": {
     "systemPrompt": "You are conducting an onboarding conversation with a new user. Your goal is to make them feel welcome and collect some basic information that will help you assist them better in the future. Be friendly, professional, and conversational. Ask one question at a time, and acknowledge their answers before moving to the next question. Once you've collected all the requested information, summarize what you've learned and let them know you're ready to help them with their tasks.",
