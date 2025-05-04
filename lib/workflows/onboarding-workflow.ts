@@ -8,6 +8,7 @@ import { A1BaseAPI } from "a1base-node";
 import { ThreadMessage } from "@/types/chat";
 import { loadOnboardingFlow } from "../onboarding-flow/onboarding-storage";
 import { createAgenticOnboardingPrompt } from "./agentic-onboarding-workflows";
+import OpenAI from 'openai';
 
 // Initialize A1Base client
 const client = new A1BaseAPI({
@@ -17,10 +18,50 @@ const client = new A1BaseAPI({
   },
 });
 
+// Initialize OpenAI client
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+/**
+ * Generate a conversational onboarding message using OpenAI
+ * @param systemPrompt The system prompt containing onboarding instructions
+ * @returns A conversational, user-friendly onboarding message
+ */
+async function generateOnboardingMessage(systemPrompt: string): Promise<string> {
+  try {
+    console.log('[Onboarding] Generating conversational onboarding message with OpenAI');
+    
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4",
+      messages: [
+        {
+          role: "system",
+          content: systemPrompt
+        },
+        {
+          role: "user",
+          content: "Hello!"
+        }
+      ],
+      temperature: 0.7,
+    });
+    
+    const generatedMessage = completion.choices[0]?.message?.content || 
+      "Hello! I'm your assistant. To get started, could you please tell me your name?";
+    
+    console.log('[Onboarding] Successfully generated conversational message');
+    return generatedMessage;
+  } catch (error) {
+    console.error('[Onboarding] Error generating conversational message:', error);
+    return "Hello! I'm your assistant. To help you get set up, could you please tell me your name?";
+  }
+}
+
 /**
  * Handles the onboarding flow when triggered by "Start onboarding"
- * Creates an agentic onboarding experience where the AI guides the conversation
- * @returns A structured onboarding response with a system prompt for the AI
+ * Creates an AI-powered onboarding experience where the AI guides the conversation
+ * @returns A structured onboarding response with a user-friendly message
  */
 export async function StartOnboarding(
   threadMessages: ThreadMessage[],
@@ -41,13 +82,18 @@ export async function StartOnboarding(
       return { messages: [] };
     }
 
-    console.log("Using agentic onboarding mode with AI-driven conversation");
+    console.log("Using AI-driven onboarding conversation");
     
-    // Use the dedicated function to create the agentic onboarding prompt
-    const aiPrompt = createAgenticOnboardingPrompt(onboardingFlow);
+    // Create the system prompt for onboarding
+    const systemPrompt = createAgenticOnboardingPrompt(onboardingFlow);
     
-    // Create a single message with the agentic prompt
-    const agenticMessage = { text: aiPrompt, waitForResponse: true };
+    console.log("[Onboarding] System prompt created, generating user-friendly message");
+    
+    // Generate a conversational message using the system prompt
+    const conversationalMessage = await generateOnboardingMessage(systemPrompt);
+    
+    // Create a single message with the conversational prompt
+    const onboardingMessage = { text: conversationalMessage, waitForResponse: true };
     
     // For WhatsApp or other channels, send the message through A1Base
     // Skip sending if we're using the special skip marker
@@ -57,7 +103,7 @@ export async function StartOnboarding(
       
       console.log("Sending onboarding message(s) via A1Base API");
       const messageData = {
-        content: agenticMessage.text,
+        content: onboardingMessage.text,
         from: process.env.A1BASE_AGENT_NUMBER!,
         service: "whatsapp" as const,
       };
@@ -77,8 +123,8 @@ export async function StartOnboarding(
       console.log("Skipping onboarding message sending as requested by __skip_send marker");
     }
     
-    // Return the agentic message for the web UI or other channels
-    return { messages: [agenticMessage] };
+    // Return the conversational message for the web UI or other channels
+    return { messages: [onboardingMessage] };
   } catch (error) {
     console.error("[StartOnboarding] Error:", error);
     const errorMessage = "Sorry, I encountered an error starting the onboarding process.";

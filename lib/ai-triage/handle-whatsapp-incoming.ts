@@ -5,8 +5,11 @@ import { initializeDatabase, getInitializedAdapter } from "../supabase/config";
 import { WebhookPayload } from "@/app/api/messaging/incoming/route";
 import { StartOnboarding } from "../workflows/onboarding-workflow";
 import { A1BaseAPI } from "a1base-node";
+import OpenAI from "openai";
 import fs from "fs";
 import path from "path";
+import { createAgenticOnboardingPrompt } from "../workflows/agentic-onboarding-workflows";
+import { loadOnboardingFlow } from "../onboarding-flow/onboarding-storage";
 
 // IN-MEMORY STORAGE
 const messagesByThread = new Map();
@@ -40,6 +43,128 @@ const client = new A1BaseAPI({
     apiSecret: process.env.A1BASE_API_SECRET!,
   },
 });
+
+// Initialize OpenAI client
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+/**
+ * Handle follow-up onboarding messages with conversational AI
+ * @param threadMessages Array of messages in the thread
+ * @param thread_type Type of thread (individual or group)
+ * @param thread_id ID of the thread
+ * @param sender_number Phone number of the sender
+ * @param service Service type (whatsapp, etc.)
+ * @returns Response message object
+ */
+async function handleOnboardingFollowUp(
+  threadMessages: MessageRecord[],
+  thread_type: "individual" | "group",
+  thread_id?: string,
+  sender_number?: string,
+  service?: string
+): Promise<{ text: string; waitForResponse: boolean }> {
+  console.log("[Onboarding] Handling follow-up onboarding message");
+
+  try {
+    // Load the onboarding flow configuration
+    const onboardingFlow = await loadOnboardingFlow();
+
+    // Create the system prompt for the AI
+    const systemPrompt = createAgenticOnboardingPrompt(onboardingFlow);
+
+    // Format messages for the AI - ensuring proper typing for the OpenAI API
+    const formattedMessages = threadMessages.map((msg) => ({
+      role:
+        msg.sender_number === process.env.A1BASE_AGENT_NUMBER
+          ? ("assistant" as const)
+          : ("user" as const),
+      content: msg.content,
+    }));
+
+    console.log(
+      `[Onboarding] Processing ${formattedMessages.length} messages for follow-up`
+    );
+
+    // Call OpenAI for a response
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4",
+      messages: [
+        { role: "system" as const, content: systemPrompt },
+        ...formattedMessages,
+      ],
+      temperature: 0.7,
+    });
+
+    // Extract the AI's response
+    const responseContent =
+      completion.choices[0]?.message?.content ||
+      "I'm sorry, I couldn't process your message. Could you please try again?";
+
+    console.log(`[Onboarding] Generated follow-up response`);
+
+    // If this is a WhatsApp or other channel, send the message
+    if (
+      (thread_type === "individual" || thread_type === "group") &&
+      service !== "web-ui" &&
+      service !== "__skip_send"
+    ) {
+      console.log("[Onboarding] Sending follow-up response via A1Base API");
+
+      const messageData = {
+        content: responseContent,
+        from: process.env.A1BASE_AGENT_NUMBER!,
+        service: "whatsapp" as const,
+      };
+
+      if (thread_type === "group" && thread_id) {
+        await client.sendGroupMessage(process.env.A1BASE_ACCOUNT_ID!, {
+          ...messageData,
+          thread_id,
+        });
+      } else if (thread_type === "individual" && sender_number) {
+        await client.sendIndividualMessage(process.env.A1BASE_ACCOUNT_ID!, {
+          ...messageData,
+          to: sender_number,
+        });
+      }
+    }
+
+    return { text: responseContent, waitForResponse: true };
+  } catch (error) {
+    console.error("[Onboarding] Error in follow-up handling:", error);
+    const errorMessage =
+      "I'm having trouble processing your message. Let's continue with the onboarding. Could you please tell me your name?";
+
+    // Handle error by sending a fallback message
+    if (
+      (thread_type === "individual" || thread_type === "group") &&
+      service !== "web-ui" &&
+      service !== "__skip_send"
+    ) {
+      const messageData = {
+        content: errorMessage,
+        from: process.env.A1BASE_AGENT_NUMBER!,
+        service: "whatsapp" as const,
+      };
+
+      if (thread_type === "group" && thread_id) {
+        await client.sendGroupMessage(process.env.A1BASE_ACCOUNT_ID!, {
+          ...messageData,
+          thread_id,
+        });
+      } else if (thread_type === "individual" && sender_number) {
+        await client.sendIndividualMessage(process.env.A1BASE_ACCOUNT_ID!, {
+          ...messageData,
+          to: sender_number,
+        });
+      }
+    }
+
+    return { text: errorMessage, waitForResponse: true };
+  }
+}
 
 interface DatabaseAdapterInterface {
   createUser: (name: string, phoneNumber: string) => Promise<string | null>;
@@ -436,74 +561,117 @@ export async function handleWhatsAppIncoming(webhookData: WebhookPayload) {
   try {
     console.log(`[WhatsApp] Running message triage for thread ${thread_id}`);
 
-    
-    // Special handling for brand new threads that need onboarding
+    // Special handling for onboarding process
     if (shouldTriggerOnboarding) {
-      console.log(
-        `[WhatsApp] Triggering onboarding flow for thread ${thread_id}`
-      );
-      try {
-        // Create an array of thread messages in the correct format
-        const formattedThreadMessages = threadMessages.map((msg) => ({
-          message_id: msg.message_id,
-          content: msg.content,
-          message_type: (msg.message_type || "text") as
-            | "text"
-            | "rich_text"
-            | "image"
-            | "video"
-            | "audio"
-            | "location"
-            | "reaction"
-            | "group_invite"
-            | "unsupported_message_type",
-          message_content: msg.message_content || { text: msg.content },
-          sender_number: msg.sender_number,
-          sender_name: msg.sender_name,
-          timestamp: msg.timestamp,
-          role: (msg.sender_number === process.env.A1BASE_AGENT_NUMBER
-            ? "assistant"
-            : "user") as "user" | "assistant" | "system",
-        }));
+      // Check if this is a first message (starting onboarding) or a follow-up
+      const isOnboardingInProgress = threadMessages.length > 1;
 
-        // For onboarding, we only generate the messages and let the workflow handle sending them
-        // We just pass a special marker to the service parameter to prevent double-sending
-        const onboardingData = await StartOnboarding(
-          formattedThreadMessages,
-          thread_type as "individual" | "group",
-          thread_id,
-          sender_number,
-          "__skip_send" // Special marker to avoid double-sending
+      if (isOnboardingInProgress) {
+        console.log(
+          `[WhatsApp] Continuing onboarding flow for thread ${thread_id}`
         );
-
-        if (
-          onboardingData &&
-          onboardingData.messages &&
-          onboardingData.messages.length > 0
-        ) {
-          console.log(
-            `[TRIAGE] Got ${onboardingData.messages.length} onboarding messages to send`
+        try {
+          // Handle follow-up onboarding message with AI
+          const response = await handleOnboardingFollowUp(
+            threadMessages,
+            thread_type as "individual" | "group",
+            thread_id,
+            sender_number,
+            "__skip_send" // Special marker to avoid double-sending
           );
+
+          console.log(`[WhatsApp] Generated onboarding follow-up response`);
+
+          // Split and send messages if needed
           const splitParagraphs = await getSplitMessageSetting();
-          for (const message of onboardingData.messages) {
-            const messageLines = splitParagraphs
-              ? message.text.split("\n").filter((line) => line.trim())
-              : [message.text];
+          const messageLines = splitParagraphs
+            ? response.text.split("\n").filter((line) => line.trim())
+            : [response.text];
 
-            // Send each line as a separate message
-            for (const line of messageLines) {
-              await client.sendIndividualMessage(
-                process.env.A1BASE_ACCOUNT_ID!,
-                {
-                  content: line,
-                  from: process.env.A1BASE_AGENT_NUMBER!,
-                  to: sender_number,
-                  service: "whatsapp",
-                }
-              );
+          // Send each line as a separate message
+          for (const line of messageLines) {
+            await client.sendIndividualMessage(process.env.A1BASE_ACCOUNT_ID!, {
+              content: line,
+              from: process.env.A1BASE_AGENT_NUMBER!,
+              to: sender_number,
+              service: "whatsapp",
+            });
+            // Wait a short delay between messages
+            await new Promise((resolve) => setTimeout(resolve, 500));
+          }
 
-              // Add a small delay between split message lines
-              if (splitParagraphs && messageLines.length > 1) {
+          // Return early since we've handled the message
+          return { success: true, message: "Onboarding follow-up handled" };
+        } catch (error) {
+          console.error(
+            "[WhatsApp] Error handling onboarding follow-up:",
+            error
+          );
+          // Continue with regular triage if follow-up handling fails
+        }
+      } else {
+        console.log(
+          `[WhatsApp] Starting initial onboarding flow for thread ${thread_id}`
+        );
+        try {
+          // Create an array of thread messages in the correct format for initial onboarding
+          const formattedThreadMessages = threadMessages.map((msg) => ({
+            message_id: msg.message_id,
+            content: msg.content,
+            message_type: (msg.message_type || "text") as
+              | "text"
+              | "rich_text"
+              | "image"
+              | "video"
+              | "audio"
+              | "location"
+              | "reaction"
+              | "group_invite"
+              | "unsupported_message_type",
+            message_content: msg.message_content || { text: msg.content },
+            sender_number: msg.sender_number,
+            sender_name: msg.sender_name,
+            timestamp: msg.timestamp,
+            role: (msg.sender_number === process.env.A1BASE_AGENT_NUMBER
+              ? "assistant"
+              : "user") as "user" | "assistant" | "system",
+          }));
+
+          // For initial onboarding, use the StartOnboarding function to generate messages
+          const onboardingData = await StartOnboarding(
+            formattedThreadMessages,
+            thread_type as "individual" | "group",
+            thread_id,
+            sender_number,
+            "__skip_send" // Special marker to avoid double-sending
+          );
+
+          if (
+            onboardingData &&
+            onboardingData.messages &&
+            onboardingData.messages.length > 0
+          ) {
+            console.log(
+              `[TRIAGE] Got ${onboardingData.messages.length} onboarding messages to send`
+            );
+            const splitParagraphs = await getSplitMessageSetting();
+            for (const message of onboardingData.messages) {
+              const messageLines = splitParagraphs
+                ? message.text.split("\n").filter((line) => line.trim())
+                : [message.text];
+
+              // Send each line as a separate message
+              for (const line of messageLines) {
+                await client.sendIndividualMessage(
+                  process.env.A1BASE_ACCOUNT_ID!,
+                  {
+                    content: line,
+                    from: process.env.A1BASE_AGENT_NUMBER!,
+                    to: sender_number,
+                    service: "whatsapp",
+                  }
+                );
+                // Wait a short delay between messages
                 await new Promise((resolve) => setTimeout(resolve, 500));
               }
             }
@@ -511,12 +679,11 @@ export async function handleWhatsAppIncoming(webhookData: WebhookPayload) {
             // Add a larger delay between different onboarding messages
             await new Promise((resolve) => setTimeout(resolve, 1000));
           }
-
           return;
+        } catch (error) {
+          console.error(`[WhatsApp] Error in onboarding flow:`, error);
+          // Fall through to standard message triage
         }
-      } catch (error) {
-        console.error(`[WhatsApp] Error in onboarding flow:`, error);
-        // Fall through to standard message triage
       }
     }
 
