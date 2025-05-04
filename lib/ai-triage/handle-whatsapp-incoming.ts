@@ -50,6 +50,143 @@ const openai = new OpenAI({
 });
 
 /**
+ * Process onboarding conversation to extract user information and check if onboarding is complete
+ * @param threadMessages Messages in the conversation thread
+ * @param loadOnboardingFlow Function to load onboarding flow configuration
+ * @returns Object containing extracted information and completion status
+ */
+async function processOnboardingConversation(threadMessages: MessageRecord[]): Promise<{
+  extractedInfo: Record<string, string>;
+  isComplete: boolean;
+}> {
+  console.log("[Onboarding] Processing conversation for user information");
+  
+  try {
+    // Load onboarding flow to get required fields
+    const onboardingFlow = await loadOnboardingFlow();
+    if (!onboardingFlow.agenticSettings?.userFields) {
+      throw new Error("Onboarding settings not available");
+    }
+
+    // Get required fields from onboarding settings
+    const requiredFields = onboardingFlow.agenticSettings.userFields
+      .filter(field => field.required)
+      .map(field => field.id);
+    
+    // Format the messages for analysis
+    const formattedMessages = threadMessages.map(msg => ({
+      role: msg.sender_number === process.env.A1BASE_AGENT_NUMBER ? "assistant" as const : "user" as const,
+      content: msg.content
+    }));
+
+    // Use OpenAI to extract structured information from the conversation
+    const extractionPrompt = `
+      Based on the conversation, extract the following information about the user:
+      ${onboardingFlow.agenticSettings.userFields.map(field => `- ${field.id}: ${field.description}`).join('\n')}
+      
+      For any fields not mentioned in the conversation, return an empty string.
+      You MUST respond in valid JSON format with only the extracted fields and nothing else.
+      The response should be a valid JSON object that can be parsed with JSON.parse().
+      
+      Example response format: 
+      { "name": "John Doe", "email": "john@example.com", "business_type": "Tech", "goals": "Increase productivity" }
+      
+      DO NOT include any explanations, markdown formatting, or anything outside the JSON object.
+    `;
+
+    // Call OpenAI to extract the information
+    const extraction = await openai.chat.completions.create({
+      model: "gpt-4",
+      messages: [
+        { role: "system" as const, content: extractionPrompt },
+        ...formattedMessages
+      ],
+      temperature: 0.2,
+    });
+    
+    // Parse the extraction result
+    const extractionContent = extraction.choices[0]?.message?.content || "{}";
+    console.log("[Onboarding] Raw extraction content:", extractionContent);
+    
+    // Try to extract JSON from the response if it's not already valid JSON
+    let jsonContent = extractionContent;
+    if (extractionContent.includes('{') && extractionContent.includes('}')) {
+      const jsonMatch = extractionContent.match(/\{[\s\S]*\}/); // Match everything between { and }
+      if (jsonMatch) {
+        jsonContent = jsonMatch[0];
+      }
+    }
+    
+    // Parse the JSON content
+    let extractedInfo: Record<string, string>;
+    try {
+      extractedInfo = JSON.parse(jsonContent);
+    } catch (e) {
+      console.error("[Onboarding] Error parsing extraction result:", e);
+      extractedInfo = {};
+    }
+    
+    // Check if all required fields are filled
+    const isComplete = requiredFields.every(field => {
+      return extractedInfo[field] && extractedInfo[field].trim() !== '';
+    });
+    
+    console.log(`[Onboarding] Extraction results:`, extractedInfo);
+    console.log(`[Onboarding] Onboarding complete: ${isComplete}`);
+    
+    return { extractedInfo, isComplete };
+  } catch (error) {
+    console.error("[Onboarding] Error processing conversation:", error);
+    return { extractedInfo: {}, isComplete: false };
+  }
+}
+
+/**
+ * Save extracted onboarding information to user metadata in the database
+ * @param sender_number User's phone number
+ * @param extractedInfo Information extracted from conversation
+ * @param isComplete Whether onboarding is complete
+ * @returns Success status
+ */
+async function saveOnboardingInfo(
+  sender_number: string, 
+  extractedInfo: Record<string, string>,
+  isComplete: boolean
+): Promise<boolean> {
+  console.log(`[Onboarding] Saving onboarding info for user ${sender_number}`);
+  
+  try {
+    const adapter = await getInitializedAdapter();
+    if (!adapter) {
+      throw new Error("Database adapter not initialized");
+    }
+    
+    // Normalize phone number (remove '+' and spaces)
+    const normalizedPhone = sender_number.replace(/\+|\s/g, "");
+    
+    // Prepare metadata with extracted info and completion status
+    const metadata = {
+      ...extractedInfo,
+      onboarding_complete: isComplete
+    };
+    
+    // Update user metadata in database
+    const success = await adapter.updateUser(normalizedPhone, { metadata });
+    
+    if (success) {
+      console.log(`[Onboarding] Successfully updated user metadata for ${sender_number}`);
+    } else {
+      console.error(`[Onboarding] Failed to update user metadata for ${sender_number}`);
+    }
+    
+    return success;
+  } catch (error) {
+    console.error("[Onboarding] Error saving onboarding info:", error);
+    return false;
+  }
+}
+
+/**
  * Handle follow-up onboarding messages with conversational AI
  * @param threadMessages Array of messages in the thread
  * @param thread_type Type of thread (individual or group)
@@ -86,23 +223,44 @@ async function handleOnboardingFollowUp(
     console.log(
       `[Onboarding] Processing ${formattedMessages.length} messages for follow-up`
     );
+    
+    // Process the conversation to extract user information
+    const { extractedInfo, isComplete } = await processOnboardingConversation(threadMessages);
+    
+    // If we have a sender number and extracted information, save it
+    if (sender_number && Object.keys(extractedInfo).length > 0) {
+      await saveOnboardingInfo(sender_number, extractedInfo, isComplete);
+    }
+    
+    // If onboarding is complete, send a final message
+    let responseContent = "";
+    if (isComplete) {
+      // Get user's name from extracted info or default
+      const userName = extractedInfo.name || "there";
+      
+      // Generate a personalized completion message
+      responseContent = onboardingFlow.agenticSettings?.finalMessage || 
+        `Thank you, ${userName}! Your onboarding is now complete. I've saved your information and I'm ready to help you with your tasks.`;
+      
+      console.log(`[Onboarding] Onboarding completed for user with phone number ${sender_number}`);
+    } else {
+      // Call OpenAI for a regular follow-up response
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4",
+        messages: [
+          { role: "system" as const, content: systemPrompt },
+          ...formattedMessages,
+        ],
+        temperature: 0.7,
+      });
 
-    // Call OpenAI for a response
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4",
-      messages: [
-        { role: "system" as const, content: systemPrompt },
-        ...formattedMessages,
-      ],
-      temperature: 0.7,
-    });
-
-    // Extract the AI's response
-    const responseContent =
-      completion.choices[0]?.message?.content ||
-      "I'm sorry, I couldn't process your message. Could you please try again?";
-
-    console.log(`[Onboarding] Generated follow-up response`);
+      // Extract the AI's response
+      responseContent =
+        completion.choices[0]?.message?.content ||
+        "I'm sorry, I couldn't process your message. Could you please try again?";
+      
+      console.log(`[Onboarding] Generated follow-up response`);
+    }
 
     // If this is a WhatsApp or other channel, send the message
     if (
@@ -131,7 +289,10 @@ async function handleOnboardingFollowUp(
       }
     }
 
-    return { text: responseContent, waitForResponse: true };
+    return { 
+      text: responseContent, 
+      waitForResponse: !isComplete  // Don't wait for response if onboarding is complete
+    };
   } catch (error) {
     console.error("[Onboarding] Error in follow-up handling:", error);
     const errorMessage =

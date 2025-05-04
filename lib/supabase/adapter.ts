@@ -215,10 +215,34 @@ export class SupabaseAdapter {
     }
   }
 
-  async updateUser(phoneNumber: string, updates: { name?: string }): Promise<boolean> {
+  async updateUser(phoneNumber: string, updates: { name?: string, metadata?: any }): Promise<boolean> {
     this.ensureInitialized()
 
     try {
+      // Handle metadata updates specially to merge with existing metadata
+      if (updates.metadata) {
+        // First get the current user data
+        const { data: userData, error: fetchError } = await this.supabase
+          .from(CONVERSATION_USERS_TABLE)
+          .select('metadata')
+          .eq('phone_number', phoneNumber)
+          .single()
+        
+        if (fetchError) {
+          console.error('Error fetching user for metadata update:', fetchError)
+          return false
+        }
+        
+        // Merge existing metadata with new metadata
+        const mergedMetadata = {
+          ...userData?.metadata || {},
+          ...updates.metadata
+        }
+        
+        // Update with merged metadata
+        updates.metadata = mergedMetadata
+      }
+      
       const { error } = await this.supabase
         .from(CONVERSATION_USERS_TABLE)
         .update(updates)
