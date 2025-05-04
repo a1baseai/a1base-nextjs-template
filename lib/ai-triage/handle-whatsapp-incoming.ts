@@ -262,10 +262,7 @@ export async function handleWhatsAppIncoming(webhookData: WebhookPayload) {
   await initializeDatabase();
 
   console.log("[Message Received]", {
-    thread_id,
-    message_id,
     content,
-    message_type,
     message_content,
     sender_number,
     sender_name,
@@ -305,6 +302,23 @@ export async function handleWhatsAppIncoming(webhookData: WebhookPayload) {
       } else {
         chatId = thread.id;
         threadMessages = thread.messages || [];
+        
+        // Check and log onboarding status from the sender's metadata
+        if (thread.sender) {
+          const onboardingComplete = thread.sender.metadata?.onboarding_complete === true;
+          console.log(`[Onboarding] User ${thread.sender.name} (${thread.sender.phone_number}) onboarding status:`, {
+            onboardingComplete,
+            metadata: thread.sender.metadata || {}
+          });
+          
+          // Set onboarding flag based on metadata
+          if (!onboardingComplete) {
+            shouldTriggerOnboarding = true;
+            console.log(`[Onboarding] Will trigger onboarding for user ${thread.sender.name}.`);
+          }
+        } else {
+          console.log(`[Onboarding] Could not determine sender for thread ${thread_id}`);
+        }
       }
 
       // Store in memory too for redundancy

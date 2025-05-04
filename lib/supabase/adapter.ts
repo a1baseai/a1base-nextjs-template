@@ -9,6 +9,65 @@ import { CONVERSATION_USERS_TABLE, CHATS_TABLE } from './config'
 // Import WebhookPayload type
 import { WebhookPayload } from '@/app/api/messaging/incoming/route'
 
+/**
+ * Interface for participant data in a thread
+ */
+interface ThreadParticipant extends Record<string, unknown> {
+  user_id: string;
+  phone_number: string;
+  name: string;
+  service?: string;
+  metadata?: Record<string, any>;
+  created_at?: string;
+  preferences?: Record<string, any>;
+}
+
+/**
+ * Interface for message data in a thread
+ */
+interface ThreadMessage extends Record<string, unknown> {
+  message_id: string;
+  external_id?: string;
+  content: string;
+  message_type: string;
+  message_content: Record<string, any>;
+  service?: string;
+  sender_id?: string;
+  sender_number: string;
+  sender_name: string;
+  sender_service?: string;
+  sender_metadata?: Record<string, any>;
+  timestamp: string;
+}
+
+/**
+ * Interface for project data associated with a thread
+ */
+interface ThreadProject {
+  id: string;
+  name: string;
+  description?: string;
+  created_at: string;
+  is_live?: boolean;
+}
+
+/**
+ * Interface for thread data returned by getThread
+ */
+export interface ThreadData {
+  id: string;
+  external_id?: string;
+  type?: string;
+  name?: string;
+  service?: string;
+  created_at?: string;
+  metadata?: Record<string, any>;
+  messages: ThreadMessage[];
+  participants: ThreadParticipant[];
+  projects: ThreadProject[];
+  sender?: ThreadParticipant | null;
+}
+
 export class SupabaseAdapter {
   private supabase: SupabaseClient<Database>
   private isInitialized: boolean = false
@@ -260,7 +319,12 @@ export class SupabaseAdapter {
     }
   }
 
-  async getThread(threadId: string) {
+  /**
+   * Get thread data including messages, participants, and sender information
+   * @param threadId External ID of the thread to retrieve
+   * @returns ThreadData object or null if thread not found
+   */
+  async getThread(threadId: string): Promise<ThreadData | null> {
     this.ensureInitialized()
 
     try {
@@ -399,6 +463,21 @@ export class SupabaseAdapter {
         return formattedParticipant;
       })
 
+      // Determine the current sender from participants (for individual chats)  
+      let currentSender = null;
+      if (chat.type === 'individual' && formattedParticipants.length > 0) {
+        // For individual chats, find the non-agent participant (assuming agent is one of the participants)
+        const agentNumber = process.env.A1BASE_AGENT_NUMBER?.replace(/\+/g, '') || '';
+        currentSender = formattedParticipants.find(p => 
+          p.phone_number.replace(/\+/g, '') !== agentNumber
+        );
+        
+        // If we couldn't identify by agent number, take the first participant
+        if (!currentSender && formattedParticipants.length > 0) {
+          currentSender = formattedParticipants[0];
+        }
+      }
+      
       // Create the final thread object with all data
       const threadData = {
         id: chat.id,
@@ -410,12 +489,16 @@ export class SupabaseAdapter {
         metadata: chat.metadata,
         messages: formattedMessages,
         participants: formattedParticipants,
-        projects: projects || []
+        projects: projects || [],
+        // Include current sender information for easy access
+        sender: currentSender
       };
+
+      
       
       // Log the complete thread data being returned
-      console.log(`[DB Data Debug] Complete thread data overview:`);
-      console.log(threadData)
+      // console.log(`[DB Data Debug] Complete thread data overview:`);
+      // console.log({...threadData, messages: `[${threadData.messages.length} messages]`});
       // console.log(`- Chat ID: ${threadData.id}`);
       // console.log(`- External ID: ${threadData.external_id}`);
       // console.log(`- Type: ${threadData.type}`);
