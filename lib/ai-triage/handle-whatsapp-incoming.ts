@@ -8,8 +8,8 @@ import { A1BaseAPI } from "a1base-node";
 import OpenAI from "openai";
 import fs from "fs";
 import path from "path";
-import { createAgenticOnboardingPrompt } from "../workflows/agentic-onboarding-workflows";
 import { loadOnboardingFlow } from "../onboarding-flow/onboarding-storage";
+import { createAgenticOnboardingPrompt } from "../workflows/onboarding-workflow";
 
 // IN-MEMORY STORAGE
 const messagesByThread = new Map();

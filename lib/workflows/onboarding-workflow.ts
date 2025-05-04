@@ -7,7 +7,7 @@
 import { A1BaseAPI } from "a1base-node";
 import { ThreadMessage } from "@/types/chat";
 import { loadOnboardingFlow } from "../onboarding-flow/onboarding-storage";
-import { createAgenticOnboardingPrompt } from "./agentic-onboarding-workflows";
+import { OnboardingFlow } from "../onboarding-flow/types";
 import OpenAI from 'openai';
 
 // Initialize A1Base client
@@ -22,6 +22,35 @@ const client = new A1BaseAPI({
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
+
+/**
+ * Creates a system prompt for onboarding based on the onboarding settings
+ * 
+ * @param onboardingFlow The complete onboarding flow configuration
+ * @returns The formatted system prompt for the AI
+ */
+export function createAgenticOnboardingPrompt(onboardingFlow: OnboardingFlow): string {
+  if (!onboardingFlow.agenticSettings) {
+    throw new Error("Agentic settings not available in the onboarding flow");
+  }
+  
+  // Use the configured system prompt for onboarding
+  const systemPrompt = onboardingFlow.agenticSettings.systemPrompt;
+  
+  // Convert user fields to instructions for the AI
+  const fieldInstructions = onboardingFlow.agenticSettings.userFields
+    .map(field => {
+      const requiredText = field.required ? "(required)" : "(optional)";
+      return `- ${field.description} ${requiredText}. Store as '${field.id}'.`;
+    })
+    .join("\n");
+  
+  // Combine system prompt with field instructions
+  const aiPrompt = `${systemPrompt}\n\nCollect the following information:\n${fieldInstructions}\n\nAfter collecting all required information, respond with: ${onboardingFlow.agenticSettings.finalMessage}`;
+  
+  console.log("[Onboarding] Generated AI prompt for onboarding");
+  return aiPrompt;
+}
 
 /**
  * Generate a conversational onboarding message using OpenAI
