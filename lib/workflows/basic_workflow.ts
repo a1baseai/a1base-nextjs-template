@@ -71,11 +71,13 @@ export async function DefaultReplyToMessage(
       console.log("Detected onboarding trigger, starting onboarding workflow");
       const onboardingResult = await StartOnboarding(threadMessages, thread_type, thread_id, sender_number, service);
       
-      // For web-ui, we need to convert the messages array to a single string to maintain
+      // For web-ui, we need to extract just the message text to maintain
       // backward compatibility with the existing API. The API route will handle the full message array.
       if (service === "web-ui") {
-        // Just return a placeholder - the actual implementation for web UI is in the API route
-        return JSON.stringify(onboardingResult);
+        // Return just the message text, not the entire JSON structure
+        return onboardingResult.messages && onboardingResult.messages.length > 0 
+          ? onboardingResult.messages[0].text 
+          : "Onboarding started.";
       }
       
       // For other services, we'll only send messages if service is NOT the special skip marker
