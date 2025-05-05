@@ -409,35 +409,35 @@ export async function triageMessage({
           message: onboardingResponse,
         };
         
-      case "handleEmailAction":
-        console.log("Running Email Workflow");
+      // case "handleEmailAction": (DISABLED)
+      //   console.log("Running Email Workflow");
 
-        const emailData = await ConstructEmail(messages);
+      //   const emailData = await ConstructEmail(messages);
 
-        if (service === "web-ui") {
-          return {
-            type: "email",
-            success: true,
-            message: `Email drafted with subject: ${emailData.subject}`,
-            data: emailData,
-          };
-        }
+      //   if (service === "web-ui") {
+      //     return {
+      //       type: "email",
+      //       success: true,
+      //       message: `Email drafted with subject: ${emailData.subject}`,
+      //       data: emailData,
+      //     };
+      //   }
 
-        const emailConfirmation = `I've prepared an email with the subject "${emailData.subject}". Would you like me to send it?`;
+      //   const emailConfirmation = `I've prepared an email with the subject "${emailData.subject}". Would you like me to send it?`;
 
-        await client.sendIndividualMessage(process.env.A1BASE_ACCOUNT_ID!, {
-          content: emailConfirmation,
-          from: process.env.A1BASE_AGENT_NUMBER!,
-          to: sender_number,
-          service: "whatsapp",
-        });
+      //   await client.sendIndividualMessage(process.env.A1BASE_ACCOUNT_ID!, {
+      //     content: emailConfirmation,
+      //     from: process.env.A1BASE_AGENT_NUMBER!,
+      //     to: sender_number,
+      //     service: "whatsapp",
+      //   });
 
-        return {
-          type: "email",
-          success: true,
-          message: emailConfirmation,
-          data: emailData,
-        };
+      //   return {
+      //     type: "email",
+      //     success: true,
+      //     message: emailConfirmation,
+      //     data: emailData,
+      //   };
 
       case "simpleResponse":
       default:

@@ -191,12 +191,13 @@ export default function Home() {
                     <pre className="text-xs overflow-x-auto"><code>{`// Create an email address for your agent
 await CreateEmailAddress("your-agent", "a1send.com");
 
-const { subject, body } = await ConstructEmail(threadMessages);
-await SendEmailFromAgent({
-  subject,
-  body,
-  recipient_address: "recipient@example.com"
-});`}</code></pre>
+// DISABLED: Email functionality
+// const { subject, body } = await ConstructEmail(threadMessages);
+// await SendEmailFromAgent({
+//   subject,
+//   body,
+//   recipient_address: "recipient@example.com"
+// });`}</code></pre>
                   </div>
                   <a
                     href="https://docs.a1base.com/email"

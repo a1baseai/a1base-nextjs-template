@@ -27,7 +27,7 @@ type ChatRole = "system" | "user" | "assistant" | "function";
  * This function returns one of the following responseTypes:
  *  - simpleResponse: Provide a simple response
  *  - followUpResponse: Follow up on the message to gather additional information
- *  - handleEmailAction: Draft email and await user approval for sending
+ *  - handleEmailAction: Draft email and await user approval for sending (DISABLED)
  *  - taskActionConfirmation: Confirm with user before proceeding with requested task (i.e before sending an email)
  * =======================================================================
  */   
@@ -36,7 +36,7 @@ export async function triageMessageIntent(
 ): Promise<{
   responseType:
     | "simpleResponse"
-    | "handleEmailAction"
+    // | "handleEmailAction" (DISABLED)
     | "onboardingFlow"
 }> {
   // Convert thread messages to OpenAI chat format
@@ -55,11 +55,11 @@ export async function triageMessageIntent(
   const triagePrompt = `
 Based on the conversation, analyze the user's intent and respond with exactly one of these JSON responses:
 {"responseType":"simpleResponse"}
-{"responseType":"handleEmailAction"}
+// {"responseType":"handleEmailAction"} (DISABLED)
 
 Rules:
-- If the user is asking to create, draft, or send an email, select "handleEmailAction"
-- Otherwise, select "simpleResponse"
+// - If the user is asking to create, draft, or send an email, select "handleEmailAction" (DISABLED)
+- Select "simpleResponse" for all user messages
 
 Return valid JSON with only that single key "responseType" and value as one of the allowed strings.
 `;
@@ -80,7 +80,7 @@ Return valid JSON with only that single key "responseType" and value as one of t
     const parsed = JSON.parse(content);
     const validTypes = [
       "simpleResponse",
-      "handleEmailAction",
+      // "handleEmailAction", (DISABLED)
     ];
 
     if (validTypes.includes(parsed.responseType)) {
