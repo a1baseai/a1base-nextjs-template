@@ -55,12 +55,14 @@ const openai = new OpenAI({
  * @param loadOnboardingFlow Function to load onboarding flow configuration
  * @returns Object containing extracted information and completion status
  */
-async function processOnboardingConversation(threadMessages: MessageRecord[]): Promise<{
+async function processOnboardingConversation(
+  threadMessages: MessageRecord[]
+): Promise<{
   extractedInfo: Record<string, string>;
   isComplete: boolean;
 }> {
   console.log("[Onboarding] Processing conversation for user information");
-  
+
   try {
     // Load onboarding flow to get required fields
     const onboardingFlow = await loadOnboardingFlow();
@@ -70,19 +72,24 @@ async function processOnboardingConversation(threadMessages: MessageRecord[]): P
 
     // Get required fields from onboarding settings
     const requiredFields = onboardingFlow.agenticSettings.userFields
-      .filter(field => field.required)
-      .map(field => field.id);
-    
+      .filter((field) => field.required)
+      .map((field) => field.id);
+
     // Format the messages for analysis
-    const formattedMessages = threadMessages.map(msg => ({
-      role: msg.sender_number === process.env.A1BASE_AGENT_NUMBER ? "assistant" as const : "user" as const,
-      content: msg.content
+    const formattedMessages = threadMessages.map((msg) => ({
+      role:
+        msg.sender_number === process.env.A1BASE_AGENT_NUMBER
+          ? ("assistant" as const)
+          : ("user" as const),
+      content: msg.content,
     }));
 
     // Use OpenAI to extract structured information from the conversation
     const extractionPrompt = `
       Based on the conversation, extract the following information about the user:
-      ${onboardingFlow.agenticSettings.userFields.map(field => `- ${field.id}: ${field.description}`).join('\n')}
+      ${onboardingFlow.agenticSettings.userFields
+        .map((field) => `- ${field.id}: ${field.description}`)
+        .join("\n")}
       
       For any fields not mentioned in the conversation, return an empty string.
       You MUST respond in valid JSON format with only the extracted fields and nothing else.
@@ -99,24 +106,24 @@ async function processOnboardingConversation(threadMessages: MessageRecord[]): P
       model: "gpt-4",
       messages: [
         { role: "system" as const, content: extractionPrompt },
-        ...formattedMessages
+        ...formattedMessages,
       ],
       temperature: 0.2,
     });
-    
+
     // Parse the extraction result
     const extractionContent = extraction.choices[0]?.message?.content || "{}";
     console.log("[Onboarding] Raw extraction content:", extractionContent);
-    
+
     // Try to extract JSON from the response if it's not already valid JSON
     let jsonContent = extractionContent;
-    if (extractionContent.includes('{') && extractionContent.includes('}')) {
+    if (extractionContent.includes("{") && extractionContent.includes("}")) {
       const jsonMatch = extractionContent.match(/\{[\s\S]*\}/); // Match everything between { and }
       if (jsonMatch) {
         jsonContent = jsonMatch[0];
       }
     }
-    
+
     // Parse the JSON content
     let extractedInfo: Record<string, string>;
     try {
@@ -125,15 +132,15 @@ async function processOnboardingConversation(threadMessages: MessageRecord[]): P
       console.error("[Onboarding] Error parsing extraction result:", e);
       extractedInfo = {};
     }
-    
+
     // Check if all required fields are filled
-    const isComplete = requiredFields.every(field => {
-      return extractedInfo[field] && extractedInfo[field].trim() !== '';
+    const isComplete = requiredFields.every((field) => {
+      return extractedInfo[field] && extractedInfo[field].trim() !== "";
     });
-    
+
     console.log(`[Onboarding] Extraction results:`, extractedInfo);
     console.log(`[Onboarding] Onboarding complete: ${isComplete}`);
-    
+
     return { extractedInfo, isComplete };
   } catch (error) {
     console.error("[Onboarding] Error processing conversation:", error);
@@ -149,36 +156,40 @@ async function processOnboardingConversation(threadMessages: MessageRecord[]): P
  * @returns Success status
  */
 async function saveOnboardingInfo(
-  sender_number: string, 
+  sender_number: string,
   extractedInfo: Record<string, string>,
   isComplete: boolean
 ): Promise<boolean> {
   console.log(`[Onboarding] Saving onboarding info for user ${sender_number}`);
-  
+
   try {
     const adapter = await getInitializedAdapter();
     if (!adapter) {
       throw new Error("Database adapter not initialized");
     }
-    
+
     // Normalize phone number (remove '+' and spaces)
     const normalizedPhone = sender_number.replace(/\+|\s/g, "");
-    
+
     // Prepare metadata with extracted info and completion status
     const metadata = {
       ...extractedInfo,
-      onboarding_complete: isComplete
+      onboarding_complete: isComplete,
     };
-    
+
     // Update user metadata in database
     const success = await adapter.updateUser(normalizedPhone, { metadata });
-    
+
     if (success) {
-      console.log(`[Onboarding] Successfully updated user metadata for ${sender_number}`);
+      console.log(
+        `[Onboarding] Successfully updated user metadata for ${sender_number}`
+      );
     } else {
-      console.error(`[Onboarding] Failed to update user metadata for ${sender_number}`);
+      console.error(
+        `[Onboarding] Failed to update user metadata for ${sender_number}`
+      );
     }
-    
+
     return success;
   } catch (error) {
     console.error("[Onboarding] Error saving onboarding info:", error);
@@ -223,26 +234,31 @@ async function handleOnboardingFollowUp(
     console.log(
       `[Onboarding] Processing ${formattedMessages.length} messages for follow-up`
     );
-    
+
     // Process the conversation to extract user information
-    const { extractedInfo, isComplete } = await processOnboardingConversation(threadMessages);
-    
+    const { extractedInfo, isComplete } = await processOnboardingConversation(
+      threadMessages
+    );
+
     // If we have a sender number and extracted information, save it
     if (sender_number && Object.keys(extractedInfo).length > 0) {
       await saveOnboardingInfo(sender_number, extractedInfo, isComplete);
     }
-    
+
     // If onboarding is complete, send a final message
     let responseContent = "";
     if (isComplete) {
       // Get user's name from extracted info or default
       const userName = extractedInfo.name || "there";
-      
+
       // Generate a personalized completion message
-      responseContent = onboardingFlow.agenticSettings?.finalMessage || 
+      responseContent =
+        onboardingFlow.agenticSettings?.finalMessage ||
         `Thank you, ${userName}! Your onboarding is now complete. I've saved your information and I'm ready to help you with your tasks.`;
-      
-      console.log(`[Onboarding] Onboarding completed for user with phone number ${sender_number}`);
+
+      console.log(
+        `[Onboarding] Onboarding completed for user with phone number ${sender_number}`
+      );
     } else {
       // Call OpenAI for a regular follow-up response
       const completion = await openai.chat.completions.create({
@@ -258,7 +274,7 @@ async function handleOnboardingFollowUp(
       responseContent =
         completion.choices[0]?.message?.content ||
         "I'm sorry, I couldn't process your message. Could you please try again?";
-      
+
       console.log(`[Onboarding] Generated follow-up response`);
     }
 
@@ -289,9 +305,9 @@ async function handleOnboardingFollowUp(
       }
     }
 
-    return { 
-      text: responseContent, 
-      waitForResponse: !isComplete  // Don't wait for response if onboarding is complete
+    return {
+      text: responseContent,
+      waitForResponse: !isComplete, // Don't wait for response if onboarding is complete
     };
   } catch (error) {
     console.error("[Onboarding] Error in follow-up handling:", error);
@@ -565,10 +581,8 @@ export async function handleWhatsAppIncoming(webhookData: WebhookPayload) {
   await initializeDatabase();
 
   console.log("[Message Received]", {
-    content,
-    message_content,
     sender_number,
-    sender_name,
+    message_content,
     thread_type,
     timestamp,
     service,
@@ -592,9 +606,6 @@ export async function handleWhatsAppIncoming(webhookData: WebhookPayload) {
       // Process and store the webhook data in Supabase
       const success = await adapter.processWebhookPayload(webhookData);
       if (success) {
-        console.log(
-          `[Supabase] Successfully stored webhook data for message ${message_id}`
-        );
       } else {
         console.error(
           `[Supabase] Failed to store webhook data for message ${message_id}`
@@ -605,9 +616,6 @@ export async function handleWhatsAppIncoming(webhookData: WebhookPayload) {
       const thread = await adapter.getThread(thread_id);
       if (!thread) {
         shouldTriggerOnboarding = true;
-        console.log(
-          `[WhatsApp] New thread detected: ${thread_id}. Will trigger onboarding.`
-        );
       } else {
         chatId = thread.id;
         threadMessages = thread.messages || [];
@@ -616,13 +624,6 @@ export async function handleWhatsAppIncoming(webhookData: WebhookPayload) {
         if (thread.sender) {
           const onboardingComplete =
             thread.sender.metadata?.onboarding_complete === true;
-          console.log(
-            `[Onboarding] User ${thread.sender.name} (${thread.sender.phone_number}) onboarding status:`,
-            {
-              onboardingComplete,
-              metadata: thread.sender.metadata || {},
-            }
-          );
 
           // Set onboarding flag based on metadata
           if (!onboardingComplete) {
@@ -691,9 +692,6 @@ export async function handleWhatsAppIncoming(webhookData: WebhookPayload) {
     threadMessages = messagesByThread.get(thread_id) || [];
     if (threadMessages.length === 0) {
       shouldTriggerOnboarding = true;
-      console.log(
-        `[WhatsApp] First message in thread: ${thread_id}. Will trigger onboarding.`
-      );
     }
   }
 
@@ -708,11 +706,6 @@ export async function handleWhatsAppIncoming(webhookData: WebhookPayload) {
         chatId,
         service
       );
-      if (projectId) {
-        console.log(
-          `[WhatsApp] Message associated with project ID: ${projectId}`
-        );
-      }
     } catch (error) {
       console.error("[WhatsApp] Error in project triage:", error);
     }
@@ -720,8 +713,6 @@ export async function handleWhatsAppIncoming(webhookData: WebhookPayload) {
 
   // Always run message triage to generate a response
   try {
-    console.log(`[WhatsApp] Running message triage for thread ${thread_id}`);
-
     // Special handling for onboarding process
     if (shouldTriggerOnboarding) {
       // Check if this is a first message (starting onboarding) or a follow-up
@@ -740,8 +731,6 @@ export async function handleWhatsAppIncoming(webhookData: WebhookPayload) {
             sender_number,
             "__skip_send" // Special marker to avoid double-sending
           );
-
-          console.log(`[WhatsApp] Generated onboarding follow-up response`);
 
           // Split and send messages if needed
           const splitParagraphs = await getSplitMessageSetting();
@@ -771,9 +760,6 @@ export async function handleWhatsAppIncoming(webhookData: WebhookPayload) {
           // Continue with regular triage if follow-up handling fails
         }
       } else {
-        console.log(
-          `[WhatsApp] Starting initial onboarding flow for thread ${thread_id}`
-        );
         try {
           // Create an array of thread messages in the correct format for initial onboarding
           const formattedThreadMessages = threadMessages.map((msg) => ({
@@ -864,14 +850,8 @@ export async function handleWhatsAppIncoming(webhookData: WebhookPayload) {
     });
 
     if (triageResult.success) {
-      console.log(
-        `[WhatsApp] Successfully triaged message with type: ${triageResult.type}`
-      );
-
       // Send the response if the triage was successful and we have a message to send
       if (triageResult.message) {
-        console.log(`[WhatsApp] Sending response to ${sender_number}`);
-
         // For web-ui service, the response is handled by the calling code
         if (service !== "web-ui") {
           // Check if we should split messages (based on settings or defaults)

@@ -66,51 +66,37 @@ export const defaultAgentProfileSettings: AgentProfileSettingsWithSource = {
  * 4. Default settings
  */
 const getAgentProfileSettings = async (): Promise<AgentProfileSettingsWithSource> => {
-  console.log('[PROFILE SETTINGS] Starting to load agent profile settings...');
   // First try to load from file storage via API
   try {
-    console.log('[PROFILE SETTINGS] Attempting to load from file storage...');
     const fileSettings = await loadProfileSettings();
     if (fileSettings) {
-      console.log(`[PROFILE SETTINGS] Successfully loaded settings for "${fileSettings.name}" from file storage`);
       return { ...fileSettings, _source: 'file_storage' };
-    } else {
-      console.log('[PROFILE SETTINGS] No settings found in file storage');
     }
   } catch (error) {
-    console.warn('[PROFILE SETTINGS] Error loading profile settings from API:', error);
+    console.error('[PROFILE SETTINGS] Error loading profile settings from API:', error);
     // Continue to next method if API fails
   }
   
   // Next try to load from localStorage (browser only)
   if (typeof window !== 'undefined') {
-    console.log('[PROFILE SETTINGS] Attempting to load from localStorage...');
     const localStorageSettings = loadFromLocalStorage<AgentProfileSettings>(LOCAL_STORAGE_KEYS.AGENT_PROFILE);
     if (localStorageSettings) {
-      console.log(`[PROFILE SETTINGS] Successfully loaded settings for "${localStorageSettings.name}" from localStorage`);
       return { ...localStorageSettings, _source: 'local_storage' };
-    } else {
-      console.log('[PROFILE SETTINGS] No settings found in localStorage');
     }
   }
   
   // Next try environment variable
   if (process.env.AGENT_PROFILE_SETTINGS) {
-    console.log('[PROFILE SETTINGS] Attempting to load from environment variable...');
     try {
       const envSettings = JSON.parse(process.env.AGENT_PROFILE_SETTINGS);
-      console.log(`[PROFILE SETTINGS] Successfully loaded settings for "${envSettings.name}" from environment variable`);
       return { ...envSettings, _source: 'environment_variable' };
     } catch (error) {
-      console.warn('[PROFILE SETTINGS] Error parsing AGENT_PROFILE_SETTINGS env variable:', error);
+      console.error('[PROFILE SETTINGS] Error parsing AGENT_PROFILE_SETTINGS env variable:', error);
       // Continue to defaults if parsing fails
     }
-  } else {
-    console.log('[PROFILE SETTINGS] AGENT_PROFILE_SETTINGS environment variable not found');
   }
   
   // Fall back to default settings
-  console.log(`[PROFILE SETTINGS] Using default settings for "${defaultAgentProfileSettings.name}"`);
   return { ...defaultAgentProfileSettings, _source: 'default' };
 };
 
@@ -137,7 +123,6 @@ const getAgentProfileSettingsSync = (): AgentProfileSettingsWithSource => {
   }
   
   // Fall back to default settings
-  console.log(`[PROFILE SETTINGS] Using default settings for "${defaultAgentProfileSettings.name}"`);
   return { ...defaultAgentProfileSettings, _source: 'default' };
 };
 
