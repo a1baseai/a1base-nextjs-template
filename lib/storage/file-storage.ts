@@ -79,23 +79,23 @@ export const saveProfileSettings = async (settings: AgentProfileSettings): Promi
 export const loadProfileSettings = async (): Promise<AgentProfileSettings | null> => {
   // If we're running on the server side in an API route, access the file directly
   if (typeof window === 'undefined') {
-    console.log('🔄 [SERVER] Loading profile settings directly from file...');
+    // Console log removed - [SERVER] Loading profile settings directly from file
     try {
       const dataDir = path.join(process.cwd(), 'data');
       const filePath = path.join(dataDir, 'profile-settings.json');
       
-      console.log('[SERVER] Profile settings file path:', filePath);
+      // Console log removed - [SERVER] Profile settings file path
       
       // Check if file exists
       if (!fs.existsSync(filePath)) {
-        console.log('❌ [SERVER] Profile settings file not found');
+        // Console log removed - [SERVER] Profile settings file not found
         return null;
       }
       
       // Read and parse file
       const data = fs.readFileSync(filePath, 'utf8');
       const settings = JSON.parse(data);
-      console.log('✅ [SERVER] Successfully loaded profile settings from file. Name:', settings?.name);
+      // Console log removed - [SERVER] Successfully loaded profile settings from file
       
       // Add source information to help with debugging
       return {
@@ -109,16 +109,16 @@ export const loadProfileSettings = async (): Promise<AgentProfileSettings | null
   }
   
   // Client-side or non-API server code: use API endpoint
-  console.log('🔄 Attempting to load profile settings via API...');
+  // Console log removed - Attempting to load profile settings via API
   try {
     const response = await fetch(`${getBaseUrl()}/api/profile-settings`);
     
     if (response.ok) {
       const data = await response.json();
-      console.log('✅ Successfully loaded profile settings via API. Name:', data.settings?.name);
+      // Console log removed - Successfully loaded profile settings via API
       return data.settings;
     } else {
-      console.log('❌ Failed to load profile settings via API. Status:', response.status);
+      // Console log removed - Failed to load profile settings via API
     }
     
     return null;
@@ -159,23 +159,23 @@ export const saveBaseInformation = async (information: InformationSection[]): Pr
 export const loadBaseInformation = async (): Promise<InformationSection[] | null> => {
   // If we're running on the server side in an API route, access the file directly
   if (typeof window === 'undefined') {
-    console.log('🔄 [SERVER] Loading base information directly from file...');
+    // Console log removed - [SERVER] Loading base information directly from file
     try {
       const dataDir = path.join(process.cwd(), 'data');
       const filePath = path.join(dataDir, 'base-information.json');
       
-      console.log('[SERVER] Base information file path:', filePath);
+      // Console log removed - [SERVER] Base information file path
       
       // Check if file exists
       if (!fs.existsSync(filePath)) {
-        console.log('❌ [SERVER] Base information file not found');
+        // Console log removed - [SERVER] Base information file not found
         return null;
       }
       
       // Read and parse file
       const data = fs.readFileSync(filePath, 'utf8');
       const information = JSON.parse(data);
-      console.log('✅ [SERVER] Successfully loaded base information from file. Sections:', information?.length);
+      // Console log removed - [SERVER] Successfully loaded base information from file
       return information;
     } catch (error) {
       console.error('❌ [SERVER] Error loading base information from file:', error);
@@ -184,16 +184,16 @@ export const loadBaseInformation = async (): Promise<InformationSection[] | null
   }
   
   // Client-side or non-API server code: use API endpoint
-  console.log('🔄 Attempting to load base information via API...');
+  // Console log removed - Attempting to load base information via API
   try {
     const response = await fetch(`${getBaseUrl()}/api/base-information`);
     
     if (response.ok) {
       const data = await response.json();
-      console.log('✅ Successfully loaded base information via API. Sections:', data.information?.length);
+      // Console log removed - Successfully loaded base information via API
       return data.information;
     } else {
-      console.log('❌ Failed to load base information via API. Status:', response.status);
+      // Console log removed - Failed to load base information via API
     }
     
     return null;

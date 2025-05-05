@@ -68,12 +68,7 @@ export async function SetDataRetention(
   sender_number?: string,
   service?: string
 ): Promise<string> {
-  console.log("Workflow Start [SetDataRetention]", {
-    userId,
-    period,
-    unit,
-    service,
-  });
+  // Console log removed - Workflow Start [SetDataRetention]
 
   try {
     // Get settings directory path
@@ -149,11 +144,7 @@ export async function ForgetMemory(
   sender_number?: string,
   service?: string
 ): Promise<string> {
-  console.log("Workflow Start [ForgetMemory]", {
-    userId,
-    dataTypes,
-    service,
-  });
+  // Console log removed - Workflow Start [ForgetMemory]
 
   try {
     // Get deletion requests directory path
@@ -237,11 +228,7 @@ export async function DownloadUserData(
   sender_number?: string,
   service?: string
 ): Promise<string> {
-  console.log("Workflow Start [DownloadUserData]", {
-    userId,
-    dataTypes,
-    service,
-  });
+  // Console log removed - Workflow Start [DownloadUserData]
 
   try {
     // This function would typically:
@@ -297,10 +284,7 @@ export async function AnonymizeUserData(
   sender_number?: string,
   service?: string
 ): Promise<string> {
-  console.log("Workflow Start [AnonymizeUserData]", {
-    userId,
-    service,
-  });
+  // Console log removed - Workflow Start [AnonymizeUserData]
 
   try {
     // This function would typically:
@@ -365,11 +349,7 @@ export async function ManageConsentPreferences(
   sender_number?: string,
   service?: string
 ): Promise<string> {
-  console.log("Workflow Start [ManageConsentPreferences]", {
-    userId,
-    consentOptions,
-    service,
-  });
+  // Console log removed - Workflow Start [ManageConsentPreferences]
 
   try {
     // Get consent directory path

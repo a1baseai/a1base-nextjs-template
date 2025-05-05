@@ -80,16 +80,12 @@ export async function POST(request: Request) {
     // - request.headers: Headers including authorization
     // - request.body: Request body if any data was sent
     // This helps debug what information A1Base sends during cron job execution
-    console.log('Cron job request:', {
-      url: request.url,
-      method: request.method,
-      headers: Object.fromEntries(request.headers),
-      // Body needs to be parsed separately if needed
-    });
+    // Console log removed - Cron job request with URL, method, and headers
+    // Details included URL, HTTP method, headers, etc.
 
     return new NextResponse("Cron job completed successfully", { status: 200 });
   } catch (error) {
-    console.error("Cron job failed:", error);
+    console.error('Cron job failed:', error);
     return new NextResponse("Internal Server Error", { status: 500 });
   }
 }

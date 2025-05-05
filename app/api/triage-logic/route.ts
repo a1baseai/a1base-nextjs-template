@@ -18,12 +18,12 @@ const isBuildTime = () => {
 };
 
 export async function GET() {
-  console.log('[TRIAGE-API] GET request received for triage logic');
+  // Console log removed - [TRIAGE-API] GET request received for triage logic
   
   try {
     // Handle build-time context without file system access
     if (isBuildTime()) {
-      console.log('[TRIAGE-API] Build-time context detected, returning mock data');
+      // Console log removed - [TRIAGE-API] Build-time context detected
       return NextResponse.json({ 
         content: "// This is a placeholder for the triage logic file during build time."
       });
@@ -31,11 +31,11 @@ export async function GET() {
     
     // Read the triage logic file
     const fileContent = await fs.readFile(TRIAGE_LOGIC_PATH, "utf8");
-    console.log(`[TRIAGE-API] Successfully read triage logic file: ${TRIAGE_LOGIC_PATH}`);
+    // Console log removed - [TRIAGE-API] Successfully read triage logic file
     
     return NextResponse.json({ content: fileContent });
   } catch (error) {
-    console.error('[TRIAGE-API] Error reading triage logic file:', error);
+    console.error('Error getting triage configuration:', error);
     return NextResponse.json(
       { error: "Failed to read triage logic file" },
       { status: 500 }
@@ -44,12 +44,12 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  console.log('[TRIAGE-API] POST request received for updating triage logic');
+  // Console log removed - [TRIAGE-API] POST request received for updating triage logic
   
   try {
     // Handle build-time context without file system access
     if (isBuildTime()) {
-      console.log('[TRIAGE-API] Build-time context detected, returning mock response');
+      // Console log removed - [TRIAGE-API] Build-time context detected
       return NextResponse.json({ success: true });
     }
     
@@ -67,11 +67,11 @@ export async function POST(req: Request) {
     const backupPath = `${TRIAGE_LOGIC_PATH}.bak`;
     const originalContent = await fs.readFile(TRIAGE_LOGIC_PATH, "utf8");
     await fs.writeFile(backupPath, originalContent);
-    console.log(`[TRIAGE-API] Created backup: ${backupPath}`);
+    // Console log removed - [TRIAGE-API] Created backup
     
     // Write the new content
     await fs.writeFile(TRIAGE_LOGIC_PATH, content);
-    console.log(`[TRIAGE-API] Successfully updated triage logic file`);
+    // Console log removed - [TRIAGE-API] Successfully updated triage logic file
     
     return NextResponse.json({ success: true });
   } catch (error) {

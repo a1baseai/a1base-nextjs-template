@@ -64,21 +64,10 @@ export async function POST(request: Request) {
     const body = (await request.json()) as WebhookPayload;
     
     // == LOGGING THE MESSAGE
-    console.log("\n=== INCOMING WHATSAPP MESSAGE ===");
-    console.log("\n[Message Details]", {
-      message_id: body.message_id,
-      thread_id: body.thread_id,
-      thread_type: body.thread_type,
-      sender_number: body.sender_number,
-      sender_name: body.sender_name,
-      timestamp: body.timestamp,
-      service: body.service,
-      message_type: body.message_type,
-      is_from_agent: body.is_from_agent,
-      a1_account_id: body.a1_account_id
-    });
+    // Console log removed - INCOMING WHATSAPP MESSAGE
+    // Console log removed - [Message Details] with message details like ID, thread, sender info, etc.
 
-    console.log("\n[Message Content]", body.message_content);
+    // Console log removed - [Message Content]
     // == END LOGS
 
     // Patch bug where group message sender number is missing if sender is a1base agent
@@ -91,7 +80,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("[API] Error:", error);
+    console.error('[API] Error processing incoming message:', error);
     return NextResponse.json(
       { success: false, error: "Internal server error" },
       { status: 500 }

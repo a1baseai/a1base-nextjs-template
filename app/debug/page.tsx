@@ -70,7 +70,7 @@ export default function DebugPage() {
       // Load message chunking setting
       await checkMessageChunkingSetting();
     } catch (error) {
-      console.error("Failed to check environment variables:", error);
+      console.error('Error fetching environment variables:', error);
     } finally {
       setIsLoading(false);
     }
@@ -84,7 +84,7 @@ export default function DebugPage() {
         setMessageChunkingEnabled(data.splitParagraphs || false);
       }
     } catch (error) {
-      console.error("Failed to check message chunking setting:", error);
+      console.error('Error getting message chunking settings:', error);
     }
   }
 
@@ -117,7 +117,7 @@ export default function DebugPage() {
         throw new Error(data.error || "Failed to update model provider");
       }
     } catch (error) {
-      console.error("Failed to update model provider:", error);
+      console.error('Failed to update model provider:', error);
       toast({
         title: "Update failed",
         description: error instanceof Error ? error.message : "Failed to update model provider",
@@ -162,7 +162,7 @@ export default function DebugPage() {
         throw new Error(data.error || "Failed to update profile name");
       }
     } catch (error) {
-      console.error("Failed to update WhatsApp profile name:", error);
+      console.error('Failed to update WhatsApp profile name:', error);
       toast({
         title: "Update failed",
         description: error instanceof Error ? error.message : "Failed to update WhatsApp profile name",
@@ -209,7 +209,7 @@ export default function DebugPage() {
         throw new Error(data.error || "Failed to update profile picture");
       }
     } catch (error) {
-      console.error("Failed to update WhatsApp profile picture:", error);
+      console.error('Failed to update WhatsApp profile picture:', error);
       toast({
         title: "Update failed",
         description: error instanceof Error ? error.message : "Failed to update WhatsApp profile picture",
@@ -247,7 +247,7 @@ export default function DebugPage() {
         throw new Error(data.error || "Failed to update message chunking setting");
       }
     } catch (error) {
-      console.error("Failed to update message chunking setting:", error);
+      console.error('Failed to update message chunking setting:', error);
       toast({
         title: "Update failed",
         description: error instanceof Error ? error.message : "Failed to update message chunking setting",

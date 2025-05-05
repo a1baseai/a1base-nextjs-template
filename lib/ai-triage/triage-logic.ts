@@ -191,7 +191,7 @@ async function createNewProject(
       'project_created',
       `Project created from thread ${thread_id}`
     );
-    console.log(`[projectTriage] Created new project: ${defaultName} with ID: ${projectId}`);
+    // Console log removed
   }
   
   return projectId;
@@ -203,19 +203,19 @@ export async function projectTriage(
   chatId: string,
   service: string
 ): Promise<string | null> {
-  console.log('[projectTriage] Starting project triage');
+  // Console log removed
 
   try {
     // Get the adapter
     const adapter = await getInitializedAdapter();
     if (!adapter) {
-      console.log('[projectTriage] No adapter available, skipping project triage');
+      // Console log removed
       return null;
     }
 
     // If there are no messages, skip project triage
     if (!threadMessages || threadMessages.length === 0) {
-      console.log('[projectTriage] No messages to analyze, skipping project triage');
+      // Console log removed
       return null;
     }
 
@@ -231,17 +231,17 @@ export async function projectTriage(
     // Analyze message to determine intent regarding projects
     const intent = await analyzeProjectIntent(latestMessage, existingProjects);
     
-    console.log(`[projectTriage] Detected intent: ${intent.type}`);
+    // Console log removed
     
     switch (intent.type) {
       case 'CONTINUE_CURRENT_PROJECT':
         // Just return the current live project ID if it exists
         if (liveProject) {
-          console.log(`[projectTriage] Continuing with existing project: ${liveProject.name}`);
+          // Console log removed
           return liveProject.id;
         }
         // If no live project, fall through to create a new one
-        console.log('[projectTriage] No live project to continue, will create new one');
+        // Console log removed
         break;
       
       case 'COMPLETE_PROJECT':
@@ -254,11 +254,11 @@ export async function projectTriage(
               'project_completed',
               `Project completed: ${latestMessage.content.substring(0, 100)}`
             );
-            console.log(`[projectTriage] Marked project as complete: ${liveProject.name}`);
+            // Console log removed
           }
           return liveProject.id;
         }
-        console.log('[projectTriage] No live project to complete');
+        // Console log removed
         break;
       
       case 'REFERENCE_PAST_PROJECT':
@@ -266,16 +266,16 @@ export async function projectTriage(
         if (intent.projectId) {
           const referencedProject = existingProjects.find(p => p.id === intent.projectId);
           if (referencedProject) {
-            console.log(`[projectTriage] Referencing past project: ${referencedProject.name}`);
+            // Console log removed
             return intent.projectId;
           }
         }
         // Otherwise continue with live project or create new one
         if (liveProject) {
-          console.log(`[projectTriage] Using live project: ${liveProject.name}`);
+          // Console log removed
           return liveProject.id;
         }
-        console.log('[projectTriage] No referenced project found, will create new one');
+        // Console log removed
         break;
         
       case 'START_NEW_PROJECT':
@@ -288,7 +288,7 @@ export async function projectTriage(
               'project_completed',
               `Project completed due to new project start`
             );
-            console.log(`[projectTriage] Marked previous project as complete: ${liveProject.name}`);
+            // Console log removed
           }
         }
         
@@ -298,14 +298,14 @@ export async function projectTriage(
     
     // Default case - return current live project or create a new one if none exists
     if (liveProject) {
-      console.log(`[projectTriage] Using existing live project: ${liveProject.name}`);
+      // Console log removed
       return liveProject.id;
     } else {
-      console.log('[projectTriage] No live project found, creating new one');
+      // Console log removed
       return await createNewProject(adapter, chatId, thread_id, latestMessage);
     }
   } catch (error) {
-    console.error('[projectTriage] Error:', error);
+    console.error('Error in project triage:', error);
     return null;
   }
 }
@@ -332,7 +332,7 @@ export async function triageMessage({
   messagesByThread,
   service,
 }: TriageParams): Promise<TriageResult> {
-  console.log("[triageMessage] Starting message triage");
+  // Console log removed
 
   try {
     let threadMessages: MessageRecord[] = [];
@@ -345,17 +345,15 @@ export async function triageMessage({
       const adapter = await getInitializedAdapter();
 
       if (adapter) {
-        console.log("[triageMessage] Using Supabase for message history");
+        // Console log removed
         const thread = await adapter.getThread(thread_id);
         if (thread?.messages) {
           // Get last 10 messages from the thread
           threadMessages = thread.messages.slice(-10);
-          console.log(threadMessages);
+          // Console log removed
         }
       } else {
-        console.log(
-          "[triageMessage] Using in-memory storage for message history"
-        );
+        // Console log removed
         threadMessages = messagesByThread.get(thread_id) || [];
       }
     }
@@ -393,7 +391,7 @@ export async function triageMessage({
 
     switch (triage.responseType) {
       case "onboardingFlow":
-        console.log("Running Onboarding Flow");
+        // Console log removed
         
         const onboardingResponse = await DefaultReplyToMessage(
           messages,
@@ -410,7 +408,7 @@ export async function triageMessage({
         };
         
       // case "handleEmailAction": (DISABLED)
-      //   console.log("Running Email Workflow");
+      //   // Console log removed
 
       //   const emailData = await ConstructEmail(messages);
 
@@ -441,7 +439,7 @@ export async function triageMessage({
 
       case "simpleResponse":
       default:
-        console.log("Running Default Response");
+        // Console log removed
 
         const response = await DefaultReplyToMessage(
           messages,
@@ -451,7 +449,7 @@ export async function triageMessage({
           service
         );
 
-        console.log("Response:", response);
+        // Console log removed
 
         if (service === "web-ui") {
           return {
@@ -468,7 +466,7 @@ export async function triageMessage({
         };
     }
   } catch (error) {
-    console.error("[Triage] Error:", error);
+    console.error('Error in message triage:', error);
     return {
       type: "default",
       success: false,

@@ -23,31 +23,31 @@ const DATA_DIR = path.join(process.cwd(), 'data');
 const BASE_INFORMATION_FILE = path.join(DATA_DIR, 'base-information.json');
 
 // Log paths to help debug
-console.log('[BASE-INFO-API] Current working directory:', process.cwd());
-console.log('[BASE-INFO-API] Data directory path:', DATA_DIR);
-console.log('[BASE-INFO-API] Base information file path:', BASE_INFORMATION_FILE);
+// Console log removed - [BASE-INFO-API] Current working directory
+// Console log removed - [BASE-INFO-API] Data directory path
+// Console log removed - [BASE-INFO-API] Base information file path
 
 try {
   const fileExists = fs.existsSync(BASE_INFORMATION_FILE);
-  console.log('[BASE-INFO-API] File exists?', fileExists);
+  // Console log removed - [BASE-INFO-API] File exists
   
   if (fileExists) {
     // Get file stats
     const stats = fs.statSync(BASE_INFORMATION_FILE);
-    console.log('[BASE-INFO-API] File size:', stats.size, 'bytes');
-    console.log('[BASE-INFO-API] Last modified:', stats.mtime);
+    // Console log removed - [BASE-INFO-API] File size
+    // Console log removed - [BASE-INFO-API] Last modified
     
     // Try to read the first 100 characters to verify content
     const sampleContent = fs.readFileSync(BASE_INFORMATION_FILE, 'utf8').substring(0, 100);
-    console.log('[BASE-INFO-API] File content sample:', sampleContent);
+    // Console log removed - [BASE-INFO-API] File content sample
   } else {
     // Check if the data directory exists
     const dataDirExists = fs.existsSync(DATA_DIR);
-    console.log('[BASE-INFO-API] Data directory exists?', dataDirExists);
+    // Console log removed - [BASE-INFO-API] Data directory exists
     
     if (dataDirExists) {
       const dirContents = fs.readdirSync(DATA_DIR);
-      console.log('[BASE-INFO-API] Data directory contents:', dirContents);
+      // Console log removed - [BASE-INFO-API] Data directory contents
     }
   }
 } catch (error) {
@@ -72,7 +72,7 @@ const initializeDataDirectory = (): void => {
  * Retrieves base information from the server filesystem
  */
 export async function GET() {
-  console.log('[BASE-INFO-API] GET request received for base information');
+  // Console log removed - [BASE-INFO-API] GET request received
   try {
     let information = defaultBaseInformation;
     
@@ -81,17 +81,17 @@ export async function GET() {
       try {
         const data = fs.readFileSync(BASE_INFORMATION_FILE, 'utf8');
         information = JSON.parse(data) as InformationSection[];
-        console.log('✅ Successfully loaded base information from file');
+        // Console log removed - Successfully loaded base information from file
         // Log first section title to confirm it's loading correctly
         if (information.length > 0) {
-          console.log('First section title:', information[0].title);
+          // Console log removed - First section title
         }
       } catch (error) {
         console.error('Error reading base information file:', error);
         // Continue with default information
       }
     } else {
-      console.log('❌ Base information file not found at:', BASE_INFORMATION_FILE);
+      // Console log removed - Base information file not found
     }
     
     return NextResponse.json({ information });

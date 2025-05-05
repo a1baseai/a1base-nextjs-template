@@ -103,7 +103,7 @@ export class SupabaseAdapter {
 
       this.isInitialized = true;
     } catch (error) {
-      console.error('Failed to initialize SupabaseAdapter:', error);
+      // Console error removed
       throw error;
     }
   }
@@ -111,7 +111,7 @@ export class SupabaseAdapter {
   private async createUsersTable(): Promise<void> {
     const { error } = await this.supabase.rpc('create_users_table');
     if (error) {
-      console.error('Error creating users table:', error);
+      // Console error removed
       throw error;
     }
   }
@@ -119,7 +119,7 @@ export class SupabaseAdapter {
   private async createThreadsTable(): Promise<void> {
     const { error } = await this.supabase.rpc('create_threads_table');
     if (error) {
-      console.error('Error creating threads table:', error);
+      // Console error removed
       throw error;
     }
   }
@@ -154,7 +154,7 @@ export class SupabaseAdapter {
       if (error) throw error
       return data.id
     } catch (error) {
-      console.error('Error creating user:', error)
+      // Console error removed
       return null
     }
   }
@@ -185,11 +185,11 @@ export class SupabaseAdapter {
       
       // Check if user exists - note single() throws error if no results
       if (!findError && existingUser) {
-        console.log(`Found existing user with ID: ${existingUser.id}`);
+        // Console log removed
         return existingUser.id;
       }
       
-      console.log(`Creating new user with phone: ${normalizedNumber}`);
+      // Console log removed
       // Create new user if not found
       const { data: newUser, error: insertError } = await this.supabase
         .from(CONVERSATION_USERS_TABLE)
@@ -204,13 +204,13 @@ export class SupabaseAdapter {
         .single();
       
       if (insertError) {
-        console.error('Error inserting new user:', insertError);
+        // Console error removed
         throw insertError;
       }
-      console.log(`Created new user with ID: ${newUser.id}`);
+      // Console log removed
       return newUser.id;
     } catch (error) {
-      console.error('Error in getUserFromWebhook:', error);
+      // Console error removed
       return null;
     }
   }
@@ -229,7 +229,7 @@ export class SupabaseAdapter {
           .single()
         
         if (fetchError) {
-          console.error('Error fetching user for metadata update:', fetchError)
+          // Console error removed
           return false
         }
         
@@ -250,7 +250,7 @@ export class SupabaseAdapter {
 
       return !error
     } catch (error) {
-      console.error('Error updating user:', error)
+      // Console error removed
       return false
     }
   }
@@ -275,7 +275,7 @@ export class SupabaseAdapter {
 
       return data
     } catch (error) {
-      console.error('Error getting user by phone:', error)
+      // Console error removed
       return null
     }
   }
@@ -296,7 +296,7 @@ export class SupabaseAdapter {
       
       // If thread already exists, just return its ID
       if (!findError && existingThread) {
-        console.log(`Thread ${threadId} already exists, skipping creation`);
+        // Console log removed
         return existingThread.id;
       }
       
@@ -306,7 +306,7 @@ export class SupabaseAdapter {
       }
 
       // Create the chat entry since it doesn't exist
-      console.log(`Creating new thread with ID ${threadId}`);
+      // Console log removed
       const { data, error } = await this.supabase
         .from(CHATS_TABLE)
         .insert({
@@ -338,7 +338,7 @@ export class SupabaseAdapter {
 
       return data.id
     } catch (error) {
-      console.error('Error creating thread:', error)
+      // Console error removed
       return null
     }
   }
@@ -425,7 +425,8 @@ export class SupabaseAdapter {
       // Format the messages and participants with enhanced data
       const formattedMessages = messages.map((msg: any) => {
         // Log the raw message data for debugging
-        console.log(`[DB Data Debug] Message raw data:`, JSON.stringify({
+        // Console log removed - [DB Data Debug] Message raw data
+        const rawData = {
           id: msg.id,
           chat_id: msg.chat_id,
           sender_id: msg.sender_id,
@@ -436,7 +437,7 @@ export class SupabaseAdapter {
           rich_content: msg.rich_content,
           service: msg.service,
           conversation_users: msg.conversation_users
-        }, null, 2));
+        };
         
         const formattedMsg = {
           message_id: msg.id,
@@ -454,7 +455,7 @@ export class SupabaseAdapter {
         };
         
         // Log the formatted message for comparison
-        console.log(`[DB Data Debug] Formatted message data:`, JSON.stringify(formattedMsg, null, 2));
+        // Console log removed - Formatted message data
         
         return formattedMsg;
       })
@@ -464,12 +465,13 @@ export class SupabaseAdapter {
         const userPref = userPreferences.find((pref: any) => pref.user_id === p.user_id);
         
         // Log the raw participant data for debugging
-        console.log(`[DB Data Debug] Participant raw data:`, JSON.stringify({
+        // Console log removed - [DB Data Debug] Participant raw data
+        const rawParticipantData = {
           chat_id: p.chat_id,
           user_id: p.user_id,
           conversation_users: p.conversation_users,
           preferences: userPref
-        }, null, 2));
+        };
         
         const formattedParticipant = {
           user_id: p.user_id,
@@ -482,7 +484,7 @@ export class SupabaseAdapter {
         };
         
         // Log the formatted participant for comparison
-        console.log(`[DB Data Debug] Formatted participant data:`, JSON.stringify(formattedParticipant, null, 2));
+        // Console log removed - Formatted participant data
         
         return formattedParticipant;
       })
@@ -521,21 +523,21 @@ export class SupabaseAdapter {
       
       
       // Log the complete thread data being returned
-      // console.log(`[DB Data Debug] Complete thread data overview:`);
-      // console.log({...threadData, messages: `[${threadData.messages.length} messages]`});
-      // console.log(`- Chat ID: ${threadData.id}`);
-      // console.log(`- External ID: ${threadData.external_id}`);
-      // console.log(`- Type: ${threadData.type}`);
-      // console.log(`- Service: ${threadData.service}`);
-      // console.log(`- Message count: ${threadData.messages.length}`);
-      // console.log(`- Participant count: ${threadData.participants.length}`);
-      // console.log(`- Projects count: ${threadData.projects.length}`);
+      // Console log already commented out - Complete thread data overview
+      // Console log already commented out - threadData
+      // Console log already commented out - Chat ID
+      // Console log already commented out - External ID
+      // Console log already commented out - Type
+      // Console log already commented out - Service
+      // Console log already commented out - Message count
+      // Console log already commented out - Participant count
+      // Console log already commented out - Projects count
       
       return threadData;
     } catch (error: any) { // Type error as any to access code property
       // Log errors, but don't log PGRST116 as an error since it's expected for new threads
       if (error.code !== 'PGRST116') {
-        console.error('Error getting thread:', error)
+        // Console error removed
       }
       return null
     }
@@ -579,7 +581,7 @@ export class SupabaseAdapter {
 
       return true
     } catch (error) {
-      console.error('Error updating thread messages:', error)
+      // Console error removed
       return false
     }
   }
@@ -637,7 +639,7 @@ export class SupabaseAdapter {
       
       return true
     } catch (error) {
-      console.error('Error updating thread participants:', error)
+      // Console error removed
       return false
     }
   }
@@ -655,7 +657,7 @@ export class SupabaseAdapter {
     
     try {
       // First try to find existing chat by external_id
-      console.log(`Looking for chat with external_id ${threadId}`);
+      // Console log removed
       const { data: existingChat, error: findError } = await this.supabase
         .from('chats')
         .select('id')
@@ -663,18 +665,18 @@ export class SupabaseAdapter {
         .single();
       
       if (!findError && existingChat) {
-        console.log(`Found existing chat with ID ${existingChat.id}`);
+        // Console log removed
         return existingChat.id;
       }
       
       if (findError && findError.code !== 'PGRST116') {
         // This is an error other than "not found"
-        console.error(`Error finding chat for thread_id ${threadId}:`, findError);
+        // Console error removed
         throw findError;
       }
       
       // At this point, we know the chat doesn't exist, so create a new one
-      console.log(`Creating new chat for thread_id ${threadId}, type ${threadType}`);
+      // Console log removed
       
       // Ensure thread type is one of the acceptable values for the CHECK constraint
       const validatedThreadType = ['individual', 'group'].includes(threadType) ? threadType : 'individual';
@@ -692,14 +694,14 @@ export class SupabaseAdapter {
         .single();
       
       if (insertError) {
-        console.error(`Error creating new chat: ${insertError.message}`);
+        // Console error removed
         throw insertError;
       }
       
-      console.log(`Successfully created new chat with ID ${newChat.id}`);
+      // Console log removed
       return newChat.id;
     } catch (error) {
-      console.error('Error in getChatFromWebhook:', error);
+      // Console error removed
       return null;
     }
   }
@@ -712,7 +714,7 @@ export class SupabaseAdapter {
     
     try {
       // Check if participant already exists to avoid unique constraint violation
-      console.log(`Checking if user ${userId} is already in chat ${chatId}`);
+      // Console log removed
       const { data: existingParticipant, error: findError } = await this.supabase
         .from('chat_participants')
         .select('*')
@@ -721,12 +723,12 @@ export class SupabaseAdapter {
       
       if (!findError && existingParticipant && existingParticipant.length > 0) {
         // Already exists
-        console.log(`User ${userId} is already a participant in chat ${chatId}`);
+        // Console log removed
         return true;
       }
       
       // Add participant
-      console.log(`Adding user ${userId} to chat ${chatId}`);
+      // Console log removed
       const { error: insertError } = await this.supabase
         .from('chat_participants')
         .insert({
@@ -735,14 +737,14 @@ export class SupabaseAdapter {
         });
       
       if (insertError) {
-        console.error(`Error adding participant: ${insertError.message}`);
+        // Console error removed
         throw insertError;
       }
       
-      console.log(`Successfully added user ${userId} to chat ${chatId}`);
+      // Console log removed
       return true;
     } catch (error) {
-      console.error('Error in addParticipantToChat:', error);
+      // Console error removed
       return false;
     }
   }
@@ -781,7 +783,7 @@ export class SupabaseAdapter {
         }
       }
       
-      console.log(`Storing message in chat ${chatId} from sender ${senderId || 'unknown'}`);
+      // Console log removed
       
       const { data, error } = await this.supabase
         .from('messages')
@@ -799,12 +801,12 @@ export class SupabaseAdapter {
         .single();
       
       if (error) {
-        console.error('Database error storing message:', error);
+        // Console error removed
         throw error;
       }
       return data.id;
     } catch (error) {
-      console.error('Error in storeMessage:', error);
+      // Console error removed
       return null;
     }
   }
@@ -826,7 +828,7 @@ export class SupabaseAdapter {
       if (error) throw error;
       return data || [];
     } catch (error) {
-      console.error('Error getting projects by chat:', error);
+      // Console error removed
       return [];
     }
   }
@@ -851,7 +853,7 @@ export class SupabaseAdapter {
       if (error) throw error;
       return data.id;
     } catch (error) {
-      console.error('Error creating project:', error);
+      // Console error removed
       return null;
     }
   }
@@ -861,7 +863,7 @@ export class SupabaseAdapter {
     this.ensureInitialized();
     
     try {
-      console.log(`Updating project ${projectId} with:`, updates);
+      // Console log removed
       const { error } = await this.supabase
         .from('projects')
         .update(updates)
@@ -871,10 +873,10 @@ export class SupabaseAdapter {
         console.error('Error updating project:', error);
         throw error;
       }
-      console.log(`Successfully updated project ${projectId}`);
+      // Console log removed - Successfully updated project
       return true;
     } catch (error) {
-      console.error('Error updating project:', error);
+      // Console log removed - Error updating project
       return false;
     }
   }
@@ -945,7 +947,7 @@ export class SupabaseAdapter {
    */
   async processWebhookPayload(payload: WebhookPayload): Promise<boolean> {
     try {
-      console.log(`Processing webhook for thread ${payload.thread_id} from ${payload.sender_number}`);
+      // Console log removed - Processing webhook
       
       // 1. Get or create user
       const userId = await this.getUserFromWebhook(
@@ -960,7 +962,7 @@ export class SupabaseAdapter {
         throw new Error("Failed to get or create user");
       }
       
-      console.log(`User identified with ID: ${userId}`);
+      // Console log removed - User identified
       
       // 2. Get or create chat
       const chatId = await this.getChatFromWebhook(
@@ -975,7 +977,7 @@ export class SupabaseAdapter {
         throw new Error("Failed to get or create chat");
       }
       
-      console.log(`Chat identified with ID: ${chatId}`);
+      // Console log removed - Chat identified
       
       // 3. Add user as participant 
       const participantAdded = await this.addParticipantToChat(chatId, userId);
@@ -984,7 +986,7 @@ export class SupabaseAdapter {
         throw new Error("Failed to add participant to chat");
       }
       
-      console.log(`Added user ${userId} as participant to chat ${chatId}`);
+      // Console log removed - Added user as participant
       
       // 4. Store the message
       const messageId = await this.storeMessage(
@@ -1001,7 +1003,7 @@ export class SupabaseAdapter {
         throw new Error("Failed to store message");
       }
       
-      console.log(`Successfully stored message with ID: ${messageId}`);
+      // Console log removed - Successfully stored message
       
       return true;
     } catch (error) {

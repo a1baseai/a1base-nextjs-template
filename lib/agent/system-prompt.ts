@@ -101,21 +101,21 @@ ${getFormattedInformation(baseInfo)}
 }
 
 export const getSystemPrompt = async (): Promise<string> => {
-  console.log('[SYSTEM PROMPT] Getting system prompt, starting to load profile settings...');
+  // Console log removed
   
   try {
     // Get the most up-to-date profile settings (from file storage, localStorage, or defaults)
     const profileSettings = await getAgentProfileSettings();
-    console.log(`[SYSTEM PROMPT] Loaded profile settings for "${profileSettings.name}" from ${profileSettings.companyName}`);
-    console.log(`[SYSTEM PROMPT] Profile source: ${profileSettings._source || 'unknown'}`);
+    // Console log removed
+    // Console log removed
 
     // Get the formatted base information
-    console.log('[SYSTEM PROMPT] Loading base information...');
+    // Console log removed
     const baseInfoSnippet = await getAgentBaseInformationSnippet();
-    console.log(`[SYSTEM PROMPT] Base information loaded, length: ${baseInfoSnippet.length} characters`);
+    // Console log removed
     
     if (baseInfoSnippet.length < 50) {
-      console.warn('[SYSTEM PROMPT] WARNING: Base information seems too short, might be missing or incomplete');
+      console.warn('Base information is very short or empty. This may affect agent performance.')
     }
 
   const finalPrompt = `  
@@ -134,12 +134,12 @@ ${getSafetyPrompt(safetySettings)}
 
 `;
   
-    console.log(`[SYSTEM PROMPT] Generated complete system prompt (${finalPrompt.length} chars)`);
-    console.log('[SYSTEM PROMPT] First 100 chars: ' + finalPrompt.substring(0, 100));
+    // Console log removed
+    // Console log removed
     
     return finalPrompt;
   } catch (error) {
-    console.error('[SYSTEM PROMPT] ERROR generating system prompt:', error);
+    console.error('Error generating system prompt:', error);
     throw error;
   }
 };

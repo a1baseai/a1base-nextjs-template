@@ -10,7 +10,7 @@ let openai: OpenAI;
 const getOpenAI = () => {
   if (!openai) {
     if (!process.env.OPENAI_API_KEY) {
-      console.log('Warning: OPENAI_API_KEY is not set. Using dummy API key for build.');
+      console.error('OpenAI API error: No API key provided');
     }
     openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY || 'dummy-key-for-build-time',
@@ -74,7 +74,7 @@ Return valid JSON with only that single key "responseType" and value as one of t
   });
 
   const content = completion.choices[0]?.message?.content || "";
-  console.log(content);
+  // console.log removed
   // Parse response and validate response type
   try {
     const parsed = JSON.parse(content);

@@ -31,7 +31,7 @@ function loadMessageSettings() {
       return settings.splitParagraphs || false;
     }
   } catch (error) {
-    console.error("Error loading message settings:", error);
+    console.error('Error loading settings:', error);
   }
   return false; // Default to false if settings can't be loaded
 }
@@ -57,18 +57,15 @@ export async function DefaultReplyToMessage(
   sender_number?: string,
   service?: string
 ): Promise<string> {
-  console.log("Workflow Start [DefaultReplyToMessage]", {
-    sender_number,
-    message_count: threadMessages.length,
-    service,
-  });
+  // Console log removed
+  // Removed log with sender_number, message count and service
 
   try {
     // Check if the most recent message is the onboarding trigger
     const latestMessage = threadMessages[threadMessages.length - 1];
     if (latestMessage?.role === "user" && 
         latestMessage?.content?.trim().toLowerCase() === "start onboarding") {
-      console.log("Detected onboarding trigger, starting onboarding workflow");
+      // Console log removed
       const onboardingResult = await StartOnboarding(threadMessages, thread_type, thread_id, sender_number, service);
       
       // For web-ui, we need to extract just the message text to maintain
@@ -120,7 +117,7 @@ export async function DefaultReplyToMessage(
       basicWorkflowsPrompt.simple_response.user
     );
 
-    console.log("Generated response:", response);
+    // Console log removed
 
     // For web UI, we just return the response without sending through A1Base
     if (service === "web-ui") {
@@ -129,7 +126,7 @@ export async function DefaultReplyToMessage(
     
     // Skip sending if we're using the special skip marker
     if (service === "__skip_send") {
-      console.log("Skipping message sending as requested by __skip_send marker");
+      // Console log removed
       return response;
     }
     
@@ -162,7 +159,7 @@ export async function DefaultReplyToMessage(
 
     return response;
   } catch (error) {
-    console.error("[DefaultReplyToMessage] Error:", error);
+    console.error('Error loading settings:', error);
     const errorMessage = "I'm sorry, but I encountered an error while processing your message.";
 
     // Don't send error message if this is a web UI request or using the skip marker
@@ -186,7 +183,7 @@ export async function DefaultReplyToMessage(
           });
         }
       } catch (sendError) {
-        console.error("[DefaultReplyToMessage] Error sending error message:", sendError);
+        console.error('Error loading settings:', error);
       }
     }
 
@@ -204,7 +201,7 @@ export async function DefaultReplyToMessage(
 export async function ConstructEmail(
   threadMessages: ThreadMessage[]
 ): Promise<{ subject: string; body: string }> {
-  console.log("Workflow Start [ConstructEmail]");
+  // Console log removed
 
   try {
     const response = await generateAgentResponse(
@@ -218,7 +215,7 @@ export async function ConstructEmail(
 
     return { subject, body };
   } catch (error) {
-    console.error("[ConstructEmail] Error:", error);
+    console.error('Error loading settings:', error);
     throw error;
   }
 }
@@ -235,7 +232,7 @@ export async function SendEmailFromAgent(
     recipient_address: string;
   }
 ): Promise<string> {
-  console.log("Workflow Start [SendEmailFromAgent]");
+  // Console log removed
 
   try {
     const emailData = {
@@ -249,7 +246,7 @@ export async function SendEmailFromAgent(
     
     return "Email sent successfully";
   } catch (error) {
-    console.error("[SendEmailFromAgent] Error:", error);
+    console.error('Error loading settings:', error);
     throw error;
   }
 }
@@ -264,7 +261,7 @@ export async function CreateEmailAddress(
   emailAddress: string,
   domain: string = "a1send.com"
 ): Promise<string> {
-  console.log("Workflow Start [CreateEmailAddress]");
+  // Console log removed
 
   try {
     const emailData = {
@@ -276,7 +273,7 @@ export async function CreateEmailAddress(
     
     return `Email address ${emailAddress}@${domain} created successfully`;
   } catch (error) {
-    console.error("[CreateEmailAddress] Error:", error);
+    console.error('Error loading settings:', error);
     throw error;
   }
 }

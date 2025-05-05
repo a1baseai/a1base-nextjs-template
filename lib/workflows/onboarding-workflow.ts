@@ -48,7 +48,7 @@ export function createAgenticOnboardingPrompt(onboardingFlow: OnboardingFlow): s
   // Combine system prompt with field instructions
   const aiPrompt = `${systemPrompt}\n\nCollect the following information:\n${fieldInstructions}\n\nAfter collecting all required information, respond with: ${onboardingFlow.agenticSettings.finalMessage}`;
   
-  console.log("[Onboarding] Generated AI prompt for onboarding");
+  // Console log removed
   return aiPrompt;
 }
 
@@ -59,7 +59,7 @@ export function createAgenticOnboardingPrompt(onboardingFlow: OnboardingFlow): s
  */
 async function generateOnboardingMessage(systemPrompt: string): Promise<string> {
   try {
-    console.log('[Onboarding] Generating conversational onboarding message with OpenAI');
+    // Console log removed
     
     const completion = await openai.chat.completions.create({
       model: "gpt-4",
@@ -79,10 +79,10 @@ async function generateOnboardingMessage(systemPrompt: string): Promise<string> 
     const generatedMessage = completion.choices[0]?.message?.content || 
       "Hello! I'm your assistant. To get started, could you please tell me your name?";
     
-    console.log('[Onboarding] Successfully generated conversational message');
+    // Console log removed
     return generatedMessage;
   } catch (error) {
-    console.error('[Onboarding] Error generating conversational message:', error);
+    console.error('Error generating onboarding message:', error);
     return "Hello! I'm your assistant. To help you get set up, could you please tell me your name?";
   }
 }
@@ -99,7 +99,7 @@ export async function StartOnboarding(
   sender_number?: string,
   service?: string
 ): Promise<{ messages: { text: string, waitForResponse: boolean }[] }> {
-  console.log("Workflow Start [StartOnboarding]");
+  // Console log removed
 
   try {
     // Safely load the onboarding flow
@@ -107,16 +107,16 @@ export async function StartOnboarding(
   
     // If onboarding is disabled, just skip
     if (!onboardingFlow.enabled) {
-      console.log("Onboarding flow is disabled, skipping");
+      // Console log removed
       return { messages: [] };
     }
 
-    console.log("Using AI-driven onboarding conversation");
+    // Console log removed
     
     // Create the system prompt for onboarding
     const systemPrompt = createAgenticOnboardingPrompt(onboardingFlow);
     
-    console.log("[Onboarding] System prompt created, generating user-friendly message");
+    // Console log removed
     
     // Generate a conversational message using the system prompt
     const conversationalMessage = await generateOnboardingMessage(systemPrompt);
@@ -130,7 +130,7 @@ export async function StartOnboarding(
         service !== "web-ui" && 
         service !== "__skip_send") {
       
-      console.log("Sending onboarding message(s) via A1Base API");
+      // Console log removed
       const messageData = {
         content: onboardingMessage.text,
         from: process.env.A1BASE_AGENT_NUMBER!,
@@ -149,13 +149,13 @@ export async function StartOnboarding(
         });
       }
     } else if (service === "__skip_send") {
-      console.log("Skipping onboarding message sending as requested by __skip_send marker");
+      // Console log removed
     }
     
     // Return the conversational message for the web UI or other channels
     return { messages: [onboardingMessage] };
   } catch (error) {
-    console.error("[StartOnboarding] Error:", error);
+    console.error('Error in onboarding workflow:', error);
     const errorMessage = "Sorry, I encountered an error starting the onboarding process.";
     
     // Handle error similarly to DefaultReplyToMessage

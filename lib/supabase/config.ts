@@ -38,18 +38,18 @@ export async function initializeDatabase(): Promise<SupabaseAdapter | null> {
 
   // Check if Supabase is configured
   if (!isSupabaseConfigured()) {
-    console.log('Supabase not configured, using in-memory storage')
+    // Console log removed - Supabase not configured, using in-memory storage
     return null
   }
 
   try {
-    console.log('Initializing Supabase connection...')
+    // Console log removed - Initializing Supabase connection...
     const adapter = new SupabaseAdapter(supabaseUrl!, supabaseKey!)
     await adapter.init()
     
     // Store the initialized instance
     initializedAdapter = adapter
-    console.log('Successfully initialized Supabase database')
+    // Console log removed - Successfully initialized Supabase database
     return adapter
   } catch (error) {
     console.error('Failed to initialize Supabase adapter:', error)
