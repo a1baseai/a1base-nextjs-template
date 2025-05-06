@@ -328,9 +328,6 @@ async function handleOnboardingFollowUp(
   }
 }
 
-// Interface moved to lib/interfaces/database-adapter.ts
-// userCheck function moved to lib/data/message-storage.ts
-
 /**
  * Save a message either to Supabase (if configured) or in-memory storage
  * This function has been moved to lib/data/message-storage.ts
