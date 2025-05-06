@@ -55,7 +55,9 @@ export async function DefaultReplyToMessage(
   thread_type: "individual" | "group",
   thread_id?: string,
   sender_number?: string,
-  service?: string
+  service?: string,
+  participants: any[] = [],
+  projects: any[] = []
 ): Promise<string> {
   // Console log removed
   // Removed log with sender_number, message count and service
@@ -111,10 +113,13 @@ export async function DefaultReplyToMessage(
     // Load current settings
     const splitParagraphs = loadMessageSettings();
 
-    // Use the 'simple_response' prompt
+    // Use the 'simple_response' prompt with enhanced context
     const response = await generateAgentResponse(
       threadMessages,
-      basicWorkflowsPrompt.simple_response.user
+      basicWorkflowsPrompt.simple_response.user,
+      thread_type,
+      participants,
+      projects
     );
 
     // Console log removed

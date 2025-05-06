@@ -557,12 +557,22 @@ export async function handleWhatsAppIncoming(webhookData: WebhookPayload) {
 
           // Send each line as a separate message
           for (const line of messageLines) {
-            await client.sendIndividualMessage(process.env.A1BASE_ACCOUNT_ID!, {
-              content: line,
-              from: process.env.A1BASE_AGENT_NUMBER!,
-              to: sender_number,
-              service: "whatsapp",
-            });
+            // Use the appropriate send method based on thread type
+            if (thread_type === "group" && thread_id) {
+              await client.sendGroupMessage(process.env.A1BASE_ACCOUNT_ID!, {
+                content: line,
+                from: process.env.A1BASE_AGENT_NUMBER!,
+                thread_id: thread_id,
+                service: "whatsapp",
+              });
+            } else {
+              await client.sendIndividualMessage(process.env.A1BASE_ACCOUNT_ID!, {
+                content: line,
+                from: process.env.A1BASE_AGENT_NUMBER!,
+                to: sender_number,
+                service: "whatsapp",
+              });
+            }
             // Wait a short delay between messages
             await new Promise((resolve) => setTimeout(resolve, 500));
           }
@@ -681,12 +691,22 @@ export async function handleWhatsAppIncoming(webhookData: WebhookPayload) {
 
           // Send each message line individually
           for (const messageContent of messages) {
-            await client.sendIndividualMessage(process.env.A1BASE_ACCOUNT_ID!, {
-              content: messageContent,
-              from: process.env.A1BASE_AGENT_NUMBER!,
-              to: sender_number,
-              service: "whatsapp",
-            });
+            // Check thread type and use appropriate send method
+            if (thread_type === "group" && thread_id) {
+              await client.sendGroupMessage(process.env.A1BASE_ACCOUNT_ID!, {
+                content: messageContent,
+                from: process.env.A1BASE_AGENT_NUMBER!,
+                thread_id: thread_id,
+                service: "whatsapp",
+              });
+            } else {
+              await client.sendIndividualMessage(process.env.A1BASE_ACCOUNT_ID!, {
+                content: messageContent,
+                from: process.env.A1BASE_AGENT_NUMBER!,
+                to: sender_number,
+                service: "whatsapp",
+              });
+            }
 
             // Add a small delay between messages to maintain order
             if (splitParagraphs && messages.length > 1) {
@@ -699,13 +719,24 @@ export async function handleWhatsAppIncoming(webhookData: WebhookPayload) {
       console.error(`[WhatsApp] Triage failed: ${triageResult.message}`);
       // Optionally send an error message
       if (service !== "web-ui") {
-        await client.sendIndividualMessage(process.env.A1BASE_ACCOUNT_ID!, {
-          content:
-            "Sorry, I'm having trouble processing your request right now. Please try again later.",
-          from: process.env.A1BASE_AGENT_NUMBER!,
-          to: sender_number,
-          service: "whatsapp",
-        });
+        const errorContent = "Sorry, I'm having trouble processing your request right now. Please try again later.";
+        
+        // Send error message to the appropriate destination based on thread type
+        if (thread_type === "group" && thread_id) {
+          await client.sendGroupMessage(process.env.A1BASE_ACCOUNT_ID!, {
+            content: errorContent,
+            from: process.env.A1BASE_AGENT_NUMBER!,
+            thread_id: thread_id,
+            service: "whatsapp",
+          });
+        } else {
+          await client.sendIndividualMessage(process.env.A1BASE_ACCOUNT_ID!, {
+            content: errorContent,
+            from: process.env.A1BASE_AGENT_NUMBER!,
+            to: sender_number,
+            service: "whatsapp",
+          });
+        }
       }
     }
   } catch (error) {

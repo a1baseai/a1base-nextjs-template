@@ -1,6 +1,7 @@
 import { ThreadMessage } from "@/types/chat";
 import OpenAI from "openai";
 import { getSystemPrompt } from "../agent/system-prompt";
+import { generateRichChatContext } from "./chat-context";
 
 // Don't initialize during build time
 const isBuildTime = process.env.NODE_ENV === 'production' && process.env.NEXT_PHASE === 'phase-production-build';
@@ -129,25 +130,18 @@ export async function generateAgentIntroduction(
 }
 
 /**
- * Generate a response to a WhatsApp thread of messages.
- * If userPrompt is provided, it will be passed as a user-level instruction in addition to the system prompt.
+ * Generate a response from the AI agent
  */
 export async function generateAgentResponse(
   threadMessages: ThreadMessage[],
-  userPrompt?: string
+  userPrompt?: string,
+  threadType: string = 'individual',
+  participants: any[] = [],
+  projects: any[] = []
 ): Promise<string> {
-  const messages = threadMessages.map((msg) => ({
-    role: (msg.sender_number === process.env.A1BASE_AGENT_NUMBER!
-      ? "assistant"
-      : "user") as ChatRole,
-    content: msg.content,
-  }));
-
-  // Extract the latest user's name (not the agent)
-  const userName = [...threadMessages]
-    .reverse()
-    .find(
-      (msg) => msg.sender_number !== process.env.A1BASE_AGENT_NUMBER!
+  // Try to extract the user's name from the latest message
+  const userName = threadMessages.find(
+    (msg) => msg.sender_number !== process.env.A1BASE_AGENT_NUMBER
     )?.sender_name;
 
   if (!userName) {
@@ -157,9 +151,20 @@ export async function generateAgentResponse(
   // Get the system prompt with custom settings
   const systemPromptContent = await getSystemPrompt();
   
+  // Generate rich context about the chat (participants, projects, etc.)
+  const richContext = generateRichChatContext(
+    threadType,
+    threadMessages,
+    participants,
+    projects
+  );
+  
+  // Combine the base system prompt with the rich context
+  const enhancedSystemPrompt = systemPromptContent + richContext;
+  
   // Build the conversation to pass to OpenAI
   const conversation = [
-    { role: "system" as ChatRole, content: systemPromptContent },
+    { role: "system" as ChatRole, content: enhancedSystemPrompt },
   ];
 
   // If there's a user-level prompt from basicWorkflowsPrompt, add it as a user message
@@ -167,8 +172,30 @@ export async function generateAgentResponse(
     conversation.push({ role: "user" as ChatRole, content: userPrompt });
   }
 
-  // Then add the actual chat messages
-  conversation.push(...messages);
+  // Then add the actual chat messages with sender names for better context
+  // Format messages with sender names for better context in group chats
+  const formattedMessages = threadMessages.map((msg: ThreadMessage) => {
+    // For messages from the agent, just pass through
+    if (msg.sender_number === process.env.A1BASE_AGENT_NUMBER) {
+      return {
+        role: "assistant" as ChatRole,
+        content: msg.content
+      };
+    }
+    
+    // For user messages, include the sender's name in group chats
+    let content = msg.content;
+    if (threadType === 'group' && msg.sender_name) {
+      content = `[${msg.sender_name}]: ${content}`;
+    }
+    
+    return {
+      role: "user" as ChatRole,
+      content: content
+    };
+  });
+  
+  conversation.push(...formattedMessages);
 
   const completion = await getOpenAI().chat.completions.create({
     model: "gpt-4",

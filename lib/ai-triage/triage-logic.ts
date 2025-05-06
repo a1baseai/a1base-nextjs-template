@@ -332,6 +332,9 @@ export async function triageMessage({
   messagesByThread,
   service,
 }: TriageParams): Promise<TriageResult> {
+  // Initialize variables to hold participants and projects data
+  let participants: any[] = [];
+  let projects: any[] = [];
   // Console log removed
 
   try {
@@ -342,18 +345,36 @@ export async function triageMessage({
       threadMessages = messagesByThread.get(thread_id) || [];
     } else {
       // Try to get messages from Supabase first
-      const adapter = await getInitializedAdapter();
-
-      if (adapter) {
-        // Console log removed
-        const thread = await adapter.getThread(thread_id);
-        if (thread?.messages) {
-          // Get last 10 messages from the thread
-          threadMessages = thread.messages.slice(-10);
-          // Console log removed
+      try {
+        // Init adapter
+        const adapter = await getInitializedAdapter();
+        if (adapter) {
+          const thread = await adapter.getThread(thread_id);
+          if (thread) {
+            threadMessages = thread.messages || [];
+            
+            // Get participants data for context
+            participants = thread.participants || [];
+            
+            // Get projects data associated with the chat
+            if (thread.id) {
+              try {
+                projects = await adapter.getProjectsByChat(thread.id) || [];
+              } catch (projectError) {
+                console.error("Error retrieving projects for chat:", projectError);
+              }
+            }
+          } else {
+            // Thread not found, fall back to in-memory
+            threadMessages = messagesByThread.get(thread_id) || [];
+          }
+        } else {
+          // No adapter, fall back to in-memory
+          threadMessages = messagesByThread.get(thread_id) || [];
         }
-      } else {
-        // Console log removed
+      } catch (error) {
+        console.error("Error retrieving thread from Supabase:", error);
+        // Continue with in-memory as fallback
         threadMessages = messagesByThread.get(thread_id) || [];
       }
     }
@@ -398,7 +419,9 @@ export async function triageMessage({
           thread_type as "individual" | "group",
           thread_id,
           sender_number,
-          service
+          service,
+          participants,
+          projects
         );
         
         return {
@@ -446,7 +469,9 @@ export async function triageMessage({
           thread_type as "individual" | "group",
           thread_id,
           sender_number,
-          service
+          service,
+          participants,
+          projects
         );
 
         // Console log removed
