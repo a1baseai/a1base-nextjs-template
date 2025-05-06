@@ -88,10 +88,10 @@ export default function ProfileEditorLayout({
       variant: pathname.includes("/base-information") ? "default" : "ghost",
     },
     {
-      title: "Onboarding Builder",
+      title: "Onboarding",
       icon: <MessageSquare className="h-5 w-5" />,
-      href: "/profile-editor/onboarding-flow",
-      variant: pathname.includes("/onboarding-flow") ? "default" : "ghost",
+      href: "#", // No direct link as this is now a parent item
+      variant: pathname.includes("/onboarding-flow") || pathname.includes("/group-onboarding") ? "default" : "ghost",
     },
     {
       title: "Triage Logic",
@@ -122,24 +122,70 @@ export default function ProfileEditorLayout({
         <div className="p-4">
           <h2 className="text-xl font-bold mb-6">Agent Settings</h2>
           <nav className="space-y-1">
-            {sidebarItems.map((item, index) => (
-              <Link
-                key={index}
-                href={item.href}
-                className={cn(
-                  "flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
-                  item.variant === "default"
-                    ? "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
-                    : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                )}
-              >
-                {item.icon}
-                <span>{item.title}</span>
-                {item.variant === "default" && (
-                  <div className="ml-auto h-2 w-2 rounded-full bg-blue-500" />
-                )}
-              </Link>
-            ))}
+            {sidebarItems.map((item, index) => {
+              // Check if this is the onboarding item to render subitems
+              if (item.title === "Onboarding") {
+                return (
+                  <div key={index} className="space-y-1">
+                    {/* Parent Onboarding item */}
+                    <div
+                      className={cn(
+                        "flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                        item.variant === "default"
+                          ? "bg-blue-100 text-blue-900 dark:bg-blue-900 dark:text-blue-100"
+                          : "text-gray-700 dark:text-gray-300"
+                      )}
+                    >
+                      {item.icon}
+                      <span>{item.title}</span>
+                    </div>
+                    
+                    {/* Individual Chat subitem */}
+                    <Link
+                      href="/profile-editor/onboarding-flow"
+                      className={cn(
+                        "flex items-center space-x-3 pl-9 py-2 rounded-md text-sm font-medium transition-colors",
+                        pathname.includes("/onboarding-flow")
+                          ? "bg-blue-50 text-blue-900 dark:bg-blue-900/50 dark:text-blue-100"
+                          : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                      )}
+                    >
+                      <span>Individual Chat</span>
+                    </Link>
+                    
+                    {/* Group Chat subitem */}
+                    <Link
+                      href="/profile-editor/group-onboarding"
+                      className={cn(
+                        "flex items-center space-x-3 pl-9 py-2 rounded-md text-sm font-medium transition-colors",
+                        pathname.includes("/group-onboarding")
+                          ? "bg-blue-50 text-blue-900 dark:bg-blue-900/50 dark:text-blue-100"
+                          : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                      )}
+                    >
+                      <span>Group Chat</span>
+                    </Link>
+                  </div>
+                );
+              }
+              
+              // Render all other normal sidebar items
+              return (
+                <Link
+                  key={index}
+                  href={item.href}
+                  className={cn(
+                    "flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                    item.variant === "default"
+                      ? "bg-blue-100 text-blue-900 dark:bg-blue-900 dark:text-blue-100"
+                      : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  )}
+                >
+                  {item.icon}
+                  <span>{item.title}</span>
+                </Link>
+              );
+            })}
           </nav>
         </div>
         <div className="absolute bottom-0 p-4 w-64 border-t border-gray-200 dark:border-gray-700">
@@ -165,7 +211,9 @@ export default function ProfileEditorLayout({
               {pathname.includes("/profile-settings") && "Profile Settings"}
               {pathname.includes("/base-information") && "Base Information"}
               {pathname.includes("/onboarding-flow") &&
-                "Onboarding Flow Builder"}
+                "Individual Chat Onboarding"}
+              {pathname.includes("/group-onboarding") &&
+                "Group Chat Onboarding"}
               {pathname.includes("/integrations") && "Integrations"}
               {pathname.includes("/web-behavior") && "Web Behavior"}
               {pathname.includes("/conversation-settings") &&
@@ -180,7 +228,9 @@ export default function ProfileEditorLayout({
               {pathname.includes("/base-information") &&
                 "Provide base knowledge for your agent"}
               {pathname.includes("/onboarding-flow") &&
-                "Create welcome messages and onboarding experience for new users. Create your first onboarding flow here, but we strongly encourage you to code your own onboarding flows as your agent grows in complexity."}
+                "Create welcome messages and onboarding experience for one-on-one conversations with new users."}
+              {pathname.includes("/group-onboarding") &&
+                "Configure how your agent introduces itself and onboards users in group chat environments."}
               {pathname.includes("/integrations") &&
                 "Connect your agent to external services"}
               {pathname.includes("/web-behavior") &&

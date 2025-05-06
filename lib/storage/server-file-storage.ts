@@ -11,7 +11,7 @@
 import fs from 'fs';
 import path from 'path';
 import { AgentProfileSettings, InformationSection } from '../agent-profile/types';
-import { OnboardingFlow } from '../onboarding-flow/types';
+import { OnboardingFlow, GroupOnboardingFlow } from '../onboarding-flow/types';
 
 // Directory where profile data will be stored
 const DATA_DIR = path.join(process.cwd(), 'data');
@@ -20,6 +20,7 @@ const DATA_DIR = path.join(process.cwd(), 'data');
 const PROFILE_SETTINGS_FILE = path.join(DATA_DIR, 'profile-settings.json');
 const BASE_INFORMATION_FILE = path.join(DATA_DIR, 'base-information.json');
 const ONBOARDING_FLOW_FILE = path.join(DATA_DIR, 'onboarding-flow.json');
+const GROUP_ONBOARDING_FLOW_FILE = path.join(DATA_DIR, 'group-onboarding-flow.json');
 
 /**
  * Initialize the data directory if it doesn't exist
@@ -55,6 +56,25 @@ export const loadOnboardingFlowFromFile = async (): Promise<OnboardingFlow | nul
 };
 
 /**
+ * Load group onboarding flow data from file
+ * 
+ * @returns Promise that resolves with the group flow data or null if not found
+ */
+export const loadGroupOnboardingFlowFromFile = async (): Promise<GroupOnboardingFlow | null> => {
+  if (!fs.existsSync(GROUP_ONBOARDING_FLOW_FILE)) {
+    return null;
+  }
+  
+  try {
+    const data = await fs.promises.readFile(GROUP_ONBOARDING_FLOW_FILE, 'utf8');
+    return JSON.parse(data) as GroupOnboardingFlow;
+  } catch (error) {
+    console.error('Error loading group onboarding flow from file:', error);
+    return null;
+  }
+};
+
+/**
  * Save onboarding flow data to file
  * 
  * @param flow OnboardingFlow object to save
@@ -70,6 +90,26 @@ export const saveOnboardingFlowToFile = async (flow: OnboardingFlow): Promise<vo
     );
   } catch (error) {
     console.error('Error saving onboarding flow to file:', error);
+    throw error;
+  }
+};
+
+/**
+ * Save group onboarding flow data to file
+ * 
+ * @param flow GroupOnboardingFlow object to save
+ * @returns Promise that resolves when the file is written
+ */
+export const saveGroupOnboardingFlowToFile = async (flow: GroupOnboardingFlow): Promise<void> => {
+  initializeDataDirectory();
+  
+  try {
+    await fs.promises.writeFile(
+      GROUP_ONBOARDING_FLOW_FILE, 
+      JSON.stringify(flow, null, 2)
+    );
+  } catch (error) {
+    console.error('Error saving group onboarding flow to file:', error);
     throw error;
   }
 };
