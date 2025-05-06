@@ -489,16 +489,27 @@ export class SupabaseAdapter {
         return formattedParticipant;
       })
 
-      // Determine the current sender from participants (for individual chats)  
+      // Determine the current sender from participants
       let currentSender = null;
-      if (chat.type === 'individual' && formattedParticipants.length > 0) {
-        // For individual chats, find the non-agent participant (assuming agent is one of the participants)
-        const agentNumber = process.env.A1BASE_AGENT_NUMBER?.replace(/\+/g, '') || '';
-        currentSender = formattedParticipants.find(p => 
-          p.phone_number.replace(/\+/g, '') !== agentNumber
-        );
+      const agentNumber = process.env.A1BASE_AGENT_NUMBER?.replace(/\+/g, '') || '';
+      
+      if (formattedParticipants.length > 0) {
+        if (chat.type === 'individual') {
+          // For individual chats, find the non-agent participant (assuming agent is one of the participants)
+          currentSender = formattedParticipants.find(p => 
+            p.phone_number.replace(/\+/g, '') !== agentNumber
+          );
+        } else if (chat.type === 'group') {
+          // For group chats, use the most recent message to determine who sent it
+          if (formattedMessages.length > 0) {
+            const mostRecentMessage = formattedMessages[formattedMessages.length - 1];
+            currentSender = formattedParticipants.find(p => 
+              p.phone_number === mostRecentMessage.sender_number
+            );
+          }
+        }
         
-        // If we couldn't identify by agent number, take the first participant
+        // If we still don't have a sender, just use the first participant as a fallback
         if (!currentSender && formattedParticipants.length > 0) {
           currentSender = formattedParticipants[0];
         }
@@ -944,8 +955,9 @@ export class SupabaseAdapter {
 
   /**
    * Process entire webhook payload
+   * @returns Object with success status and isNewChat flag indicating if a new chat was created
    */
-  async processWebhookPayload(payload: WebhookPayload): Promise<boolean> {
+  async processWebhookPayload(payload: WebhookPayload): Promise<{ success: boolean; isNewChat: boolean }> {
     try {
       // Console log removed - Processing webhook
       
@@ -965,6 +977,18 @@ export class SupabaseAdapter {
       // Console log removed - User identified
       
       // 2. Get or create chat
+      // First check if the chat already exists
+      let isNewChat = false;
+      const { data: existingChat } = await this.supabase
+        .from('chats')
+        .select('id')
+        .eq('external_id', payload.thread_id)
+        .single();
+      
+      if (!existingChat) {
+        isNewChat = true; // Chat doesn't exist yet, so it's new
+      }
+      
       const chatId = await this.getChatFromWebhook(
         payload.thread_id,
         payload.thread_type,
@@ -1005,10 +1029,10 @@ export class SupabaseAdapter {
       
       // Console log removed - Successfully stored message
       
-      return true;
+      return { success: true, isNewChat };
     } catch (error) {
       console.error('Error processing webhook payload:', error);
-      return false;
+      return { success: false, isNewChat: false };
     }
   }
 } 

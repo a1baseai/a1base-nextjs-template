@@ -38,7 +38,7 @@ export const loadGroupOnboardingFlow = async (): Promise<GroupOnboardingFlow> =>
   try {
     // Try to load from API first
     const response = await fetch(`${getBaseUrl()}/api/group-onboarding-flow`);
-    
+    console.log(response)
     if (response.ok) {
       const data = await response.json();
       console.log('✅ Successfully loaded group onboarding flow via API');

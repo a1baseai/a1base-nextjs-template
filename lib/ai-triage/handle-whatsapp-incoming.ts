@@ -6,35 +6,18 @@ import { WebhookPayload } from "@/app/api/messaging/incoming/route";
 import { StartOnboarding } from "../workflows/onboarding-workflow";
 import { A1BaseAPI } from "a1base-node";
 import OpenAI from "openai";
-import fs from "fs";
-import path from "path";
 import { loadOnboardingFlow } from "../onboarding-flow/onboarding-storage";
 import { createAgenticOnboardingPrompt } from "../workflows/onboarding-workflow";
+import { handleGroupChatOnboarding } from "../workflows/group-onboarding-workflow";
+import { getSplitMessageSetting } from "../settings/message-settings";
+import { saveMessage, userCheck } from "../data/message-storage";
 
 // IN-MEMORY STORAGE
 const messagesByThread = new Map();
-const MAX_CONTEXT_MESSAGES = 10;
+// Maximum number of messages to keep in context
+export const MAX_CONTEXT_MESSAGES = 10;
 
-/**
- * Get message splitting setting from configuration file
- * This determines if long messages should be split into multiple messages
- */
-async function getSplitMessageSetting(): Promise<boolean> {
-  try {
-    const settingsFilePath = path.join(
-      process.cwd(),
-      "data",
-      "message-settings.json"
-    );
-    if (fs.existsSync(settingsFilePath)) {
-      const settings = JSON.parse(fs.readFileSync(settingsFilePath, "utf-8"));
-      return settings.splitParagraphs || false;
-    }
-  } catch (error) {
-    console.error("Error loading message settings:", error);
-  }
-  return false; // Default to false if settings can't be loaded
-}
+// The getSplitMessageSetting function has been moved to lib/settings/message-settings.ts
 
 // Initialize A1Base API client for sending messages
 const client = new A1BaseAPI({
@@ -163,9 +146,11 @@ async function saveOnboardingInfo(
   console.log(`[Onboarding] Saving onboarding info for user ${sender_number}`);
 
   try {
+    // Try to get the initialized adapter for database operations
     const adapter = await getInitializedAdapter();
     if (!adapter) {
-      throw new Error("Database adapter not initialized");
+      console.error(`[Onboarding] Database adapter not initialized`);
+      return false;
     }
 
     // Normalize phone number (remove '+' and spaces)
@@ -343,194 +328,13 @@ async function handleOnboardingFollowUp(
   }
 }
 
-interface DatabaseAdapterInterface {
-  createUser: (name: string, phoneNumber: string) => Promise<string | null>;
-  updateUser: (
-    phoneNumber: string,
-    updates: { name?: string }
-  ) => Promise<boolean>;
-  getUserByPhone: (phoneNumber: string) => Promise<{ name: string } | null>;
-}
-
-/**
- * Check if user exists in the database and update their information if needed
- */
-async function userCheck(
-  phoneNumber: string,
-  name: string,
-  adapter: DatabaseAdapterInterface
-): Promise<void> {
-  try {
-    // Normalize phone number (remove '+' and spaces)
-    const normalizedPhone = phoneNumber.replace(/\+|\s/g, "");
-
-    // Check if user exists
-    const existingUser = await adapter.getUserByPhone(normalizedPhone);
-
-    if (!existingUser) {
-      // Create new user if they don't exist
-      console.log("Creating new user:", { name, phoneNumber });
-      const userId = await adapter.createUser(name, normalizedPhone);
-      if (!userId) {
-        throw new Error("Failed to create user");
-      }
-      console.log("Successfully created user with ID:", userId);
-    } else if (existingUser.name !== name) {
-      // Update user's name if it has changed
-      console.log("Updating user name:", {
-        oldName: existingUser.name,
-        newName: name,
-      });
-      const success = await adapter.updateUser(normalizedPhone, { name });
-      if (!success) {
-        console.error("Failed to update user name");
-      }
-    }
-  } catch (error) {
-    console.error("Error managing user:", error);
-    // Continue execution even if user management fails
-  }
-}
+// Interface moved to lib/interfaces/database-adapter.ts
+// userCheck function moved to lib/data/message-storage.ts
 
 /**
  * Save a message either to Supabase (if configured) or in-memory storage
+ * This function has been moved to lib/data/message-storage.ts
  */
-async function saveMessage(
-  threadId: string,
-  message: {
-    message_id: string;
-    content: string;
-    message_type: string;
-    message_content: {
-      text?: string;
-      data?: string;
-      latitude?: number;
-      longitude?: number;
-      name?: string;
-      address?: string;
-      quoted_message_content?: string;
-      quoted_message_sender?: string;
-      reaction?: string;
-      groupName?: string;
-      inviteCode?: string;
-      error?: string;
-    };
-    sender_number: string;
-    sender_name: string;
-    timestamp: string;
-  },
-  thread_type: string
-) {
-  const adapter = await getInitializedAdapter();
-
-  if (adapter) {
-    try {
-      // Check user exists in database (skip for agent messages)
-      if (message.sender_number !== process.env.A1BASE_AGENT_NUMBER) {
-        await userCheck(message.sender_number, message.sender_name, adapter);
-      }
-
-      // Get existing thread
-      const thread = await adapter.getThread(threadId);
-
-      // Format the new message with enhanced fields matching our updated data model
-      const newMessage = {
-        message_id: message.message_id,
-        external_id: message.message_id, // Use message_id as external_id for consistency
-        content: message.content,
-        message_type: message.message_type,
-        message_content: message.message_content,
-        service: thread_type || "whatsapp", // Use thread_type as service or default to whatsapp
-        sender_id: "", // Will be populated by Supabase
-        sender_number: message.sender_number,
-        sender_name: message.sender_name,
-        sender_service: thread_type || "whatsapp",
-        sender_metadata: {},
-        timestamp: message.timestamp,
-      };
-
-      // Normalize sender number (remove '+' sign)
-      const normalizedSenderNumber = message.sender_number.replace(/\+/g, "");
-
-      if (thread) {
-        // Add message to existing thread
-        let messages = thread.messages || [];
-        messages = [...messages, newMessage];
-
-        // Keep only last MAX_CONTEXT_MESSAGES
-        if (messages.length > MAX_CONTEXT_MESSAGES) {
-          messages = messages.slice(-MAX_CONTEXT_MESSAGES);
-        }
-
-        // Check if sender is already in participants (using normalized numbers)
-        let participants = thread.participants || [];
-        const senderIsParticipant = participants.some((p: any) => {
-          // Handle both string and object formats for backward compatibility
-          const participantNumber =
-            typeof p === "string" ? p : p.phone_number || "";
-
-          // Normalize the participant number for comparison
-          const normalizedParticipantNumber = participantNumber.replace(
-            /\+/g,
-            ""
-          );
-          return normalizedParticipantNumber === normalizedSenderNumber;
-        });
-
-        // If sender is not a participant, add them
-        if (
-          !senderIsParticipant &&
-          message.sender_number !== process.env.A1BASE_AGENT_NUMBER
-        ) {
-          // Create new participant object with enhanced fields matching our updated data model
-          const newParticipant = {
-            user_id: "", // Will be filled by adapter
-            phone_number: normalizedSenderNumber,
-            name: message.sender_name,
-            service: thread_type || "whatsapp", // Use thread_type as service or default to whatsapp
-            metadata: {},
-            created_at: new Date().toISOString(),
-            preferences: {},
-          };
-          participants = [...participants, newParticipant];
-        }
-
-        // Update thread with new messages and participants
-        await adapter.updateThreadMessages(threadId, messages);
-        if (participants.length > 0) {
-          await adapter.updateThreadParticipants(threadId, participants);
-        }
-      } else {
-        // Create new thread with message
-        const participants = [];
-
-        // Only add sender as participant if not the agent
-        if (message.sender_number !== process.env.A1BASE_AGENT_NUMBER) {
-          participants.push({
-            user_id: "", // Will be filled by adapter
-            phone_number: normalizedSenderNumber,
-            name: message.sender_name,
-          });
-        }
-
-        await adapter.createThread(
-          threadId,
-          [newMessage],
-          participants,
-          thread_type
-        );
-      }
-
-      console.log("Successfully saved message to database");
-    } catch (error) {
-      console.error("Error saving message to database:", error);
-      await saveToMemory(threadId, message);
-    }
-  } else {
-    console.log("Using in-memory storage");
-    await saveToMemory(threadId, message);
-  }
-}
 
 /**
  * Save a message to in-memory storage
@@ -604,9 +408,14 @@ export async function handleWhatsAppIncoming(webhookData: WebhookPayload) {
   if (adapter) {
     try {
       // Process and store the webhook data in Supabase
-      const success = await adapter.processWebhookPayload(webhookData);
-      if (success) {
-      } else {
+      const { success, isNewChat } = await adapter.processWebhookPayload(webhookData);
+      
+      // Check if this is a new group chat and handle group onboarding if needed
+      if (success && thread_type === 'group') {
+        await handleGroupChatOnboarding(webhookData, isNewChat);
+      }
+      
+      if (!success) {
         console.error(
           `[Supabase] Failed to store webhook data for message ${message_id}`
         );
@@ -620,10 +429,17 @@ export async function handleWhatsAppIncoming(webhookData: WebhookPayload) {
         chatId = thread.id;
         threadMessages = thread.messages || [];
 
+        console.log("thread sender")
+        console.log(thread.sender);
+        console.log("thread sender metadata")
+        
+
         // Check and log onboarding status from the sender's metadata
         if (thread.sender) {
           const onboardingComplete =
             thread.sender.metadata?.onboarding_complete === true;
+
+          console.log("Onboarding complete:", onboardingComplete);
 
           // Set onboarding flag based on metadata
           if (!onboardingComplete) {
@@ -663,7 +479,9 @@ export async function handleWhatsAppIncoming(webhookData: WebhookPayload) {
           sender_name,
           timestamp,
         },
-        thread_type
+        thread_type,
+        await getInitializedAdapter(),
+        saveToMemory
       );
 
       // Get messages from memory instead
@@ -685,7 +503,9 @@ export async function handleWhatsAppIncoming(webhookData: WebhookPayload) {
         sender_name,
         timestamp,
       },
-      thread_type
+      thread_type,
+      null, // No adapter available
+      saveToMemory
     );
 
     // Get messages from memory
