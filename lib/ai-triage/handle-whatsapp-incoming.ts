@@ -8,7 +8,11 @@ import { A1BaseAPI } from "a1base-node";
 import OpenAI from "openai";
 import { loadOnboardingFlow } from "../onboarding-flow/onboarding-storage";
 import { createAgenticOnboardingPrompt } from "../workflows/onboarding-workflow";
-import { handleGroupChatOnboarding } from "../workflows/group-onboarding-workflow";
+import { 
+  handleGroupChatOnboarding,
+  processGroupOnboardingMessage,
+  isGroupInOnboardingState
+} from "../workflows/group-onboarding-workflow";
 import { getSplitMessageSetting } from "../settings/message-settings";
 import { saveMessage, userCheck } from "../data/message-storage";
 
@@ -390,16 +394,58 @@ export async function handleWhatsAppIncoming(webhookData: WebhookPayload) {
   });
 
   // Skip processing for messages from our own agent
-  if (sender_number === process.env.A1BASE_AGENT_NUMBER!) {
+  if (sender_number === process.env.A1BASE_AGENT_NUMBER) {
+    // This is the agent's own message
     console.log("[Message] Skipping processing for agent's own message");
-    return;
+    return { success: true, message: "Agent message skipped" };
   }
 
-  // Check if this is a new user/thread and should trigger onboarding
+  // Initialize variables for message processing
   const adapter = await getInitializedAdapter();
+  let threadMessages: MessageRecord[] = [];
   let shouldTriggerOnboarding = false;
   let chatId: string | null = null;
-  let threadMessages: MessageRecord[] = [];
+  
+  // For group chats, check if this is part of an ongoing onboarding process
+  if (thread_type === "group") {
+    try {
+      // Check if this group is in active onboarding using the helper function
+      const isInOnboarding = await isGroupInOnboardingState(thread_id);
+      
+      if (isInOnboarding) {
+        console.log(`[WhatsApp] Group chat ${thread_id} has onboarding in progress, processing response`);
+        
+        // Create a complete webhook payload to pass to the processor
+        const onboardingPayload: WebhookPayload = {
+          message_id: message_id || `tmp-${Date.now()}`,
+          sender_number,
+          sender_name: sender_name || "",
+          message_content,
+          thread_id,
+          thread_type,
+          timestamp: timestamp || new Date().toISOString(),
+          service: "whatsapp",
+          a1_account_id: process.env.A1BASE_ACCOUNT_ID || "",
+          message_type: message_type || "text",
+          is_from_agent: false
+        };
+        
+        // Process this message as an onboarding response
+        const handled = await processGroupOnboardingMessage(onboardingPayload);
+        
+        if (handled) {
+          console.log(`[WhatsApp] Successfully processed group onboarding response`); 
+          return { success: true, message: "Group onboarding response processed" };
+        }
+      }
+    } catch (error) {
+      console.error("[WhatsApp] Error checking group onboarding status:", error);
+      // Continue with normal processing if there's an error
+    }
+  }
+
+  // If we're not in a group or onboarding wasn't handled above, continue with regular processing
+  // Note: variables are already declared above
 
   // Save the message to storage (either Supabase or in-memory)
   if (adapter) {
@@ -409,7 +455,13 @@ export async function handleWhatsAppIncoming(webhookData: WebhookPayload) {
       
       // Check if this is a new group chat and handle group onboarding if needed
       if (success && thread_type === 'group') {
-        await handleGroupChatOnboarding(webhookData, isNewChat);
+        const onboardingStarted = await handleGroupChatOnboarding(webhookData, isNewChat);
+        
+        // If we just started onboarding, return early to prevent double-processing
+        if (onboardingStarted) {
+          console.log(`[WhatsApp] Group onboarding started for ${thread_id}, skipping normal processing`);
+          return { success: true, message: "Group onboarding started" };
+        }
       }
       
       if (!success) {

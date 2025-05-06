@@ -954,6 +954,50 @@ export class SupabaseAdapter {
   }
 
   /**
+   * Update metadata for a chat
+   * @param chatId ID of the chat to update
+   * @param metadata Metadata to update or add (will be merged with existing metadata)
+   * @returns Success status
+   */
+  async updateChatMetadata(chatId: string, metadata: Record<string, any>): Promise<boolean> {
+    try {
+      this.ensureInitialized();
+      
+      // First get existing metadata to merge with
+      const { data: chat, error: getError } = await this.supabase
+        .from('chats')
+        .select('metadata')
+        .eq('id', chatId)
+        .single();
+      
+      if (getError) {
+        console.error('Error fetching chat metadata:', getError);
+        return false;
+      }
+      
+      // Merge existing metadata with new metadata
+      const existingMetadata = chat?.metadata || {};
+      const updatedMetadata = { ...existingMetadata, ...metadata };
+      
+      // Update the chat with merged metadata
+      const { error: updateError } = await this.supabase
+        .from('chats')
+        .update({ metadata: updatedMetadata })
+        .eq('id', chatId);
+      
+      if (updateError) {
+        console.error('Error updating chat metadata:', updateError);
+        return false;
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Error in updateChatMetadata:', error);
+      return false;
+    }
+  }
+
+  /**
    * Process entire webhook payload
    * @returns Object with success status and isNewChat flag indicating if a new chat was created
    */
