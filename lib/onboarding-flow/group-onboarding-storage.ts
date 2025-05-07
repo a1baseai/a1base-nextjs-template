@@ -1,4 +1,4 @@
-import { GroupOnboardingFlow, defaultGroupOnboardingFlow } from './types';
+import { GroupOnboardingFlow } from './types';
 import { saveToLocalStorage, loadFromLocalStorage } from '@/lib/storage/local-storage';
 import { toast } from 'sonner';
 
@@ -27,6 +27,22 @@ const getBaseUrl = () => {
   return 'http://localhost:3000';
 };
 
+// Import Node.js modules conditionally only on the server side
+// This prevents them from being included in client bundles
+let serverFS: any;
+let serverPath: any;
+
+// Only load these modules on the server side
+if (typeof window === 'undefined') {
+  try {
+    // Use import() instead of require() to better handle Next.js bundling
+    serverFS = require('fs');
+    serverPath = require('path');
+  } catch (e) {
+    console.error('Failed to load Node.js modules:', e);
+  }
+}
+
 /**
  * Direct file system access for server-side contexts
  * Only used as fallback when API and localStorage methods fail
@@ -37,32 +53,38 @@ const loadGroupOnboardingFlowFromFileSystem = (): GroupOnboardingFlow => {
     throw new Error('Cannot load from filesystem in browser context');
   }
   
+  // Make sure the modules were properly loaded
+  if (!serverFS || !serverPath) {
+    console.error('❌ Server filesystem modules not available');
+    throw new Error('Server filesystem modules not available');
+  }
+  
   try {
     console.log('🔄 FALLBACK: Attempting to load group onboarding flow directly from filesystem...');
     
-    // Import path and fs modules dynamically to avoid client-side issues
-    const path = require('path');
-    const fs = require('fs');
-    
     // Build the path to the file
-    const filePath = path.join(process.cwd(), 'data', 'group-onboarding-flow.json');
+    const filePath = serverPath.join(process.cwd(), 'data', 'group-onboarding-flow.json');
     console.log(`🔍 DEBUG: Checking for file at ${filePath}`);
     
     // Check if file exists
-    if (!fs.existsSync(filePath)) {
-      console.log('⚠️ Group onboarding flow file not found, using defaults');
-      return { ...defaultGroupOnboardingFlow };
+    if (!serverFS.existsSync(filePath)) {
+      console.error('❌ Group onboarding flow file not found');
+      throw new Error(`Group onboarding flow file not found at ${filePath}`);
     }
     
     // Read and parse the file
-    const fileContent = fs.readFileSync(filePath, 'utf8');
+    const fileContent = serverFS.readFileSync(filePath, 'utf8');
     const parsedData = JSON.parse(fileContent) as GroupOnboardingFlow;
     console.log('✅ Successfully loaded group onboarding flow from filesystem');
+    
+    // Log the complete file contents
+    console.log('📃 GROUP ONBOARDING FLOW FILE CONTENTS:');
+    console.log(JSON.stringify(parsedData, null, 2));
     
     return parsedData;
   } catch (error) {
     console.error('❌ Error loading group onboarding flow from filesystem:', error);
-    return { ...defaultGroupOnboardingFlow };
+    throw error;
   }
 };
 
@@ -72,35 +94,49 @@ const loadGroupOnboardingFlowFromFileSystem = (): GroupOnboardingFlow => {
  * @returns Promise that resolves with the group flow settings
  */
 export const loadGroupOnboardingFlow = async (): Promise<GroupOnboardingFlow> => {
+
   console.log('🔄 Attempting to load group onboarding flow...');
   
-  // Set a timeout to prevent the operation from hanging indefinitely
-  const timeoutPromise = new Promise<GroupOnboardingFlow>((_, reject) => {
-    setTimeout(() => {
-      console.log('⚠️ WARNING: Timeout while loading group onboarding flow, falling back to defaults');
-      reject(new Error('Timeout while loading group onboarding flow'));
-    }, 5000); // 5 second timeout
-  });
+  // Run with timeout protection, but don't race - use a more robust approach
+  const loadPromise = loadGroupOnboardingFlowWithFallbacks();
+  
+  // Setup a simple timeout
+  const timeoutId = setTimeout(() => {
+    console.log('⚠️ WARNING: Timeout notification while loading group onboarding flow');
+    // Note: We're not rejecting, just logging a warning
+  }, 3000); // 3 second notification timeout
   
   try {
-    // Race the loading operation against the timeout
-    return await Promise.race([
-      loadGroupOnboardingFlowWithFallbacks(),
-      timeoutPromise
-    ]);
+    // Wait for the loading to complete
+    const result = await loadPromise;
+    
+    // Clear the timeout since we got a result
+    clearTimeout(timeoutId);
+    
+    // No caching - directly return the result
+    
+    return result;
   } catch (error) {
-    console.error('❌ Final error loading group onboarding flow settings:', error);
+    // Clear the timeout
+    clearTimeout(timeoutId);
+    console.error('❌ Error loading group onboarding flow settings:', error);
     
     // Last resort - try loading directly from filesystem in server context
     if (typeof window === 'undefined') {
       try {
-        return loadGroupOnboardingFlowFromFileSystem();
+        console.log('🔄 Last resort: Trying filesystem directly after error');
+        const fileResult = loadGroupOnboardingFlowFromFileSystem();
+        
+        // No caching - use filesystem result directly
+        
+        return fileResult;
       } catch (fsError) {
         console.error('❌ Even filesystem fallback failed:', fsError);
+        throw error; // Propagate the error since we don't have default values
       }
     }
     
-    return { ...defaultGroupOnboardingFlow };
+    throw error; // Propagate the error since we don't have default values
   }
 };
 
@@ -112,26 +148,29 @@ async function loadGroupOnboardingFlowWithFallbacks(): Promise<GroupOnboardingFl
   if (typeof window === 'undefined') {
     try {
       console.log('🔍 DEBUG: Server context detected, trying filesystem first');
-      return loadGroupOnboardingFlowFromFileSystem();
+      const flowFromFile = loadGroupOnboardingFlowFromFileSystem();
+      console.log('✅ Successfully loaded group onboarding flow directly from filesystem');
+      // Return immediately to avoid unnecessary API calls
+      return flowFromFile;
     } catch (fsError) {
-      console.error('❌ Error loading from filesystem:', fsError);
-      // Continue to API fallback if filesystem fails
+      console.error('❌ Error loading directly from filesystem:', fsError);
+      // Only continue to other methods if filesystem access fails
     }
   }
   
-  // Try to load from localStorage in client context
-  if (typeof window !== 'undefined') {
-    try {
-      console.log('🔄 Checking localStorage for group onboarding flow...');
-      const cachedFlow = loadFromLocalStorage<GroupOnboardingFlow>(GROUP_ONBOARDING_FLOW_KEY);
-      if (cachedFlow) {
-        console.log('✅ Successfully loaded group onboarding flow from localStorage');
-        return cachedFlow;
-      }
-    } catch (localStorageError) {
-      console.error('❌ Error loading from localStorage:', localStorageError);
-    }
-  }
+  // Skip localStorage loading
+  // if (typeof window !== 'undefined') {
+  //   try {
+  //     console.log('🔄 Checking localStorage for group onboarding flow...');
+  //     const cachedFlow = loadFromLocalStorage<GroupOnboardingFlow>(GROUP_ONBOARDING_FLOW_KEY);
+  //     if (cachedFlow) {
+  //       console.log('✅ Successfully loaded group onboarding flow from localStorage');
+  //       return cachedFlow;
+  //     }
+  //   } catch (localStorageError) {
+  //     console.error('❌ Error loading from localStorage:', localStorageError);
+  //   }
+  // }
   
   // Try to load from API as fallback
   console.log("🔍 DEBUG: Trying to load group onboarding flow via API...");
@@ -167,11 +206,11 @@ async function loadGroupOnboardingFlowWithFallbacks(): Promise<GroupOnboardingFl
         const data = await response.json();
         console.log('✅ Successfully loaded group onboarding flow via API');
         
-        // Also save to localStorage as a cache
+        // Skip localStorage caching
         if (data.flow) {
-          if (typeof window !== 'undefined') {
-            saveToLocalStorage(GROUP_ONBOARDING_FLOW_KEY, data.flow);
-          }
+          // if (typeof window !== 'undefined') {
+          //   saveToLocalStorage(GROUP_ONBOARDING_FLOW_KEY, data.flow);
+          // }
           return data.flow;
         } else {
           throw new Error('API returned success but no flow data');
@@ -196,9 +235,9 @@ async function loadGroupOnboardingFlowWithFallbacks(): Promise<GroupOnboardingFl
       }
     }
   
-    // Default to defaults if nothing else works
-    console.log('ℹ️ No saved group onboarding flow found, using defaults');
-    return { ...defaultGroupOnboardingFlow };
+    // No more fallbacks available
+    console.error('❌ Failed to load group onboarding flow after all attempts');
+    throw apiError; // Propagate the error since we don't have default values
   }
 }
 

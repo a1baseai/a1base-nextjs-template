@@ -25,7 +25,7 @@ interface ThreadParticipant extends Record<string, unknown> {
 /**
  * Interface for message data in a thread
  */
-interface ThreadMessage extends Record<string, unknown> {
+export interface ThreadMessage extends Record<string, unknown> {
   message_id: string;
   external_id?: string;
   content: string;

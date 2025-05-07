@@ -8,7 +8,7 @@ const isBuildTime = process.env.NODE_ENV === 'production' && process.env.NEXT_PH
 
 // Create a lazy-loaded OpenAI client that will only be initialized at runtime
 let openai: OpenAI;
-const getOpenAI = () => {
+export const getOpenAI = () => {
   if (!openai) {
     if (!process.env.OPENAI_API_KEY) {
       console.error('OpenAI API error: No API key provided');
@@ -184,9 +184,10 @@ export async function generateAgentResponse(
     }
     
     // For user messages, include the sender's name in group chats
+    // Using a format that doesn't influence the AI to mimic it in responses
     let content = msg.content;
     if (threadType === 'group' && msg.sender_name) {
-      content = `[${msg.sender_name}]: ${content}`;
+      content = `${msg.sender_name} said: ${content}`;
     }
     
     return {

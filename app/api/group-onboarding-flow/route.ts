@@ -4,7 +4,7 @@ import {
   saveGroupOnboardingFlowToFile,
   initializeDataDirectory
 } from '@/lib/storage/server-file-storage';
-import { defaultGroupOnboardingFlow } from '@/lib/onboarding-flow/types';
+import { GroupOnboardingFlow } from '@/lib/onboarding-flow/types';
 import { dynamic, runtime, maxDuration } from '@/app/api/route-config';
 
 // Export the route configuration
@@ -38,15 +38,18 @@ export async function GET() {
       console.log('✅ [API] Successfully loaded group onboarding flow');
       return NextResponse.json({ flow }, { status: 200 });
     } else {
-      console.log('⚠️ [API] Group onboarding flow not found, returning default');
-      return NextResponse.json({ flow: defaultGroupOnboardingFlow }, { status: 200 });
+      console.error('❌ [API] Group onboarding flow not found');
+      return NextResponse.json(
+        { error: 'Group onboarding flow not found' },
+        { status: 404 }
+      );
     }
   } catch (error) {
     console.error('❌ [API] Error loading group onboarding flow:', error);
-    // Always return a successful response even on error, just with the default flow
+    // Return an error response when flow cannot be loaded
     return NextResponse.json(
-      { flow: defaultGroupOnboardingFlow, error: 'Failed to load custom flow' }, 
-      { status: 200 }
+      { error: 'Failed to load group onboarding flow', details: error instanceof Error ? error.message : 'Unknown error' }, 
+      { status: 500 }
     );
   }
 }

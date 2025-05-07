@@ -48,7 +48,13 @@ export const loadOnboardingFlowFromFile = async (): Promise<OnboardingFlow | nul
   
   try {
     const data = await fs.promises.readFile(ONBOARDING_FLOW_FILE, 'utf8');
-    return JSON.parse(data) as OnboardingFlow;
+    const flowData = JSON.parse(data) as OnboardingFlow;
+    
+    // Log the complete file contents
+    console.log('📃 INDIVIDUAL ONBOARDING FLOW FILE CONTENTS:');
+    console.log(JSON.stringify(flowData, null, 2));
+    
+    return flowData;
   } catch (error) {
     console.error('Error loading onboarding flow from file:', error);
     return null;
@@ -81,13 +87,18 @@ export const loadGroupOnboardingFlowFromFile = async (): Promise<GroupOnboarding
  * @returns Promise that resolves when the file is written
  */
 export const saveOnboardingFlowToFile = async (flow: OnboardingFlow): Promise<void> => {
-  initializeDataDirectory();
-  
   try {
+    // Always await directory initialization
+    await initializeDataDirectory();
+    
+    console.log(`Saving onboarding flow to ${ONBOARDING_FLOW_FILE}`);
+    
     await fs.promises.writeFile(
       ONBOARDING_FLOW_FILE, 
       JSON.stringify(flow, null, 2)
     );
+    
+    console.log(`Successfully saved onboarding flow to file`);
   } catch (error) {
     console.error('Error saving onboarding flow to file:', error);
     throw error;
@@ -101,13 +112,18 @@ export const saveOnboardingFlowToFile = async (flow: OnboardingFlow): Promise<vo
  * @returns Promise that resolves when the file is written
  */
 export const saveGroupOnboardingFlowToFile = async (flow: GroupOnboardingFlow): Promise<void> => {
-  initializeDataDirectory();
-  
   try {
+    // Always await directory initialization
+    await initializeDataDirectory();
+    
+    console.log(`Saving group onboarding flow to ${GROUP_ONBOARDING_FLOW_FILE}`);
+    
     await fs.promises.writeFile(
       GROUP_ONBOARDING_FLOW_FILE, 
       JSON.stringify(flow, null, 2)
     );
+    
+    console.log(`Successfully saved group onboarding flow to file`);
   } catch (error) {
     console.error('Error saving group onboarding flow to file:', error);
     throw error;
@@ -121,13 +137,18 @@ export const saveGroupOnboardingFlowToFile = async (flow: GroupOnboardingFlow): 
  * @returns Promise that resolves when the file is written
  */
 export const saveProfileSettingsToFile = async (settings: AgentProfileSettings): Promise<void> => {
-  initializeDataDirectory();
-  
   try {
+    // Always await directory initialization
+    await initializeDataDirectory();
+    
+    console.log(`Saving profile settings to ${PROFILE_SETTINGS_FILE}`);
+    
     await fs.promises.writeFile(
       PROFILE_SETTINGS_FILE, 
       JSON.stringify(settings, null, 2)
     );
+    
+    console.log(`Successfully saved profile settings to file`);
   } catch (error) {
     console.error('Error saving profile settings to file:', error);
     throw error;
@@ -160,13 +181,18 @@ export const loadProfileSettingsFromFile = async (): Promise<AgentProfileSetting
  * @returns Promise that resolves when the file is written
  */
 export const saveBaseInformationToFile = async (information: InformationSection[]): Promise<void> => {
-  initializeDataDirectory();
-  
   try {
+    // Always await directory initialization
+    await initializeDataDirectory();
+    
+    console.log(`Saving base information to ${BASE_INFORMATION_FILE}`);
+    
     await fs.promises.writeFile(
       BASE_INFORMATION_FILE, 
       JSON.stringify(information, null, 2)
     );
+    
+    console.log(`Successfully saved base information to file`);
   } catch (error) {
     console.error('Error saving base information to file:', error);
     throw error;
