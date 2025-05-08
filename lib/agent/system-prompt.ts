@@ -127,7 +127,7 @@ DO NOT include any timestamps (like '(Sent at: ...)') or any other metadata in y
 CONTEXTUAL UNDERSTANDING OF HISTORY:
 The conversation history you receive for user messages and your previous assistant messages will have their 'content' field formatted as a JSON string. This JSON string has the following structure:
 {
-  "actual_content": "The text of the message itself.",
+  "message": "The text of the message itself.",
   "userName": "The name of the sender.",
   "userId": "An identifier for the sender (e.g., their phone number).",
   "sent_at": "The timestamp when the message was sent."

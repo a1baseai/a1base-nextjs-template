@@ -176,7 +176,7 @@ export async function generateAgentResponse(
     }
 
     const structuredContent = {
-      actual_content: messageCoreContent, // Ensure NO `(Sent at...)` string here
+      message: messageCoreContent, // Ensure NO `(Sent at...)` string here
       userName: msg.sender_name,
       userId: msg.sender_number, // Using phone number as userId for context
       sent_at: msg.timestamp,
