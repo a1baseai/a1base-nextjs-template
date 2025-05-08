@@ -443,33 +443,6 @@ async function sendResponseMessage(
       console.log(
         `[Send] Message part sent to ${recipientId} (Type: ${threadType})`
       );
-
-      // Store the sent AI message part to Supabase
-      if (adapter && chatId) {
-        try {
-          console.log(
-            `[SendResponseMessage] Attempting to store AI message. ChatID: ${chatId}, Adapter: ${!!adapter}, AgentUserID: ${agentUserId}, Service: ${service}`
-          );
-          await adapter.storeMessage(
-            chatId,
-            agentUserId,
-            aiMessageId,
-            { text: line.trim() },
-            "text",
-            service,
-            { text: line.trim() }
-          );
-          console.log(
-            `[Supabase] Programmatically stored AI message part: ${aiMessageId} to chatId: ${chatId}`
-          );
-        } catch (storeError) {
-          console.error(
-            `[SendResponseMessage] ERROR storing AI message programmatically for chatId ${chatId}, aiMessageId ${aiMessageId}:`,
-            storeError
-          );
-          // This error is key!
-        }
-      }
     } catch (error) {
       console.error(
         `[Send] Error sending message part to ${recipientId}:`,
