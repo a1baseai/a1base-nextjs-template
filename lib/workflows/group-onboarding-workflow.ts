@@ -235,18 +235,36 @@ export async function processGroupOnboardingMessage(
 ): Promise<boolean> {
   try {
     if (!payload || !payload.thread_id || !payload.message_content) {
+      console.log("[PGO] Invalid payload for processing group onboarding message.");
       return false;
     }
     
+    const adapter = await getInitializedAdapter();
+    if (!adapter) {
+      console.log("[PGO] Supabase adapter not initialized.");
+      return false;
+    }
+
+    // Store the incoming user message first
+    try {
+      console.log(`[PGO] Attempting to store user message via processWebhookPayload for thread: ${payload.thread_id}, message: ${payload.message_id}`);
+      const storeResult = await adapter.processWebhookPayload(payload);
+      if (!storeResult.success) {
+        console.error(`[PGO] Failed to store user message via processWebhookPayload for thread: ${payload.thread_id}, message: ${payload.message_id}. Success was false.`);
+        // Decide if we should return false or continue. For now, let's log and continue, 
+        // as the primary function is onboarding progression.
+      } else {
+        console.log(`[PGO] Successfully stored user message via processWebhookPayload for thread: ${payload.thread_id}, message: ${payload.message_id}`);
+      }
+    } catch (error) {
+      console.error(`[PGO] Error calling processWebhookPayload for thread: ${payload.thread_id}, message: ${payload.message_id}`, error);
+      // Log and continue
+    }
+
     const threadId = payload.thread_id;
     const messageText = typeof payload.message_content === 'string' 
       ? payload.message_content 
       : payload.message_content?.text || '';
-    
-    const adapter = await getInitializedAdapter();
-    if (!adapter) {
-      return false;
-    }
     
     const thread = await adapter.getThread(payload.thread_id);
     if (!thread || !thread.id) {

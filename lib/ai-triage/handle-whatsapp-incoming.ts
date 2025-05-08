@@ -1,7 +1,7 @@
 // import { WhatsAppIncomingData } from "a1base-node";
 import { MessageRecord } from "@/types/chat";
 import { triageMessage, projectTriage } from "./triage-logic";
-import { initializeDatabase, getInitializedAdapter } from "../supabase/config";
+import { initializeDatabase, getInitializedAdapter, isSupabaseConfigured } from "../supabase/config";
 import { WebhookPayload } from "@/app/api/messaging/incoming/route";
 import { StartOnboarding } from "../workflows/onboarding-workflow";
 import { A1BaseAPI } from "a1base-node";
@@ -361,6 +361,12 @@ async function saveToMemory(threadId: string, message: MessageRecord) {
 }
 
 export async function handleWhatsAppIncoming(webhookData: WebhookPayload) {
+  // Ensure Supabase is initialized before proceeding
+  if (isSupabaseConfigured()) {
+    await initializeDatabase(); // Await initialization
+  }
+  const adapter = getInitializedAdapter(); // Get the (now hopefully) initialized adapter
+
   // Extract data for easier access
   const {
     thread_id,
@@ -382,9 +388,6 @@ export async function handleWhatsAppIncoming(webhookData: WebhookPayload) {
     sender_name = process.env.A1BASE_AGENT_NAME || sender_name;
   }
 
-  // Initialize database on first message
-  await initializeDatabase();
-
   console.log("[Message Received]", {
     sender_number,
     message_content,
@@ -396,12 +399,20 @@ export async function handleWhatsAppIncoming(webhookData: WebhookPayload) {
   // Skip processing for messages from our own agent
   if (sender_number === process.env.A1BASE_AGENT_NUMBER) {
     // This is the agent's own message
+    console.log("[Message] Agent's own message");
+    if (!adapter) {
+      console.error("[Message] Supabase adapter not initialized.");
+      return { success: false, message: "Supabase adapter not initialized" };
+    }
+    const { success, isNewChat } = await adapter.processWebhookPayload(webhookData);
+    console.log("[Message] Agent's own message processed");
+    console.log("[Message] isNewChat: ", isNewChat);
+    console.log("[Message] success: ", success);
     console.log("[Message] Skipping processing for agent's own message");
     return { success: true, message: "Agent message skipped" };
   }
 
   // Initialize variables for message processing
-  const adapter = await getInitializedAdapter();
   let threadMessages: MessageRecord[] = [];
   let shouldTriggerOnboarding = false;
   let chatId: string | null = null;
@@ -451,7 +462,9 @@ export async function handleWhatsAppIncoming(webhookData: WebhookPayload) {
   if (adapter) {
     try {
       // Process and store the webhook data in Supabase
+      console.log(`[HWAI] Attempting to store user message via processWebhookPayload. Thread ID: ${webhookData.thread_id}, Message ID: ${webhookData.message_id}, Thread Type: ${webhookData.thread_type}`);
       const { success, isNewChat } = await adapter.processWebhookPayload(webhookData);
+      console.log(`[HWAI] processWebhookPayload result - Success: ${success}, Is New Chat: ${isNewChat}. Thread ID: ${webhookData.thread_id}, Message ID: ${webhookData.message_id}`);
       
       // Check if this is a new group chat and handle group onboarding if needed
       if (success && thread_type === 'group') {
@@ -792,7 +805,7 @@ export async function handleWhatsAppIncoming(webhookData: WebhookPayload) {
               });
             }
 
-            // Store the sent AI message part to Supabase
+            
             if (adapter && chatId) { // Ensure adapter and chatId are available
               try {
                 const aiMessageId = `ai-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;

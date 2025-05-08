@@ -10,6 +10,7 @@ import { loadOnboardingFlow } from "../onboarding-flow/onboarding-storage";
 import { OnboardingFlow } from "../onboarding-flow/types";
 import OpenAI from 'openai';
 import { SupabaseAdapter } from "../supabase/adapter";
+import { getInitializedAdapter } from "../supabase/config";
 
 // Initialize A1Base client
 const client = new A1BaseAPI({
@@ -129,22 +130,31 @@ export async function StartOnboarding(
 
     // Store AI message before sending to user
     if (thread_id && process.env.A1BASE_AGENT_NUMBER && process.env.SUPABASE_URL && process.env.SUPABASE_KEY) {
-      const supabaseAdapter = new SupabaseAdapter(
-        process.env.SUPABASE_URL,
-        process.env.SUPABASE_KEY
-      );
-      const messageContentForDb = { text: conversationalMessageText };
-      const aiMessageId = `ai-onboarding-${Date.now()}`;
+      const supabaseAdapter = await getInitializedAdapter();
+      
+      if (!supabaseAdapter) { 
+        console.error("[StartOnboarding] Supabase adapter not initialized. Cannot store AI message.");
+        // Optionally handle this error, e.g., by returning or throwing
+      } else {
+        const messageContentForDb = { text: conversationalMessageText };
+        const aiMessageId = `ai-onboarding-${Date.now()}`;
 
-      await supabaseAdapter.storeMessage(
-        thread_id, 
-        process.env.A1BASE_AGENT_NUMBER, 
-        aiMessageId, 
-        messageContentForDb, 
-        'text', 
-        service || 'whatsapp', 
-        messageContentForDb 
-      );
+        console.log(`[StartOnboarding] Attempting to store initial AI onboarding message. Thread ID: ${thread_id}, Service: ${service}, Type: ${thread_type}, AI Message ID: ${aiMessageId}`);
+        try {
+          await supabaseAdapter.storeMessage(
+            thread_id, 
+            process.env.A1BASE_AGENT_NUMBER, 
+            aiMessageId, 
+            messageContentForDb, 
+            'text', 
+            service || 'whatsapp', 
+            messageContentForDb 
+          );
+          console.log(`[StartOnboarding] Successfully stored initial AI onboarding message. AI Message ID: ${aiMessageId}`);
+        } catch (storeError) {
+          console.error(`[StartOnboarding] Error storing initial AI onboarding message. AI Message ID: ${aiMessageId}, Error:`, storeError);
+        }
+      }
     }
     
     // For WhatsApp or other channels, send the message through A1Base
