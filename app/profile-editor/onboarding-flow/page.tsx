@@ -31,27 +31,29 @@ export default function OnboardingFlowBuilder() {
     const fetchOnboardingFlow = async () => {
       try {
         setIsLoading(true);
-        const flow = await loadOnboardingFlow();
+        let flow = await loadOnboardingFlow(); // Use 'let' for modification
         
+        let flowModified = false;
+
         // Ensure flow is in agentic mode with agentic settings and has enabled property
         if (flow.mode !== 'agentic' || !flow.agenticSettings || flow.enabled === undefined) {
-          // Initialize agentic settings if needed
-          const updatedFlow = {
+          flow = {
             ...flow,
             mode: 'agentic' as const,
-            // Ensure enabled property is set (default to true if missing)
             enabled: flow.enabled !== undefined ? flow.enabled : true,
             agenticSettings: flow.agenticSettings || {
               systemPrompt: 'You are conducting an onboarding conversation with a new user. Your goal is to make them feel welcome and collect some basic information that will help you assist them better in the future. Be friendly, professional, and conversational.',
               userFields: [
                 {
-                  id: uuidv4(),
+                  _internalReactKey: uuidv4(),
+                  id: 'full_name', // Default user-editable ID
                   label: 'Full Name',
                   required: true,
                   description: 'Ask for the user\'s full name'
                 },
                 {
-                  id: uuidv4(),
+                  _internalReactKey: uuidv4(),
+                  id: 'email_address', // Default user-editable ID
                   label: 'Email Address',
                   required: true,
                   description: 'Ask for the user\'s email address'
@@ -60,12 +62,38 @@ export default function OnboardingFlowBuilder() {
               finalMessage: 'Thank you for sharing this information. I\'ve saved your details and I\'m ready to help you achieve your goals.'
             }
           };
-          setOnboardingFlow(updatedFlow);
-          // Save the updated flow immediately
-          await saveOnboardingFlow(updatedFlow);
-        } else {
-          setOnboardingFlow(flow);
+          flowModified = true; // Flow was modified with defaults
         }
+
+        // Ensure all userFields have _internalReactKey
+        if (flow.agenticSettings && flow.agenticSettings.userFields) {
+          let fieldsChanged = false;
+          const processedUserFields = flow.agenticSettings.userFields.map(field => {
+            if (!field._internalReactKey) {
+              fieldsChanged = true;
+              return { ...field, _internalReactKey: uuidv4() };
+            }
+            return field;
+          });
+          if (fieldsChanged) {
+            flow = {
+              ...flow,
+              agenticSettings: {
+                ...flow.agenticSettings,
+                userFields: processedUserFields
+              }
+            };
+            flowModified = true;
+          }
+        }
+
+        setOnboardingFlow(flow);
+        if (flowModified) {
+          // If the flow was structurally changed (e.g., defaults added, keys healed), mark changes and optionally save.
+          setHasChanges(true); 
+          // await saveOnboardingFlow(flow); // Or let user save explicitly
+        }
+
       } catch (error) {
         console.error('Error loading onboarding flow:', error);
         toast.error('Failed to load onboarding flow');
@@ -114,38 +142,53 @@ export default function OnboardingFlowBuilder() {
 
   // Add a new user field
   const addUserField = () => {
-    if (!onboardingFlow || !onboardingFlow.agenticSettings) return;
-    
+    if (!onboardingFlow) return;
     const newField: UserField = {
-      id: uuidv4(),
-      label: "New Field",
+      _internalReactKey: uuidv4(), // Stable React key
+      id: `new_field_${uuidv4().substring(0, 8)}`, // User-editable ID
+      label: "",
       required: false,
       description: "Ask for this information from the user"
     };
     
-    updateAgenticSettings('userFields', [...onboardingFlow.agenticSettings.userFields, newField]);
+    setOnboardingFlow({
+      ...onboardingFlow,
+      agenticSettings: {
+        ...onboardingFlow.agenticSettings,
+        userFields: [...onboardingFlow.agenticSettings.userFields, newField]
+      }
+    });
+    setHasChanges(true);
   };
 
   // Remove a user field
-  const removeUserField = (id: string) => {
-    if (!onboardingFlow || !onboardingFlow.agenticSettings) return;
-    
-    const updatedFields = onboardingFlow.agenticSettings.userFields.filter(field => field.id !== id);
-    updateAgenticSettings('userFields', updatedFields);
+  const removeUserField = (_internalReactKey: string) => {
+    if (!onboardingFlow) return;
+    setOnboardingFlow({
+      ...onboardingFlow,
+      agenticSettings: {
+        ...onboardingFlow.agenticSettings,
+        userFields: onboardingFlow.agenticSettings.userFields.filter(
+          (field) => field._internalReactKey !== _internalReactKey
+        ),
+      },
+    });
+    setHasChanges(true);
   };
 
   // Update a user field
-  const updateUserField = (id: string, field: string, value: any) => {
-    if (!onboardingFlow || !onboardingFlow.agenticSettings) return;
-    
-    const updatedFields = onboardingFlow.agenticSettings.userFields.map(userField => {
-      if (userField.id === id) {
-        return { ...userField, [field]: value };
-      }
-      return userField;
+  const updateUserField = (_internalReactKey: string, propertyToUpdate: string, value: any) => {
+    if (!onboardingFlow) return;
+    setOnboardingFlow({
+      ...onboardingFlow,
+      agenticSettings: {
+        ...onboardingFlow.agenticSettings,
+        userFields: onboardingFlow.agenticSettings.userFields.map((f) =>
+          f._internalReactKey === _internalReactKey ? { ...f, [propertyToUpdate]: value } : f
+        ),
+      },
     });
-    
-    updateAgenticSettings('userFields', updatedFields);
+    setHasChanges(true);
   };
 
   // Update agentic settings
@@ -276,7 +319,7 @@ export default function OnboardingFlowBuilder() {
                     ) : (
                       <div className="space-y-4">
                         {onboardingFlow.agenticSettings.userFields.map((field) => (
-                          <Card key={field.id} className="overflow-hidden">
+                          <Card key={field._internalReactKey} className="overflow-hidden">
                             <CardContent className="p-4 space-y-4">
                               <div className="flex justify-between items-center">
                                 <Badge variant={field.required ? "default" : "outline"}>
@@ -286,7 +329,7 @@ export default function OnboardingFlowBuilder() {
                                   variant="ghost" 
                                   size="icon"
                                   className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900"
-                                  onClick={() => removeUserField(field.id)}
+                                  onClick={() => removeUserField(field._internalReactKey)}
                                   disabled={isSaving}
                                 >
                                   <Trash2 className="h-4 w-4" />
@@ -295,34 +338,34 @@ export default function OnboardingFlowBuilder() {
 
                               <div className="grid gap-4 md:grid-cols-2">
                                 <div className="space-y-2">
-                                  <Label htmlFor={`field-id-${field.id}`}>Field ID</Label>
+                                  <Label htmlFor={`field-id-${field._internalReactKey}`}>Field ID</Label>
                                   <Input
-                                    id={`field-id-${field.id}`}
+                                    id={`field-id-${field._internalReactKey}`}
                                     value={field.id}
-                                    onChange={(e) => updateUserField(field.id, 'id', e.target.value)}
-                                    placeholder="name, email, etc."
+                                    onChange={(e) => updateUserField(field._internalReactKey, 'id', e.target.value)}
+                                    placeholder="e.g., user_name, company_info"
                                     disabled={isSaving}
                                   />
                                 </div>
                                 
                                 <div className="space-y-2">
-                                  <Label htmlFor={`field-label-${field.id}`}>Display Label</Label>
+                                  <Label htmlFor={`field-label-${field._internalReactKey}`}>Display Label</Label>
                                   <Input
-                                    id={`field-label-${field.id}`}
+                                    id={`field-label-${field._internalReactKey}`}
                                     value={field.label}
-                                    onChange={(e) => updateUserField(field.id, 'label', e.target.value)}
-                                    placeholder="Full Name"
+                                    onChange={(e) => updateUserField(field._internalReactKey, 'label', e.target.value)}
+                                    placeholder="e.g., Full Name, Email Address"
                                     disabled={isSaving}
                                   />
                                 </div>
                               </div>
                               
                               <div className="space-y-2">
-                                <Label htmlFor={`field-desc-${field.id}`}>Description for AI</Label>
+                                <Label htmlFor={`field-desc-${field._internalReactKey}`}>Description for AI</Label>
                                 <Textarea
-                                  id={`field-desc-${field.id}`}
+                                  id={`field-desc-${field._internalReactKey}`}
                                   value={field.description}
-                                  onChange={(e) => updateUserField(field.id, 'description', e.target.value)}
+                                  onChange={(e) => updateUserField(field._internalReactKey, 'description', e.target.value)}
                                   placeholder="Tell the AI how to ask for this information"
                                   className="min-h-20"
                                   disabled={isSaving}
@@ -331,12 +374,12 @@ export default function OnboardingFlowBuilder() {
                               
                               <div className="flex items-center space-x-2">
                                 <Switch 
-                                  id={`field-required-${field.id}`}
+                                  id={`field-required-${field._internalReactKey}`}
                                   checked={field.required}
-                                  onCheckedChange={(checked) => updateUserField(field.id, 'required', checked)} 
+                                  onCheckedChange={(checked) => updateUserField(field._internalReactKey, 'required', checked)} 
                                   disabled={isSaving}
                                 />
-                                <Label htmlFor={`field-required-${field.id}`}>
+                                <Label htmlFor={`field-required-${field._internalReactKey}`}>
                                   This field is required
                                 </Label>
                               </div>

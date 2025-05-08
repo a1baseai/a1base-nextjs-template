@@ -16,7 +16,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { GroupOnboardingFlow, GroupAgenticSettings, UserField } from "@/lib/onboarding-flow/types";
 import { loadGroupOnboardingFlow, saveGroupOnboardingFlow } from "@/lib/onboarding-flow/group-onboarding-storage";
 
-
 export default function GroupOnboardingFlowBuilder() {
   // State for group onboarding flow
   const [onboardingFlow, setOnboardingFlow] = useState<GroupOnboardingFlow | null>(null);
@@ -33,7 +32,37 @@ export default function GroupOnboardingFlowBuilder() {
     const fetchGroupOnboardingFlow = async () => {
       try {
         setIsLoading(true);
-        const flow = await loadGroupOnboardingFlow();
+        let flow = await loadGroupOnboardingFlow(); // Use 'let' to allow modification
+        
+        // Heal missing IDs and ensure _internalReactKey in userFields
+        if (flow && flow.agenticSettings && flow.agenticSettings.userFields) {
+          let changed = false;
+          const processedUserFields = flow.agenticSettings.userFields.map(field => {
+            let updatedField = { ...field } as UserField; // Cast to ensure type safety
+            if (!updatedField._internalReactKey) {
+              updatedField._internalReactKey = uuidv4();
+              changed = true;
+            }
+            if (!updatedField.id) { // Original healing for user-editable ID
+              // console.warn('Healing missing ID for userField:', field.label);
+              updatedField.id = `healed_id_${uuidv4().substring(0, 8)}`;
+              changed = true;
+            }
+            return updatedField;
+          });
+          
+          if (changed) {
+            flow = {
+              ...flow,
+              agenticSettings: {
+                ...flow.agenticSettings,
+                userFields: processedUserFields,
+              },
+            };
+            // If IDs or keys were added, consider this a change that needs saving
+            // setHasChanges(true); // Optional: mark as changed immediately or let user trigger save
+          }
+        }
         setOnboardingFlow(flow);
       } catch (error) {
         console.error('Error loading group onboarding flow:', error);
@@ -93,7 +122,8 @@ export default function GroupOnboardingFlowBuilder() {
     if (!onboardingFlow) return;
     
     const newField: UserField = {
-      id: uuidv4(),
+      _internalReactKey: uuidv4(), // Stable React key
+      id: `new_field_${uuidv4().substring(0, 8)}`,
       label: '',
       required: false,
       description: '',
@@ -109,31 +139,35 @@ export default function GroupOnboardingFlowBuilder() {
   };
 
   // Remove a user field
-  const removeUserField = (id: string) => {
+  const removeUserField = (_internalReactKey: string) => {
     if (!onboardingFlow) return;
     
     setOnboardingFlow({
       ...onboardingFlow,
       agenticSettings: {
         ...onboardingFlow.agenticSettings,
-        userFields: onboardingFlow.agenticSettings.userFields.filter(field => field.id !== id),
+        userFields: onboardingFlow.agenticSettings.userFields.filter(field => field._internalReactKey !== _internalReactKey),
       },
     });
+    setHasChanges(true);
   };
 
   // Update a user field
-  const updateUserField = (id: string, field: string, value: any) => {
+  const updateUserField = (_internalReactKey: string, propertyToUpdate: string, value: any) => {
     if (!onboardingFlow) return;
+    
+    const updatedFields = onboardingFlow.agenticSettings.userFields.map((f) =>
+      f._internalReactKey === _internalReactKey ? { ...f, [propertyToUpdate]: value } : f
+    );
     
     setOnboardingFlow({
       ...onboardingFlow,
       agenticSettings: {
         ...onboardingFlow.agenticSettings,
-        userFields: onboardingFlow.agenticSettings.userFields.map(item => 
-          item.id === id ? { ...item, [field]: value } : item
-        ),
+        userFields: updatedFields,
       },
     });
+    setHasChanges(true);
   };
 
   // Update agentic settings
@@ -147,6 +181,7 @@ export default function GroupOnboardingFlowBuilder() {
         [field]: value,
       },
     });
+    setHasChanges(true);
   };
 
   // Toggle onboarding flow enabled
@@ -343,6 +378,7 @@ export default function GroupOnboardingFlowBuilder() {
                 </div>
                 
                 <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Information to Collect</h3>
                   <div className="flex items-center justify-between">
                     <h4 className="text-md font-medium">Information to Collect</h4>
                     <Button 
@@ -365,14 +401,14 @@ export default function GroupOnboardingFlowBuilder() {
                   ) : (
                     <div className="space-y-4">
                       {onboardingFlow.agenticSettings.userFields.map((field) => (
-                        <Card key={field.id} className="border-gray-200 dark:border-gray-700">
+                        <Card key={field._internalReactKey} className="border-gray-200 dark:border-gray-700">
                           <CardContent className="space-y-4 pt-4">
                             <div className="flex items-center justify-between">
                               <h5 className="font-medium">{field.label || 'Untitled Field'}</h5>
                               <Button 
                                 variant="ghost" 
                                 size="sm" 
-                                onClick={() => removeUserField(field.id)}
+                                onClick={() => removeUserField(field._internalReactKey)}
                                 disabled={isSaving}
                               >
                                 <Trash2 className="h-4 w-4 text-red-500" />
@@ -380,22 +416,36 @@ export default function GroupOnboardingFlowBuilder() {
                             </div>
                             
                             <div className="space-y-2">
-                              <Label htmlFor={`field-label-${field.id}`}>Field Label</Label>
+                              <Label htmlFor={`field-id-${field._internalReactKey}`}>Field ID</Label>
                               <Input
-                                id={`field-label-${field.id}`}
+                                id={`field-id-${field._internalReactKey}`}
+                                value={field.id}
+                                onChange={(e) => updateUserField(field._internalReactKey, 'id', e.target.value)}
+                                placeholder="e.g., user_name, project_goal"
+                                disabled={isSaving}
+                              />
+                              <p className="text-xs text-muted-foreground">
+                                Unique identifier for this field. Avoid spaces and special characters.
+                              </p>
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <Label htmlFor={`field-label-${field._internalReactKey}`}>Display Label</Label>
+                              <Input
+                                id={`field-label-${field._internalReactKey}`}
                                 value={field.label}
-                                onChange={(e) => updateUserField(field.id, 'label', e.target.value)}
+                                onChange={(e) => updateUserField(field._internalReactKey, 'label', e.target.value)}
                                 placeholder="e.g., Group Purpose, Team Name, etc."
                                 disabled={isSaving}
                               />
                             </div>
                             
                             <div className="space-y-2">
-                              <Label htmlFor={`field-desc-${field.id}`}>Description for AI</Label>
+                              <Label htmlFor={`field-desc-${field._internalReactKey}`}>Description for AI</Label>
                               <Textarea
-                                id={`field-desc-${field.id}`}
+                                id={`field-desc-${field._internalReactKey}`}
                                 value={field.description}
-                                onChange={(e) => updateUserField(field.id, 'description', e.target.value)}
+                                onChange={(e) => updateUserField(field._internalReactKey, 'description', e.target.value)}
                                 placeholder="Tell the AI how to ask for this information"
                                 className="min-h-20"
                                 disabled={isSaving}
@@ -404,12 +454,12 @@ export default function GroupOnboardingFlowBuilder() {
                             
                             <div className="flex items-center space-x-2">
                               <Switch 
-                                id={`field-required-${field.id}`}
+                                id={`field-required-${field._internalReactKey}`}
                                 checked={field.required}
-                                onCheckedChange={(checked) => updateUserField(field.id, 'required', checked)} 
+                                onCheckedChange={(checked) => updateUserField(field._internalReactKey, 'required', checked)} 
                                 disabled={isSaving}
                               />
-                              <Label htmlFor={`field-required-${field.id}`}>
+                              <Label htmlFor={`field-required-${field._internalReactKey}`}>
                                 This field is required
                               </Label>
                             </div>

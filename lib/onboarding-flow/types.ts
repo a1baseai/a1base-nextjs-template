@@ -11,7 +11,8 @@ export interface OnboardingMessage {
 }
 
 export interface UserField {
-  id: string;
+  _internalReactKey: string; // Stable key for React rendering
+  id: string; // User-editable field ID
   label: string;
   required: boolean;
   description: string;
@@ -82,12 +83,14 @@ export const defaultOnboardingFlow: OnboardingFlow = {
     systemPrompt: 'You are conducting an onboarding conversation with a new user. Your goal is to make them feel welcome and collect some basic information that will help you assist them better in the future. Be friendly, professional, and conversational.',
     userFields: [
       {
+        _internalReactKey: 'name-field', // Stable key for React rendering
         id: 'name',
         label: 'Full Name',
         required: true,
         description: 'Ask for the user\'s full name'
       },
       {
+        _internalReactKey: 'email-field', // Stable key for React rendering
         id: 'email',
         label: 'Email Address',
         required: true,

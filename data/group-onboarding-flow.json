@@ -12,7 +12,7 @@
         "description": "Ask what the main purpose/goal of this group chat is"
       },
       {
-        "id": "key_deadlines",
+        "id": "harshness",
         "label": "harshness",
         "required": true,
         "description": "The AI should ask how harsh and rude the AI should be in managing these projects"
