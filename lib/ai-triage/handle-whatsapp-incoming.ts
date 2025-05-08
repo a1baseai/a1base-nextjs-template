@@ -1,46 +1,85 @@
 // import { WhatsAppIncomingData } from "a1base-node";
 import { MessageRecord } from "@/types/chat";
 import { triageMessage, projectTriage } from "./triage-logic";
-import { initializeDatabase, getInitializedAdapter, isSupabaseConfigured } from "../supabase/config";
+import { initializeDatabase, getInitializedAdapter, isSupabaseConfigured, SupabaseAdapter } from "../supabase/config"; // Added SupabaseAdapter type
 import { WebhookPayload } from "@/app/api/messaging/incoming/route";
-import { StartOnboarding } from "../workflows/onboarding-workflow";
+import { StartOnboarding, OnboardingResponse } from "../workflows/onboarding-workflow"; // Added OnboardingResponse type
 import { A1BaseAPI } from "a1base-node";
 import OpenAI from "openai";
 import { loadOnboardingFlow } from "../onboarding-flow/onboarding-storage";
 import { createAgenticOnboardingPrompt } from "../workflows/onboarding-workflow";
-import { 
+import {
   handleGroupChatOnboarding,
   processGroupOnboardingMessage,
   isGroupInOnboardingState
 } from "../workflows/group-onboarding-workflow";
 import { getSplitMessageSetting } from "../settings/message-settings";
-import { saveMessage, userCheck } from "../data/message-storage";
+import { saveMessage, userCheck } from "../data/message-storage"; // userCheck is imported but not used in the original, keeping it.
 
-// IN-MEMORY STORAGE
-const messagesByThread = new Map();
-// Maximum number of messages to keep in context
+// --- CONSTANTS ---
 export const MAX_CONTEXT_MESSAGES = 10;
+export const SERVICE_WEB_UI = "web-ui";
+export const SERVICE_SKIP_SEND = "__skip_send"; // Marker to prevent double sending
+export const DEFAULT_AGENT_NAME = "AI Assistant";
+export const WHATSAPP_SERVICE_NAME = "whatsapp";
 
-// The getSplitMessageSetting function has been moved to lib/settings/message-settings.ts
+// --- IN-MEMORY STORAGE ---
+const messagesByThread = new Map<string, MessageRecord[]>();
 
-// Initialize A1Base API client for sending messages
-const client = new A1BaseAPI({
+// --- API CLIENTS INITIALIZATION ---
+const a1BaseClient = new A1BaseAPI({
   credentials: {
     apiKey: process.env.A1BASE_API_KEY!,
     apiSecret: process.env.A1BASE_API_SECRET!,
   },
 });
 
-// Initialize OpenAI client
-const openai = new OpenAI({
+const openaiClient = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+// --- HELPER FUNCTIONS ---
+
 /**
- * Process onboarding conversation to extract user information and check if onboarding is complete
- * @param threadMessages Messages in the conversation thread
- * @param loadOnboardingFlow Function to load onboarding flow configuration
- * @returns Object containing extracted information and completion status
+ * Normalizes a phone number by removing '+' and spaces.
+ */
+function normalizePhoneNumber(phoneNumber: string): string {
+  return phoneNumber.replace(/\+|\s/g, "");
+}
+
+/**
+ * Formats messages for OpenAI API.
+ */
+function formatMessagesForOpenAI(threadMessages: MessageRecord[]): { role: "user" | "assistant"; content: string }[] {
+  return threadMessages.map((msg) => ({
+    role: msg.sender_number === process.env.A1BASE_AGENT_NUMBER ? "assistant" : "user",
+    content: msg.content,
+  }));
+}
+
+/**
+ * Extracts JSON from a string, attempting to find a valid JSON object within.
+ */
+function extractJsonFromString(content: string): Record<string, any> {
+  let jsonContent = content;
+  if (content.includes("{") && content.includes("}")) {
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      jsonContent = jsonMatch[0];
+    }
+  }
+  try {
+    return JSON.parse(jsonContent);
+  } catch (e) {
+    console.error("[JSON Extraction] Error parsing content:", e, "Original content:", content);
+    return {};
+  }
+}
+
+// --- ONBOARDING LOGIC ---
+
+/**
+ * Processes an onboarding conversation to extract user information and check for completion.
  */
 async function processOnboardingConversation(
   threadMessages: MessageRecord[]
@@ -49,47 +88,28 @@ async function processOnboardingConversation(
   isComplete: boolean;
 }> {
   console.log("[Onboarding] Processing conversation for user information");
-
   try {
-    // Load onboarding flow to get required fields
     const onboardingFlow = await loadOnboardingFlow();
     if (!onboardingFlow.agenticSettings?.userFields) {
-      throw new Error("Onboarding settings not available");
+      throw new Error("Onboarding settings (agenticSettings.userFields) not available");
     }
 
-    // Get required fields from onboarding settings
     const requiredFields = onboardingFlow.agenticSettings.userFields
       .filter((field) => field.required)
       .map((field) => field.id);
 
-    // Format the messages for analysis
-    const formattedMessages = threadMessages.map((msg) => ({
-      role:
-        msg.sender_number === process.env.A1BASE_AGENT_NUMBER
-          ? ("assistant" as const)
-          : ("user" as const),
-      content: msg.content,
-    }));
+    const formattedMessages = formatMessagesForOpenAI(threadMessages);
 
-    // Use OpenAI to extract structured information from the conversation
     const extractionPrompt = `
       Based on the conversation, extract the following information about the user:
-      ${onboardingFlow.agenticSettings.userFields
-        .map((field) => `- ${field.id}: ${field.description}`)
-        .join("\n")}
-      
+      ${onboardingFlow.agenticSettings.userFields.map((field) => `- ${field.id}: ${field.description}`).join("\n")}
       For any fields not mentioned in the conversation, return an empty string.
       You MUST respond in valid JSON format with only the extracted fields and nothing else.
       The response should be a valid JSON object that can be parsed with JSON.parse().
-      
-      Example response format: 
-      { "name": "John Doe", "email": "john@example.com", "business_type": "Tech", "goals": "Increase productivity" }
-      
-      DO NOT include any explanations, markdown formatting, or anything outside the JSON object.
-    `;
+      Example response format: { "name": "John Doe", "email": "john@example.com", "business_type": "Tech", "goals": "Increase productivity" }
+      DO NOT include any explanations, markdown formatting, or anything outside the JSON object.`;
 
-    // Call OpenAI to extract the information
-    const extraction = await openai.chat.completions.create({
+    const extraction = await openaiClient.chat.completions.create({
       model: "gpt-4",
       messages: [
         { role: "system" as const, content: extractionPrompt },
@@ -98,37 +118,18 @@ async function processOnboardingConversation(
       temperature: 0.2,
     });
 
-    // Parse the extraction result
     const extractionContent = extraction.choices[0]?.message?.content || "{}";
     console.log("[Onboarding] Raw extraction content:", extractionContent);
+    const extractedInfo = extractJsonFromString(extractionContent);
 
-    // Try to extract JSON from the response if it's not already valid JSON
-    let jsonContent = extractionContent;
-    if (extractionContent.includes("{") && extractionContent.includes("}")) {
-      const jsonMatch = extractionContent.match(/\{[\s\S]*\}/); // Match everything between { and }
-      if (jsonMatch) {
-        jsonContent = jsonMatch[0];
-      }
-    }
-
-    // Parse the JSON content
-    let extractedInfo: Record<string, string>;
-    try {
-      extractedInfo = JSON.parse(jsonContent);
-    } catch (e) {
-      console.error("[Onboarding] Error parsing extraction result:", e);
-      extractedInfo = {};
-    }
-
-    // Check if all required fields are filled
-    const isComplete = requiredFields.every((field) => {
-      return extractedInfo[field] && extractedInfo[field].trim() !== "";
-    });
+    const isComplete = requiredFields.every(
+      (field) => extractedInfo[field] && String(extractedInfo[field]).trim() !== ""
+    );
 
     console.log(`[Onboarding] Extraction results:`, extractedInfo);
     console.log(`[Onboarding] Onboarding complete: ${isComplete}`);
-
     return { extractedInfo, isComplete };
+
   } catch (error) {
     console.error("[Onboarding] Error processing conversation:", error);
     return { extractedInfo: {}, isComplete: false };
@@ -136,49 +137,25 @@ async function processOnboardingConversation(
 }
 
 /**
- * Save extracted onboarding information to user metadata in the database
- * @param sender_number User's phone number
- * @param extractedInfo Information extracted from conversation
- * @param isComplete Whether onboarding is complete
- * @returns Success status
+ * Saves extracted onboarding information to user metadata in the database.
  */
-async function saveOnboardingInfo(
-  sender_number: string,
+async function saveOnboardingInfoToDatabase(
+  adapter: SupabaseAdapter,
+  senderNumber: string,
   extractedInfo: Record<string, string>,
   isComplete: boolean
 ): Promise<boolean> {
-  console.log(`[Onboarding] Saving onboarding info for user ${sender_number}`);
-
+  console.log(`[Onboarding] Saving onboarding info for user ${senderNumber}`);
   try {
-    // Try to get the initialized adapter for database operations
-    const adapter = await getInitializedAdapter();
-    if (!adapter) {
-      console.error(`[Onboarding] Database adapter not initialized`);
-      return false;
-    }
-
-    // Normalize phone number (remove '+' and spaces)
-    const normalizedPhone = sender_number.replace(/\+|\s/g, "");
-
-    // Prepare metadata with extracted info and completion status
-    const metadata = {
-      ...extractedInfo,
-      onboarding_complete: isComplete,
-    };
-
-    // Update user metadata in database
+    const normalizedPhone = normalizePhoneNumber(senderNumber);
+    const metadata = { ...extractedInfo, onboarding_complete: isComplete };
     const success = await adapter.updateUser(normalizedPhone, { metadata });
 
     if (success) {
-      console.log(
-        `[Onboarding] Successfully updated user metadata for ${sender_number}`
-      );
+      console.log(`[Onboarding] Successfully updated user metadata for ${senderNumber}`);
     } else {
-      console.error(
-        `[Onboarding] Failed to update user metadata for ${sender_number}`
-      );
+      console.error(`[Onboarding] Failed to update user metadata for ${senderNumber}`);
     }
-
     return success;
   } catch (error) {
     console.error("[Onboarding] Error saving onboarding info:", error);
@@ -187,70 +164,36 @@ async function saveOnboardingInfo(
 }
 
 /**
- * Handle follow-up onboarding messages with conversational AI
- * @param threadMessages Array of messages in the thread
- * @param thread_type Type of thread (individual or group)
- * @param thread_id ID of the thread
- * @param sender_number Phone number of the sender
- * @param service Service type (whatsapp, etc.)
- * @returns Response message object
+ * Handles follow-up messages during the agentic onboarding process.
  */
-async function handleOnboardingFollowUp(
+async function handleAgenticOnboardingFollowUp(
   threadMessages: MessageRecord[],
-  thread_type: "individual" | "group",
-  thread_id?: string,
-  sender_number?: string,
-  service?: string
+  senderNumber?: string,
+  adapter?: SupabaseAdapter | null
 ): Promise<{ text: string; waitForResponse: boolean }> {
-  console.log("[Onboarding] Handling follow-up onboarding message");
-
+  console.log("[Onboarding] Handling agentic follow-up onboarding message");
   try {
-    // Load the onboarding flow configuration
     const onboardingFlow = await loadOnboardingFlow();
-
-    // Create the system prompt for the AI
     const systemPrompt = createAgenticOnboardingPrompt(onboardingFlow);
+    const formattedMessages = formatMessagesForOpenAI(threadMessages);
 
-    // Format messages for the AI - ensuring proper typing for the OpenAI API
-    const formattedMessages = threadMessages.map((msg) => ({
-      role:
-        msg.sender_number === process.env.A1BASE_AGENT_NUMBER
-          ? ("assistant" as const)
-          : ("user" as const),
-      content: msg.content,
-    }));
+    console.log(`[Onboarding] Processing ${formattedMessages.length} messages for agentic follow-up`);
 
-    console.log(
-      `[Onboarding] Processing ${formattedMessages.length} messages for follow-up`
-    );
+    const { extractedInfo, isComplete } = await processOnboardingConversation(threadMessages);
 
-    // Process the conversation to extract user information
-    const { extractedInfo, isComplete } = await processOnboardingConversation(
-      threadMessages
-    );
-
-    // If we have a sender number and extracted information, save it
-    if (sender_number && Object.keys(extractedInfo).length > 0) {
-      await saveOnboardingInfo(sender_number, extractedInfo, isComplete);
+    if (senderNumber && Object.keys(extractedInfo).length > 0 && adapter) {
+      await saveOnboardingInfoToDatabase(adapter, senderNumber, extractedInfo, isComplete);
     }
 
-    // If onboarding is complete, send a final message
-    let responseContent = "";
+    let responseContent: string;
     if (isComplete) {
-      // Get user's name from extracted info or default
       const userName = extractedInfo.name || "there";
-
-      // Generate a personalized completion message
       responseContent =
         onboardingFlow.agenticSettings?.finalMessage ||
         `Thank you, ${userName}! Your onboarding is now complete. I've saved your information and I'm ready to help you with your tasks.`;
-
-      console.log(
-        `[Onboarding] Onboarding completed for user with phone number ${sender_number}`
-      );
+      console.log(`[Onboarding] Onboarding completed for user with phone number ${senderNumber}`);
     } else {
-      // Call OpenAI for a regular follow-up response
-      const completion = await openai.chat.completions.create({
+      const completion = await openaiClient.chat.completions.create({
         model: "gpt-4",
         messages: [
           { role: "system" as const, content: systemPrompt },
@@ -258,89 +201,29 @@ async function handleOnboardingFollowUp(
         ],
         temperature: 0.7,
       });
-
-      // Extract the AI's response
       responseContent =
         completion.choices[0]?.message?.content ||
         "I'm sorry, I couldn't process your message. Could you please try again?";
-
-      console.log(`[Onboarding] Generated follow-up response`);
+      console.log(`[Onboarding] Generated agentic follow-up response`);
     }
 
-    // If this is a WhatsApp or other channel, send the message
-    if (
-      (thread_type === "individual" || thread_type === "group") &&
-      service !== "web-ui" &&
-      service !== "__skip_send"
-    ) {
-      console.log("[Onboarding] Sending follow-up response via A1Base API");
-
-      const messageData = {
-        content: responseContent,
-        from: process.env.A1BASE_AGENT_NUMBER!,
-        service: "whatsapp" as const,
-      };
-
-      if (thread_type === "group" && thread_id) {
-        await client.sendGroupMessage(process.env.A1BASE_ACCOUNT_ID!, {
-          ...messageData,
-          thread_id,
-        });
-      } else if (thread_type === "individual" && sender_number) {
-        await client.sendIndividualMessage(process.env.A1BASE_ACCOUNT_ID!, {
-          ...messageData,
-          to: sender_number,
-        });
-      }
-    }
-
-    return {
-      text: responseContent,
-      waitForResponse: !isComplete, // Don't wait for response if onboarding is complete
-    };
+    return { text: responseContent, waitForResponse: !isComplete };
   } catch (error) {
-    console.error("[Onboarding] Error in follow-up handling:", error);
-    const errorMessage =
-      "I'm having trouble processing your message. Let's continue with the onboarding. Could you please tell me your name?";
-
-    // Handle error by sending a fallback message
-    if (
-      (thread_type === "individual" || thread_type === "group") &&
-      service !== "web-ui" &&
-      service !== "__skip_send"
-    ) {
-      const messageData = {
-        content: errorMessage,
-        from: process.env.A1BASE_AGENT_NUMBER!,
-        service: "whatsapp" as const,
-      };
-
-      if (thread_type === "group" && thread_id) {
-        await client.sendGroupMessage(process.env.A1BASE_ACCOUNT_ID!, {
-          ...messageData,
-          thread_id,
-        });
-      } else if (thread_type === "individual" && sender_number) {
-        await client.sendIndividualMessage(process.env.A1BASE_ACCOUNT_ID!, {
-          ...messageData,
-          to: sender_number,
-        });
-      }
-    }
-
-    return { text: errorMessage, waitForResponse: true };
+    console.error("[Onboarding] Error in agentic follow-up handling:", error);
+    return {
+      text: "I'm having trouble processing your message. Let's continue with the onboarding. Could you please tell me your name?",
+      waitForResponse: true,
+    };
   }
 }
 
-/**
- * Save a message either to Supabase (if configured) or in-memory storage
- * This function has been moved to lib/data/message-storage.ts
- */
+
+// --- MESSAGE STORAGE ---
 
 /**
- * Save a message to in-memory storage
+ * Saves a message to in-memory storage, ensuring context limits and filtering out agent's own messages.
  */
-async function saveToMemory(threadId: string, message: MessageRecord) {
+async function saveMessageToMemory(threadId: string, message: MessageRecord): Promise<void> {
   let threadMessages = messagesByThread.get(threadId) || [];
   threadMessages.push(message);
 
@@ -348,524 +231,410 @@ async function saveToMemory(threadId: string, message: MessageRecord) {
     threadMessages = threadMessages.slice(-MAX_CONTEXT_MESSAGES);
   }
 
-  const normalizedAgentNumber = process.env.A1BASE_AGENT_NUMBER?.replace(
-    /\+/g,
-    ""
-  );
-  threadMessages = threadMessages.filter((msg: MessageRecord) => {
-    const msgNumber = msg.sender_number.replace(/\+|\s/g, "");
-    return msgNumber !== normalizedAgentNumber;
-  });
+  // Filter out messages from the agent itself from the context kept in memory.
+  // This is done because the agent's previous responses are typically already part of the AI's context
+  // or are not needed for the AI to formulate its *next* response to a *user*.
+  // The primary use of this in-memory store is to provide recent user interaction context.
+  const normalizedAgentNumber = process.env.A1BASE_AGENT_NUMBER ? normalizePhoneNumber(process.env.A1BASE_AGENT_NUMBER) : undefined;
+  if (normalizedAgentNumber) {
+      threadMessages = threadMessages.filter(
+        (msg: MessageRecord) => normalizePhoneNumber(msg.sender_number) !== normalizedAgentNumber
+      );
+  }
+
 
   messagesByThread.set(threadId, threadMessages);
 }
 
-export async function handleWhatsAppIncoming(webhookData: WebhookPayload) {
-  // Ensure Supabase is initialized before proceeding
-  if (isSupabaseConfigured()) {
-    await initializeDatabase(); // Await initialization
-  }
-  const adapter = getInitializedAdapter(); // Get the (now hopefully) initialized adapter
+/**
+ * Persists the incoming message, trying Supabase first, then falling back to in-memory.
+ * Returns the database chat ID if successful with Supabase.
+ */
+async function persistIncomingMessage(
+  webhookData: WebhookPayload,
+  adapter: SupabaseAdapter | null
+): Promise<{ chatId: string | null; isNewChatInDb: boolean }> {
+  const { thread_id, message_id, message_content, message_type, sender_number, sender_name, timestamp, thread_type } = webhookData;
+  const content = message_content.text || ""; // For backward compatibility
 
-  // Extract data for easier access
-  const {
-    thread_id,
+  const messageRecord: MessageRecord = {
     message_id,
+    content,
     message_type,
     message_content,
     sender_number,
-    thread_type,
+    sender_name: sender_number === process.env.A1BASE_AGENT_NUMBER
+      ? process.env.A1BASE_AGENT_NAME || sender_name
+      : sender_name,
     timestamp,
-    service,
-  } = webhookData;
+  };
 
-  // The content field is for backward compatibility
-  const content = message_content.text || "";
-
-  // Get sender name with potential override for agent
-  let sender_name = webhookData.sender_name;
-  if (sender_number === process.env.A1BASE_AGENT_NUMBER) {
-    sender_name = process.env.A1BASE_AGENT_NAME || sender_name;
-  }
-
-  console.log("[Message Received]", {
-    sender_number,
-    message_content,
-    thread_type,
-    timestamp,
-    service,
-  });
-
-  // Skip processing for messages from our own agent
-  if (sender_number === process.env.A1BASE_AGENT_NUMBER) {
-    // This is the agent's own message
-    console.log("[Message] Agent's own message");
-    if (!adapter) {
-      console.error("[Message] Supabase adapter not initialized.");
-      return { success: false, message: "Supabase adapter not initialized" };
-    }
-    const { success, isNewChat } = await adapter.processWebhookPayload(webhookData);
-    console.log("[Message] Agent's own message processed");
-    console.log("[Message] isNewChat: ", isNewChat);
-    console.log("[Message] success: ", success);
-    console.log("[Message] Skipping processing for agent's own message");
-    return { success: true, message: "Agent message skipped" };
-  }
-
-  // Initialize variables for message processing
-  let threadMessages: MessageRecord[] = [];
-  let shouldTriggerOnboarding = false;
   let chatId: string | null = null;
-  
-  // For group chats, check if this is part of an ongoing onboarding process
-  if (thread_type === "group") {
-    try {
-      // Check if this group is in active onboarding using the helper function
-      const isInOnboarding = await isGroupInOnboardingState(thread_id);
-      
-      if (isInOnboarding) {
-        console.log(`[WhatsApp] Group chat ${thread_id} has onboarding in progress, processing response`);
-        
-        // Create a complete webhook payload to pass to the processor
-        const onboardingPayload: WebhookPayload = {
-          message_id: message_id || `tmp-${Date.now()}`,
-          sender_number,
-          sender_name: sender_name || "",
-          message_content,
-          thread_id,
-          thread_type,
-          timestamp: timestamp || new Date().toISOString(),
-          service: "whatsapp",
-          a1_account_id: process.env.A1BASE_ACCOUNT_ID || "",
-          message_type: message_type || "text",
-          is_from_agent: false
-        };
-        
-        // Process this message as an onboarding response
-        const handled = await processGroupOnboardingMessage(onboardingPayload);
-        
-        if (handled) {
-          console.log(`[WhatsApp] Successfully processed group onboarding response`); 
-          return { success: true, message: "Group onboarding response processed" };
-        }
-      }
-    } catch (error) {
-      console.error("[WhatsApp] Error checking group onboarding status:", error);
-      // Continue with normal processing if there's an error
-    }
-  }
+  let isNewChatInDb = false;
 
-  // If we're not in a group or onboarding wasn't handled above, continue with regular processing
-  // Note: variables are already declared above
-
-  // Save the message to storage (either Supabase or in-memory)
   if (adapter) {
     try {
-      // Process and store the webhook data in Supabase
-      console.log(`[HWAI] Attempting to store user message via processWebhookPayload. Thread ID: ${webhookData.thread_id}, Message ID: ${webhookData.message_id}, Thread Type: ${webhookData.thread_type}`);
-      const { success, isNewChat } = await adapter.processWebhookPayload(webhookData);
-      console.log(`[HWAI] processWebhookPayload result - Success: ${success}, Is New Chat: ${isNewChat}. Thread ID: ${webhookData.thread_id}, Message ID: ${webhookData.message_id}`);
+      console.log(`[MessageStore] Storing user message via processWebhookPayload. Thread ID: ${thread_id}, Message ID: ${message_id}`);
+      const { success, isNewChat, chat } = await adapter.processWebhookPayload(webhookData);
+      isNewChatInDb = isNewChat ?? false; // Default to false if undefined
       
-      // Check if this is a new group chat and handle group onboarding if needed
-      if (success && thread_type === 'group') {
-        const onboardingStarted = await handleGroupChatOnboarding(webhookData, isNewChat);
-        
-        // If we just started onboarding, return early to prevent double-processing
-        if (onboardingStarted) {
-          console.log(`[WhatsApp] Group onboarding started for ${thread_id}, skipping normal processing`);
-          return { success: true, message: "Group onboarding started" };
-        }
+      if (success && chat) {
+        chatId = chat.id;
+        console.log(`[MessageStore] processWebhookPayload success. Chat ID: ${chatId}, Is New Chat: ${isNewChatInDb}`);
+      } else if (success && !chat && thread_id){ // If successful but chat object not returned, try fetching thread
+        const threadData = await adapter.getThread(thread_id);
+        if (threadData) chatId = threadData.id;
+        console.log(`[MessageStore] processWebhookPayload success (chat object not in response). Fetched thread. Chat ID: ${chatId}`);
       }
-      
-      if (!success) {
-        console.error(
-          `[Supabase] Failed to store webhook data for message ${message_id}`
-        );
+       else {
+        console.error(`[MessageStore] Failed to store webhook data via Supabase for message ${message_id}. Success: ${success}`);
       }
-
-      // Check if this is a new thread in the database
-      const thread = await adapter.getThread(thread_id);
-      if (!thread) {
-        shouldTriggerOnboarding = true;
-      } else {
-        chatId = thread.id;
-        threadMessages = thread.messages || [];
-
-        console.log("thread sender")
-        console.log(thread.sender);
-        console.log("thread sender metadata")
-        
-
-        // Check and log onboarding status from the sender's metadata
-        if (thread.sender) {
-          const onboardingComplete =
-            thread.sender.metadata?.onboarding_complete === true;
-
-          console.log("Onboarding complete:", onboardingComplete);
-
-          // Set onboarding flag based on metadata
-          if (!onboardingComplete) {
-            shouldTriggerOnboarding = true;
-            console.log(
-              `[Onboarding] Will trigger onboarding for user ${thread.sender.name}.`
-            );
-          }
-        } else {
-          console.log(
-            `[Onboarding] Could not determine sender for thread ${thread_id}`
-          );
-        }
-      }
-
-      // Store in memory too for redundancy
-      await saveToMemory(thread_id, {
-        message_id,
-        content,
-        message_type,
-        message_content,
-        sender_number,
-        sender_name,
-        timestamp,
-      });
+      // Store in memory as a redundant measure or if Supabase failed partially
+      await saveMessageToMemory(thread_id, messageRecord);
     } catch (error) {
-      console.error("[Supabase] Error processing webhook data:", error);
-      // Fallback to in-memory storage if database fails
-      await saveMessage(
-        thread_id,
-        {
-          message_id,
-          content,
-          message_type,
-          message_content,
-          sender_number,
-          sender_name,
-          timestamp,
-        },
-        thread_type,
-        await getInitializedAdapter(),
-        saveToMemory
-      );
-
-      // Get messages from memory instead
-      threadMessages = messagesByThread.get(thread_id) || [];
-      if (threadMessages.length === 0) {
-        shouldTriggerOnboarding = true;
-      }
+      console.error("[MessageStore] Error processing webhook data with Supabase:", error);
+      // Fallback to in-memory storage only
+      await saveMessage(thread_id, messageRecord, thread_type, null, saveMessageToMemory);
     }
   } else {
-    // No database adapter available, use in-memory storage only
-    await saveMessage(
-      thread_id,
-      {
+    // No database adapter, use in-memory storage only
+    await saveMessage(thread_id, messageRecord, thread_type, null, saveMessageToMemory);
+  }
+  return { chatId, isNewChatInDb };
+}
+
+/**
+ * Retrieves thread messages, prioritizing Supabase then falling back to in-memory.
+ */
+async function getThreadMessages(
+  threadId: string,
+  adapter: SupabaseAdapter | null
+): Promise<MessageRecord[]> {
+  if (adapter) {
+    const thread = await adapter.getThread(threadId);
+    if (thread?.messages && thread.messages.length > 0) {
+      return thread.messages;
+    }
+  }
+  return messagesByThread.get(threadId) || [];
+}
+
+
+// --- MESSAGE SENDING ---
+
+/**
+ * Sends a response message, handling splitting and channel specifics.
+ */
+async function sendResponseMessage(
+  text: string,
+  threadType: "individual" | "group",
+  recipientId: string, // thread_id for group, sender_number for individual
+  service: string, // Original service from webhook, e.g., "whatsapp"
+  chatId: string | null, // Database chat ID for storing AI message
+  adapter: SupabaseAdapter | null
+): Promise<void> {
+  if (service === SERVICE_WEB_UI || service === SERVICE_SKIP_SEND) {
+    console.log(`[Send] Skipping send for service: ${service}`);
+    return;
+  }
+
+  const splitParagraphs = await getSplitMessageSetting();
+  const messageLines = splitParagraphs
+    ? text.split("\n").filter((line) => line.trim())
+    : [text];
+
+  for (const line of messageLines) {
+    const messageData = {
+      content: line,
+      from: process.env.A1BASE_AGENT_NUMBER!,
+      service: WHATSAPP_SERVICE_NAME as const, // Assuming A1Base only sends via WhatsApp for now
+    };
+
+    try {
+      if (threadType === "group") {
+        await a1BaseClient.sendGroupMessage(process.env.A1BASE_ACCOUNT_ID!, {
+          ...messageData,
+          thread_id: recipientId,
+        });
+      } else {
+        await a1BaseClient.sendIndividualMessage(process.env.A1BASE_ACCOUNT_ID!, {
+          ...messageData,
+          to: recipientId,
+        });
+      }
+      console.log(`[Send] Message part sent to ${recipientId} (Type: ${threadType})`);
+
+      // Store the sent AI message part to Supabase
+      if (adapter && chatId) {
+        const aiMessageId = `ai-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+        // We need the agent's user ID from the database
+        const agentUserId = await adapter.getUserFromWebhook(
+            process.env.A1BASE_AGENT_NUMBER!,
+            process.env.A1BASE_AGENT_NAME || DEFAULT_AGENT_NAME,
+            service // Use original service from webhook
+        );
+
+        if (!agentUserId) {
+            console.warn(`[Supabase] Could not get/create agent user ID for ${process.env.A1BASE_AGENT_NUMBER}. Storing AI message with null senderId.`);
+        }
+        
+        await adapter.storeMessage(
+          chatId,
+          agentUserId, // Can be null if agent user not found/created
+          aiMessageId,
+          { text: line.trim() },
+          "text",
+          service, // Store with the original service
+          { text: line.trim() }
+        );
+        console.log(`[Supabase] Stored AI message part: ${aiMessageId} to chatId: ${chatId}`);
+      }
+
+    } catch (error) {
+      console.error(`[Send] Error sending message part to ${recipientId}:`, error);
+      // Optional: Decide if we should re-throw or try next line
+    }
+
+    if (splitParagraphs && messageLines.length > 1) {
+      await new Promise((resolve) => setTimeout(resolve, 500)); // Delay between split messages
+    }
+  }
+}
+
+// --- ONBOARDING STATUS & WORKFLOW ---
+
+/**
+ * Determines if onboarding should be triggered for the current interaction.
+ */
+async function
+checkIfOnboardingNeeded(
+  threadId: string,
+  adapter: SupabaseAdapter | null
+): Promise<boolean> {
+  if (!adapter) {
+    // If no DB, assume new users always need onboarding until memory has messages
+    const inMemoryMessages = messagesByThread.get(threadId) || [];
+    return inMemoryMessages.length === 0; // True if no messages yet for this thread in memory
+  }
+
+  const thread = await adapter.getThread(threadId);
+  if (!thread) {
+    console.log(`[OnboardingCheck] No thread found in DB for ${threadId}, onboarding needed.`);
+    return true; // New thread in DB
+  }
+
+  if (thread.sender) {
+    const onboardingComplete = thread.sender.metadata?.onboarding_complete === true;
+    console.log(`[OnboardingCheck] User: ${thread.sender.name}, Onboarding complete in DB: ${onboardingComplete}`);
+    return !onboardingComplete;
+  } else {
+    console.log(`[OnboardingCheck] No sender info in thread ${threadId}, assuming onboarding needed.`);
+    return true; // Default to needing onboarding if sender info is missing
+  }
+}
+
+
+/**
+ * Handles the overall onboarding process for an individual user.
+ */
+async function manageIndividualOnboardingProcess(
+  threadMessages: MessageRecord[],
+  webhookData: WebhookPayload,
+  adapter: SupabaseAdapter | null,
+  chatId: string | null
+): Promise<boolean> { // Returns true if onboarding message was sent
+  const { thread_id, sender_number, thread_type, service } = webhookData;
+
+  const isOnboardingInProgress = threadMessages.length > 1; // User has sent at least one message after initial contact
+
+  if (isOnboardingInProgress) {
+    console.log(`[OnboardingFlow] Continuing agentic onboarding for thread ${thread_id}`);
+    try {
+      const response = await handleAgenticOnboardingFollowUp(threadMessages, sender_number, adapter);
+      await sendResponseMessage(response.text, thread_type as "individual" | "group", sender_number, service, chatId, adapter);
+      return true; // Onboarding follow-up handled and message sent (or skipped appropriately)
+    } catch (error) {
+      console.error(`[OnboardingFlow] Error in agentic onboarding follow-up for ${thread_id}:`, error);
+      // Fall through to standard triage if specific onboarding follow-up fails
+      return false;
+    }
+  } else {
+    // This is the first message, start standard (non-agentic) onboarding
+    console.log(`[OnboardingFlow] Starting initial onboarding for thread ${thread_id}`);
+    try {
+      // StartOnboarding expects MessageRecord[] with a 'role' property, which isn't standard in MessageRecord.
+      // We need to adapt or assume StartOnboarding can handle it.
+      // The original code mapped to a slightly different format for StartOnboarding.
+      // Let's replicate that formatting if StartOnboarding strictly needs it.
+      // Assuming StartOnboarding might need a specific input format different from openai format.
+      // The original code did:
+      // const formattedThreadMessages = threadMessages.map((msg) => ({
+      //   ...msg, // includes all original fields
+      //   role: (msg.sender_number === process.env.A1BASE_AGENT_NUMBER ? "assistant" : "user") as "user" | "assistant" | "system",
+      // }));
+      // If StartOnboarding can take raw MessageRecord[], this mapping is not needed.
+      // Given StartOnboarding is from `../workflows/onboarding-workflow`, it likely expects `MessageRecord[]` or a derivative.
+      // The original code used `__skip_send` for StartOnboarding directly.
+
+      const onboardingResponse: OnboardingResponse | undefined = await StartOnboarding(
+        threadMessages, // Pass the original threadMessages
+        thread_type as "individual" | "group",
+        thread_id,
+        sender_number,
+        SERVICE_SKIP_SEND // Prevent StartOnboarding from sending directly
+      );
+
+      if (onboardingResponse?.messages?.length) {
+        for (const message of onboardingResponse.messages) {
+          await sendResponseMessage(message.text, thread_type as "individual" | "group", sender_number, service, chatId, adapter);
+           // Original code had a 1s delay between distinct onboarding messages.
+           if (onboardingResponse.messages.length > 1) {
+             await new Promise(resolve => setTimeout(resolve, 1000));
+           }
+        }
+        return true; // Initial onboarding messages sent
+      } else {
+        console.log(`[OnboardingFlow] StartOnboarding did not return messages for ${thread_id}`);
+        return false; // No messages to send from initial onboarding
+      }
+    } catch (error) {
+      console.error(`[OnboardingFlow] Error in initial StartOnboarding for ${thread_id}:`, error);
+      return false; // Error, fall through to standard triage
+    }
+  }
+}
+
+// --- MAIN HANDLER ---
+
+export async function handleWhatsAppIncoming(webhookData: WebhookPayload): Promise<object> {
+  if (isSupabaseConfigured()) {
+    await initializeDatabase();
+  }
+  const adapter = getInitializedAdapter();
+
+  const {
+    thread_id,
+    message_id,
+    message_content,
+    sender_number,
+    sender_name, // Use this directly, persistIncomingMessage will handle agent name override
+    thread_type,
+    timestamp,
+    service,
+    message_type, // Added for completeness from webhookData
+  } = webhookData;
+  const content = message_content.text || ""; // Backward compatibility
+
+  console.log("[Message Received]", { sender_number, message_content, thread_type, timestamp, service });
+
+  // 1. Skip processing for agent's own messages
+  if (sender_number === process.env.A1BASE_AGENT_NUMBER) {
+    console.log("[AgentMsg] Processing agent's own message for storage.");
+    if (adapter) {
+      await adapter.processWebhookPayload(webhookData);
+      console.log("[AgentMsg] Agent's own message processed by adapter.");
+    } else {
+      console.warn("[AgentMsg] Supabase adapter not initialized. Agent message not stored in DB.");
+       // Optionally, save agent's message to memory if that's desired behavior, though original didn't explicitly for agent.
+       // await saveMessageToMemory(thread_id, { message_id, content, message_type, message_content, sender_number, sender_name: process.env.A1BASE_AGENT_NAME || sender_name, timestamp });
+    }
+    return { success: true, message: "Agent message processed for storage and skipped for further logic." };
+  }
+
+  // 2. Handle active group onboarding (early exit if message is part of it)
+  if (thread_type === "group") {
+    try {
+      if (await isGroupInOnboardingState(thread_id)) {
+        console.log(`[GroupOnboard] Group chat ${thread_id} has onboarding in progress.`);
+        // Reconstruct a full payload for processGroupOnboardingMessage as original did
+        const groupOnboardingPayload: WebhookPayload = { ...webhookData }; 
+        if (await processGroupOnboardingMessage(groupOnboardingPayload)) {
+          console.log(`[GroupOnboard] Successfully processed group onboarding response for ${thread_id}.`);
+          return { success: true, message: "Group onboarding response processed." };
+        }
+      }
+    } catch (error) {
+      console.error(`[GroupOnboard] Error checking/processing group onboarding for ${thread_id}:`, error);
+      // Continue with normal processing if error occurs
+    }
+  }
+
+  // 3. Persist incoming user message (DB and/or memory)
+  const { chatId, isNewChatInDb } = await persistIncomingMessage(webhookData, adapter);
+  
+  // 4. Handle new group chat onboarding initiation
+  if (thread_type === 'group' && adapter) { // adapter check because handleGroupChatOnboarding likely interacts with DB
+    // isNewChatInDb comes from adapter.processWebhookPayload result.
+    // If using only memory, isNewChatInDb would be false.
+    // Original code called handleGroupChatOnboarding if (success && thread_type === 'group') after adapter.processWebhookPayload
+    // 'success' there implied DB storage success. isNewChatInDb reflects the "newness" in DB.
+    if (await handleGroupChatOnboarding(webhookData, isNewChatInDb)) {
+      console.log(`[GroupOnboard] Group onboarding started for ${thread_id}.`);
+      return { success: true, message: "Group onboarding started." };
+    }
+  }
+
+  // 5. Retrieve current thread messages (from DB or memory)
+  let threadMessages = await getThreadMessages(thread_id, adapter);
+
+  // 6. Project Triage (if chatId is available)
+  if (chatId && adapter) { // Assuming projectTriage needs adapter implicitly or explicitly
+    try {
+      await projectTriage(threadMessages, thread_id, chatId, service); // projectId is not used later, so just await
+    } catch (error) {
+      console.error(`[ProjectTriage] Error for thread ${thread_id}:`, error);
+    }
+  }
+
+  // 7. Determine if onboarding is needed for this user/thread
+  const shouldTriggerOnboarding = await checkIfOnboardingNeeded(thread_id, adapter);
+
+  // 8. Handle Onboarding Flow OR Standard Triage
+  let triageResponseMessageText: string | null = null;
+  let onboardingHandled = false;
+
+  if (shouldTriggerOnboarding && thread_type === "individual") { // Original code seemed to focus onboarding logic mostly on individual, group had its own path
+    console.log(`[FlowCtrl] Onboarding determined as_needed for individual user in thread ${thread_id}.`);
+    onboardingHandled = await manageIndividualOnboardingProcess(threadMessages, webhookData, adapter, chatId);
+  }
+
+  if (!onboardingHandled) {
+    console.log(`[FlowCtrl] Proceeding to standard message triage for thread ${thread_id}. OnboardingHandled: ${onboardingHandled}`);
+    try {
+      const triageResult = await triageMessage({
+        thread_id,
         message_id,
         content,
         message_type,
         message_content,
-        sender_number,
         sender_name,
+        sender_number,
+        thread_type,
         timestamp,
-      },
-      thread_type,
-      null, // No adapter available
-      saveToMemory
-    );
+        messagesByThread, // triageMessage uses this for in-memory context
+        service: SERVICE_SKIP_SEND, // Prevent triageMessage from sending directly
+      });
 
-    // Get messages from memory
-    threadMessages = messagesByThread.get(thread_id) || [];
-    if (threadMessages.length === 0) {
-      shouldTriggerOnboarding = true;
-    }
-  }
-
-  // Always run project triage for every message (if we have a chat ID)
-  let projectId: string | null = null;
-  if (chatId) {
-    try {
-      // Run project triage on the messages
-      projectId = await projectTriage(
-        threadMessages,
-        thread_id,
-        chatId,
-        service
-      );
+      if (triageResult.success && triageResult.message) {
+        triageResponseMessageText = triageResult.message;
+      } else if (!triageResult.success) {
+        console.error(`[Triage] Failed for thread ${thread_id}: ${triageResult.message}`);
+        triageResponseMessageText = "Sorry, I'm having trouble processing your request right now. Please try again later.";
+      }
     } catch (error) {
-      console.error("[WhatsApp] Error in project triage:", error);
+      console.error(`[Triage] Critical error for thread ${thread_id}:`, error);
+      triageResponseMessageText = "An unexpected error occurred. Please try again later.";
     }
   }
 
-  // Always run message triage to generate a response
-  try {
-    // Special handling for onboarding process
-    if (shouldTriggerOnboarding) {
-      // Check if this is a first message (starting onboarding) or a follow-up
-      const isOnboardingInProgress = threadMessages.length > 1;
-
-      if (isOnboardingInProgress) {
-        console.log(
-          `[WhatsApp] Continuing onboarding flow for thread ${thread_id}`
-        );
-        try {
-          // Handle follow-up onboarding message with AI
-          const response = await handleOnboardingFollowUp(
-            threadMessages,
-            thread_type as "individual" | "group",
-            thread_id,
-            sender_number,
-            "__skip_send" // Special marker to avoid double-sending
-          );
-
-          // Split and send messages if needed
-          const splitParagraphs = await getSplitMessageSetting();
-          const messageLines = splitParagraphs
-            ? response.text.split("\n").filter((line) => line.trim())
-            : [response.text];
-
-          // Send each line as a separate message
-          for (const line of messageLines) {
-            // Use the appropriate send method based on thread type
-            if (thread_type === "group" && thread_id) {
-              await client.sendGroupMessage(process.env.A1BASE_ACCOUNT_ID!, {
-                content: line,
-                from: process.env.A1BASE_AGENT_NUMBER!,
-                thread_id: thread_id,
-                service: "whatsapp",
-              });
-            } else {
-              await client.sendIndividualMessage(process.env.A1BASE_ACCOUNT_ID!, {
-                content: line,
-                from: process.env.A1BASE_AGENT_NUMBER!,
-                to: sender_number,
-                service: "whatsapp",
-              });
-            }
-            
-            // Store the sent AI message part to Supabase
-            if (adapter && chatId) { // Ensure adapter and chatId are available
-              try {
-                const aiMessageId = `ai-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-                const agentUserId = await adapter.getUserFromWebhook(
-                  process.env.A1BASE_AGENT_NUMBER!,
-                  process.env.A1BASE_AGENT_NAME || "AI Assistant",
-                  service // Use original service from webhookData
-                );
-
-                if (!agentUserId) {
-                  console.warn(`[Supabase] Could not get or create agent user for ${process.env.A1BASE_AGENT_NUMBER}. Proceeding to store message with null senderId.`);
-                }
-
-                await adapter.storeMessage(
-                  chatId,
-                  agentUserId, // This will be null if not found/created
-                  aiMessageId,
-                  { text: line.trim() },      // content (Record<string, any>)
-                  "text",                     // messageType
-                  service,                    // original service from webhookData
-                  { text: line.trim() }       // richContent (optional)
-                );
-                console.log(`[Supabase] Stored AI message part: ${aiMessageId} to thread ${thread_id} (chatId: ${chatId})`);
-              } catch (storeError) {
-                console.error("[Supabase] Error storing AI message part:", storeError);
-              }
-            }
-
-            // Wait a short delay between messages to maintain order
-            if (splitParagraphs && messageLines.length > 1) {
-              await new Promise((resolve) => setTimeout(resolve, 500));
-            }
-          }
-
-          // Return early since we've handled the message
-          return { success: true, message: "Onboarding follow-up handled" };
-        } catch (error) {
-          console.error(
-            "[WhatsApp] Error handling onboarding follow-up:",
-            error
-          );
-          // Continue with regular triage if follow-up handling fails
-        }
-      } else {
-        try {
-          // Create an array of thread messages in the correct format for initial onboarding
-          const formattedThreadMessages = threadMessages.map((msg) => ({
-            message_id: msg.message_id,
-            content: msg.content,
-            message_type: (msg.message_type || "text") as
-              | "text"
-              | "rich_text"
-              | "image"
-              | "video"
-              | "audio"
-              | "location"
-              | "reaction"
-              | "group_invite"
-              | "unsupported_message_type",
-            message_content: msg.message_content || { text: msg.content },
-            sender_number: msg.sender_number,
-            sender_name: msg.sender_name,
-            timestamp: msg.timestamp,
-            role: (msg.sender_number === process.env.A1BASE_AGENT_NUMBER
-              ? "assistant"
-              : "user") as "user" | "assistant" | "system",
-          }));
-
-          // For initial onboarding, use the StartOnboarding function to generate messages
-          const onboardingData = await StartOnboarding(
-            formattedThreadMessages,
-            thread_type as "individual" | "group",
-            thread_id,
-            sender_number,
-            "__skip_send" // Special marker to avoid double-sending
-          );
-
-          if (
-            onboardingData &&
-            onboardingData.messages &&
-            onboardingData.messages.length > 0
-          ) {
-            console.log(
-              `[TRIAGE] Got ${onboardingData.messages.length} onboarding messages to send`
-            );
-            const splitParagraphs = await getSplitMessageSetting();
-            for (const message of onboardingData.messages) {
-              const messageLines = splitParagraphs
-                ? message.text.split("\n").filter((line) => line.trim())
-                : [message.text];
-
-              // Send each line as a separate message
-              for (const line of messageLines) {
-                await client.sendIndividualMessage(
-                  process.env.A1BASE_ACCOUNT_ID!,
-                  {
-                    content: line,
-                    from: process.env.A1BASE_AGENT_NUMBER!,
-                    to: sender_number,
-                    service: "whatsapp",
-                  }
-                );
-                // Wait a short delay between messages
-                await new Promise((resolve) => setTimeout(resolve, 500));
-              }
-
-              // Add a larger delay between different onboarding messages
-              await new Promise((resolve) => setTimeout(resolve, 1000));
-            }
-            return;
-          }
-        } catch (error) {
-          console.error(`[WhatsApp] Error in onboarding flow:`, error);
-          // Fall through to standard message triage
-        }
-      }
-    }
-
-    // For all other messages, run standard message triage
-    const triageResult = await triageMessage({
-      thread_id,
-      message_id,
-      content,
-      message_type,
-      message_content,
-      sender_name,
-      sender_number,
-      thread_type,
-      timestamp,
-      messagesByThread,
-      service: "__skip_send", // Special marker to avoid double-sending
-    });
-
-    if (triageResult.success) {
-      // Send the response if the triage was successful and we have a message to send
-      if (triageResult.message) {
-        // For web-ui service, the response is handled by the calling code
-        if (service !== "web-ui") {
-          // Check if we should split messages (based on settings or defaults)
-          const splitParagraphs = await getSplitMessageSetting();
-
-          // Split response into paragraphs if setting is enabled
-          const messages = splitParagraphs
-            ? triageResult.message.split("\n").filter((msg) => msg.trim())
-            : [triageResult.message];
-
-          // Send each message line individually
-          for (const messageContent of messages) {
-            // Check thread type and use appropriate send method
-            if (thread_type === "group" && thread_id) {
-              await client.sendGroupMessage(process.env.A1BASE_ACCOUNT_ID!, {
-                content: messageContent,
-                from: process.env.A1BASE_AGENT_NUMBER!,
-                thread_id: thread_id,
-                service: "whatsapp",
-              });
-            } else {
-              await client.sendIndividualMessage(process.env.A1BASE_ACCOUNT_ID!, {
-                content: messageContent,
-                from: process.env.A1BASE_AGENT_NUMBER!,
-                to: sender_number,
-                service: "whatsapp",
-              });
-            }
-
-            
-            if (adapter && chatId) { // Ensure adapter and chatId are available
-              try {
-                const aiMessageId = `ai-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-                const agentUserId = await adapter.getUserFromWebhook(
-                  process.env.A1BASE_AGENT_NUMBER!,
-                  process.env.A1BASE_AGENT_NAME || "AI Assistant",
-                  service // Use original service from webhookData
-                );
-
-                if (!agentUserId) {
-                  console.warn(`[Supabase] Could not get or create agent user for ${process.env.A1BASE_AGENT_NUMBER}. Proceeding to store message with null senderId.`);
-                }
-
-                await adapter.storeMessage(
-                  chatId,
-                  agentUserId, // This will be null if not found/created
-                  aiMessageId,
-                  { text: messageContent.trim() }, // content (Record<string, any>)
-                  "text",                          // messageType
-                  service,                         // original service from webhookData
-                  { text: messageContent.trim() }    // richContent (optional)
-                );
-                console.log(`[Supabase] Stored AI message part: ${aiMessageId} to thread ${thread_id} (chatId: ${chatId})`);
-              } catch (storeError) {
-                console.error("[Supabase] Error storing AI message part:", storeError);
-              }
-            }
-
-            // Add a small delay between messages to maintain order
-            if (splitParagraphs && messages.length > 1) {
-              await new Promise((resolve) => setTimeout(resolve, 500));
-            }
-          }
-        }
-      }
-    } else {
-      console.error(`[WhatsApp] Triage failed: ${triageResult.message}`);
-      // Optionally send an error message
-      if (service !== "web-ui") {
-        const errorContent = "Sorry, I'm having trouble processing your request right now. Please try again later.";
-        
-        // Send error message to the appropriate destination based on thread type
-        if (thread_type === "group" && thread_id) {
-          await client.sendGroupMessage(process.env.A1BASE_ACCOUNT_ID!, {
-            content: errorContent,
-            from: process.env.A1BASE_AGENT_NUMBER!,
-            thread_id: thread_id,
-            service: "whatsapp",
-          });
-        } else {
-          await client.sendIndividualMessage(process.env.A1BASE_ACCOUNT_ID!, {
-            content: errorContent,
-            from: process.env.A1BASE_AGENT_NUMBER!,
-            to: sender_number,
-            service: "whatsapp",
-          });
-        }
-      }
-    }
-  } catch (error) {
-    console.error("[WhatsApp] Error in message triage:", error);
+  // 9. Send Response (if any was generated and not sent by onboarding)
+  if (triageResponseMessageText) {
+    // Determine recipient ID based on thread type
+    const recipient = thread_type === "group" ? thread_id : sender_number;
+    await sendResponseMessage(triageResponseMessageText, thread_type as "individual" | "group", recipient, service, chatId, adapter);
+  } else if (!onboardingHandled) {
+    console.log(`[FlowCtrl] No response generated by triage and onboarding not handled for thread ${thread_id}.`);
   }
+
+  return { success: true, message: "Incoming message processed." };
 }
