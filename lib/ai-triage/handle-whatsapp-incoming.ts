@@ -353,7 +353,7 @@ async function saveToMemory(threadId: string, message: MessageRecord) {
     ""
   );
   threadMessages = threadMessages.filter((msg: MessageRecord) => {
-    const msgNumber = msg.sender_number.replace(/\+/g, "");
+    const msgNumber = msg.sender_number.replace(/\+|\s/g, "");
     return msgNumber !== normalizedAgentNumber;
   });
 
@@ -625,8 +625,40 @@ export async function handleWhatsAppIncoming(webhookData: WebhookPayload) {
                 service: "whatsapp",
               });
             }
-            // Wait a short delay between messages
-            await new Promise((resolve) => setTimeout(resolve, 500));
+            
+            // Store the sent AI message part to Supabase
+            if (adapter && chatId) { // Ensure adapter and chatId are available
+              try {
+                const aiMessageId = `ai-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+                const agentUserId = await adapter.getUserFromWebhook(
+                  process.env.A1BASE_AGENT_NUMBER!,
+                  process.env.A1BASE_AGENT_NAME || "AI Assistant",
+                  service // Use original service from webhookData
+                );
+
+                if (!agentUserId) {
+                  console.warn(`[Supabase] Could not get or create agent user for ${process.env.A1BASE_AGENT_NUMBER}. Proceeding to store message with null senderId.`);
+                }
+
+                await adapter.storeMessage(
+                  chatId,
+                  agentUserId, // This will be null if not found/created
+                  aiMessageId,
+                  { text: line.trim() },      // content (Record<string, any>)
+                  "text",                     // messageType
+                  service,                    // original service from webhookData
+                  { text: line.trim() }       // richContent (optional)
+                );
+                console.log(`[Supabase] Stored AI message part: ${aiMessageId} to thread ${thread_id} (chatId: ${chatId})`);
+              } catch (storeError) {
+                console.error("[Supabase] Error storing AI message part:", storeError);
+              }
+            }
+
+            // Wait a short delay between messages to maintain order
+            if (splitParagraphs && messageLines.length > 1) {
+              await new Promise((resolve) => setTimeout(resolve, 500));
+            }
           }
 
           // Return early since we've handled the message
@@ -700,12 +732,12 @@ export async function handleWhatsAppIncoming(webhookData: WebhookPayload) {
                 // Wait a short delay between messages
                 await new Promise((resolve) => setTimeout(resolve, 500));
               }
-            }
 
-            // Add a larger delay between different onboarding messages
-            await new Promise((resolve) => setTimeout(resolve, 1000));
+              // Add a larger delay between different onboarding messages
+              await new Promise((resolve) => setTimeout(resolve, 1000));
+            }
+            return;
           }
-          return;
         } catch (error) {
           console.error(`[WhatsApp] Error in onboarding flow:`, error);
           // Fall through to standard message triage
@@ -758,6 +790,35 @@ export async function handleWhatsAppIncoming(webhookData: WebhookPayload) {
                 to: sender_number,
                 service: "whatsapp",
               });
+            }
+
+            // Store the sent AI message part to Supabase
+            if (adapter && chatId) { // Ensure adapter and chatId are available
+              try {
+                const aiMessageId = `ai-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+                const agentUserId = await adapter.getUserFromWebhook(
+                  process.env.A1BASE_AGENT_NUMBER!,
+                  process.env.A1BASE_AGENT_NAME || "AI Assistant",
+                  service // Use original service from webhookData
+                );
+
+                if (!agentUserId) {
+                  console.warn(`[Supabase] Could not get or create agent user for ${process.env.A1BASE_AGENT_NUMBER}. Proceeding to store message with null senderId.`);
+                }
+
+                await adapter.storeMessage(
+                  chatId,
+                  agentUserId, // This will be null if not found/created
+                  aiMessageId,
+                  { text: messageContent.trim() }, // content (Record<string, any>)
+                  "text",                          // messageType
+                  service,                         // original service from webhookData
+                  { text: messageContent.trim() }    // richContent (optional)
+                );
+                console.log(`[Supabase] Stored AI message part: ${aiMessageId} to thread ${thread_id} (chatId: ${chatId})`);
+              } catch (storeError) {
+                console.error("[Supabase] Error storing AI message part:", storeError);
+              }
             }
 
             // Add a small delay between messages to maintain order

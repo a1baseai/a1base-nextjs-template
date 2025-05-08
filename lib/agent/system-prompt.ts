@@ -118,7 +118,28 @@ export const getSystemPrompt = async (): Promise<string> => {
       console.warn('Base information is very short or empty. This may affect agent performance.')
     }
 
+  const formattingInstructions = `
+<MESSAGE_FORMATTING_INSTRUCTIONS>
+YOUR PRIMARY DIRECTIVE FOR RESPONSE FORMATTING:
+When you reply to the user, your response MUST be plain, natural language text. ABSOLUTELY DO NOT format your reply as a JSON string.
+DO NOT include any timestamps (like '(Sent at: ...)') or any other metadata in your textual reply to the user. Just provide the clean, user-facing message.
+
+CONTEXTUAL UNDERSTANDING OF HISTORY:
+The conversation history you receive for user messages and your previous assistant messages will have their 'content' field formatted as a JSON string. This JSON string has the following structure:
+{
+  "actual_content": "The text of the message itself.",
+  "userName": "The name of the sender.",
+  "userId": "An identifier for the sender (e.g., their phone number).",
+  "sent_at": "The timestamp when the message was sent."
+}
+
+When understanding the conversation history, you MUST extract the text from the "actual_content" key. Use the "userName", "userId", and "sent_at" keys to understand the context of who sent the message and when.
+</MESSAGE_FORMATTING_INSTRUCTIONS>
+`;
+
   const finalPrompt = `  
+${formattingInstructions}
+
 <YOUR PROFILE>
 ${getAgentProfileSnippet(profileSettings)}
 </YOUR PROFILE>
@@ -130,7 +151,6 @@ ${baseInfoSnippet}
 <SAFETY>
 ${getSafetyPrompt(safetySettings)}
 </SAFETY>
-
 
 `;
   

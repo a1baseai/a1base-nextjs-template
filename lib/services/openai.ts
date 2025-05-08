@@ -121,6 +121,7 @@ export async function generateAgentIntroduction(
     },
   ];
 
+  console.log("generateAgentIntroduction prompt messages:", JSON.stringify(conversation, null, 2));
   const completion = await getOpenAI().chat.completions.create({
     model: "gpt-4",
     messages: conversation,
@@ -150,57 +151,49 @@ export async function generateAgentResponse(
 
   // Get the system prompt with custom settings
   const systemPromptContent = await getSystemPrompt();
-  
-  // Generate rich context about the chat (participants, projects, etc.)
-  const richContext = generateRichChatContext(
-    threadType,
-    threadMessages,
-    participants,
-    projects
-  );
-  
+  const richContext = generateRichChatContext(threadType, threadMessages, participants, projects);
   // Combine the base system prompt with the rich context
   const enhancedSystemPrompt = systemPromptContent + richContext;
   
-  // Build the conversation to pass to OpenAI
-  const conversation = [
-    { role: "system" as ChatRole, content: enhancedSystemPrompt },
-  ];
+  const conversationForOpenAI: OpenAI.Chat.ChatCompletionMessageParam[] = [];
+  conversationForOpenAI.push({
+    role: "system" as const,
+    content: enhancedSystemPrompt, // System prompt content is a plain string
+  });
 
-  // If there's a user-level prompt from basicWorkflowsPrompt, add it as a user message
+  // If a specific user prompt is provided, add it as a plain string content message
   if (userPrompt) {
-    conversation.push({ role: "user" as ChatRole, content: userPrompt });
+    conversationForOpenAI.push({ role: "user" as const, content: userPrompt });
   }
 
-  // Then add the actual chat messages with sender names for better context
-  // Format messages with sender names for better context in group chats
-  const formattedMessages = threadMessages.map((msg: ThreadMessage) => {
-    // For messages from the agent, just pass through
-    if (msg.sender_number === process.env.A1BASE_AGENT_NUMBER) {
-      return {
-        role: "assistant" as ChatRole,
-        content: msg.content
-      };
+  // Format existing thread messages for OpenAI
+  const formattedOpenAIMessages = threadMessages.map((msg) => {
+    let messageCoreContent = msg.content; // This is the raw message content
+    // Append sender's name to content if it's a group chat and sender is not the agent
+    // This name will also be part of the 'actual_content' in the JSON
+    if (threadType === "group" && msg.sender_number !== process.env.A1BASE_AGENT_NUMBER) {
+      messageCoreContent = `${msg.sender_name} said: ${messageCoreContent}`;
     }
-    
-    // For user messages, include the sender's name in group chats
-    // Using a format that doesn't influence the AI to mimic it in responses
-    let content = msg.content;
-    if (threadType === 'group' && msg.sender_name) {
-      content = `${msg.sender_name} said: ${content}`;
-    }
-    
+
+    const structuredContent = {
+      actual_content: messageCoreContent, // Ensure NO `(Sent at...)` string here
+      userName: msg.sender_name,
+      userId: msg.sender_number, // Using phone number as userId for context
+      sent_at: msg.timestamp,
+    };
+
     return {
-      role: "user" as ChatRole,
-      content: content
+      role: msg.sender_number === process.env.A1BASE_AGENT_NUMBER ? ("assistant" as const) : ("user" as const),
+      content: JSON.stringify(structuredContent), // Content is now a stringified JSON object
     };
   });
-  
-  conversation.push(...formattedMessages);
 
+  conversationForOpenAI.push(...formattedOpenAIMessages);
+
+  console.log("generateAgentResponse prompt messages (sent to OpenAI):", JSON.stringify(conversationForOpenAI, null, 2));
   const completion = await getOpenAI().chat.completions.create({
     model: "gpt-4",
-    messages: conversation as OpenAI.Chat.ChatCompletionMessageParam[],
+    messages: conversationForOpenAI,
   });
 
   return completion.choices[0]?.message?.content || "Sorry, I couldn't generate a response";

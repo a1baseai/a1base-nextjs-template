@@ -775,6 +775,9 @@ export class SupabaseAdapter {
     this.ensureInitialized();
     
     try {
+      console.log('Storing message:', { chatId, senderId, messageId, messageType, service });
+      console.log('Message content:', content);
+      
       // Extract text content from the content object for the content field
       let textContent = content.text || '';
       if (typeof content === 'object' && Object.keys(content).length > 0) {
@@ -783,6 +786,7 @@ export class SupabaseAdapter {
           for (const key in content) {
             if (content[key] && typeof content[key] === 'string') {
               textContent = content[key];
+              console.log(`Using content from key '${key}':`, textContent);
               break;
             }
           }
@@ -790,11 +794,13 @@ export class SupabaseAdapter {
           // If still no text found, stringify the whole object
           if (!textContent) {
             textContent = JSON.stringify(content);
+            console.log('No text content found, stringifying object:', textContent);
           }
         }
       }
       
-      // Console log removed
+      console.log('Prepared text content:', textContent);
+      console.log('Rich content:', richContent || content);
       
       const { data, error } = await this.supabase
         .from('messages')
@@ -812,16 +818,16 @@ export class SupabaseAdapter {
         .single();
       
       if (error) {
-        // Console error removed
+        console.error('Error storing message:', error);
         throw error;
       }
+      console.log('Message stored successfully with ID:', data.id);
       return data.id;
     } catch (error) {
-      // Console error removed
+      console.error('Exception in storeMessage:', error);
       return null;
     }
   }
-  
   /**
    * Project Operations
    */

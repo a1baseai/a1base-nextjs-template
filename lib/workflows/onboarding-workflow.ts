@@ -9,6 +9,7 @@ import { ThreadMessage } from "@/types/chat";
 import { loadOnboardingFlow } from "../onboarding-flow/onboarding-storage";
 import { OnboardingFlow } from "../onboarding-flow/types";
 import OpenAI from 'openai';
+import { SupabaseAdapter } from "../supabase/adapter";
 
 // Initialize A1Base client
 const client = new A1BaseAPI({
@@ -61,18 +62,20 @@ async function generateOnboardingMessage(systemPrompt: string): Promise<string> 
   try {
     // Console log removed
     
+    const messages = [
+      {
+        role: "system" as const,
+        content: systemPrompt
+      },
+      {
+        role: "user" as const,
+        content: "Hello!"
+      }
+    ];
+    console.log("Onboarding prompt messages:", JSON.stringify(messages, null, 2));
     const completion = await openai.chat.completions.create({
       model: "gpt-4",
-      messages: [
-        {
-          role: "system",
-          content: systemPrompt
-        },
-        {
-          role: "user",
-          content: "Hello!"
-        }
-      ],
+      messages: messages,
       temperature: 0.7,
     });
     
@@ -96,7 +99,7 @@ export async function StartOnboarding(
   threadMessages: ThreadMessage[],
   thread_type: "individual" | "group",
   thread_id?: string,
-  sender_number?: string,
+  sender_number?: string, 
   service?: string
 ): Promise<{ messages: { text: string, waitForResponse: boolean }[] }> {
   // Console log removed
@@ -119,10 +122,30 @@ export async function StartOnboarding(
     // Console log removed
     
     // Generate a conversational message using the system prompt
-    const conversationalMessage = await generateOnboardingMessage(systemPrompt);
+    const conversationalMessageText = await generateOnboardingMessage(systemPrompt);
     
     // Create a single message with the conversational prompt
-    const onboardingMessage = { text: conversationalMessage, waitForResponse: true };
+    const onboardingMessage = { text: conversationalMessageText, waitForResponse: true };
+
+    // Store AI message before sending to user
+    if (thread_id && process.env.A1BASE_AGENT_NUMBER && process.env.SUPABASE_URL && process.env.SUPABASE_KEY) {
+      const supabaseAdapter = new SupabaseAdapter(
+        process.env.SUPABASE_URL,
+        process.env.SUPABASE_KEY
+      );
+      const messageContentForDb = { text: conversationalMessageText };
+      const aiMessageId = `ai-onboarding-${Date.now()}`;
+
+      await supabaseAdapter.storeMessage(
+        thread_id, 
+        process.env.A1BASE_AGENT_NUMBER, 
+        aiMessageId, 
+        messageContentForDb, 
+        'text', 
+        service || 'whatsapp', 
+        messageContentForDb 
+      );
+    }
     
     // For WhatsApp or other channels, send the message through A1Base
     // Skip sending if we're using the special skip marker

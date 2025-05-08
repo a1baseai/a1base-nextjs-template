@@ -21,6 +21,7 @@ import { ThreadMessage } from "@/types/chat";
 import { basicWorkflowsPrompt } from "./basic_workflows_prompt";
 import fs from "fs";
 import path from "path";
+import { SupabaseAdapter } from "../supabase/adapter";
 
 // Settings loading function
 function loadMessageSettings() {
@@ -59,8 +60,17 @@ export async function DefaultReplyToMessage(
   participants: any[] = [],
   projects: any[] = []
 ): Promise<string> {
+  console.log(
+    "\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n" +
+    "[DefaultReplyToMessage] FUNCTION CALLED!\n" +
+    `  thread_id: ${thread_id}, sender_number: ${sender_number}, service: ${service}, thread_type: ${thread_type}\n` +
+    `  Number of messages: ${threadMessages.length}\n` +
+    `  Number of participants: ${participants.length}\n` +
+    `  Number of projects: ${projects.length}\n` +
+    "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n"
+  );
   // Console log removed
-  // Removed log with sender_number, message count and service
+  let agentMessage = ""; // Initialize agentMessage
 
   try {
     // Check if the most recent message is the onboarding trigger
@@ -136,29 +146,77 @@ export async function DefaultReplyToMessage(
     }
     
     // Split response into paragraphs if setting is enabled
-    const messages = splitParagraphs
-      ? response.split("\n").filter((msg) => msg.trim())
+    const finalMessages = splitParagraphs
+      ? response.split("\n\n")
       : [response];
 
-    // Send each message line individually for WhatsApp
-    // Send the message(s) through the appropriate channel
-    for (const messageContent of messages) {
-      const messageData = {
-        content: messageContent,
-        from: process.env.A1BASE_AGENT_NUMBER!,
-        service: "whatsapp" as const,
-      };
+    let supabaseAdapter: SupabaseAdapter | null = null;
+    if (process.env.SUPABASE_URL && process.env.SUPABASE_KEY) {
+      supabaseAdapter = new SupabaseAdapter(
+        process.env.SUPABASE_URL,
+        process.env.SUPABASE_KEY
+      );
+      console.log("[DefaultReplyToMessage] Supabase adapter initialized.");
+    } else {
+      console.log(
+        "[DefaultReplyToMessage] Supabase adapter NOT initialized. Check SUPABASE_URL and SUPABASE_KEY in the environment."
+      );
+    }
 
-      if (thread_type === "group" && thread_id) {
-        await client.sendGroupMessage(process.env.A1BASE_ACCOUNT_ID!, {
-          ...messageData,
-          thread_id,
-        });
-      } else if (thread_type === "individual" && sender_number) {
-        await client.sendIndividualMessage(process.env.A1BASE_ACCOUNT_ID!, {
-          ...messageData,
-          to: sender_number,
-        });
+    for (const [index, finalMessage] of finalMessages.entries()) {
+      if (finalMessage.trim() === "") continue;
+
+      console.log(`[DefaultReplyToMessage] Checking conditions to store AI message part ${index}:`);
+      console.log(`  - supabaseAdapter is ${supabaseAdapter ? 'INITIALIZED' : 'NULL'}`);
+      console.log(`  - thread_id: "${thread_id}"`);
+      console.log(`  - A1BASE_AGENT_NUMBER: "${process.env.A1BASE_AGENT_NUMBER}"`);
+      console.log(`  - service: "${service}"`);
+      const storeCondition = supabaseAdapter && thread_id && process.env.A1BASE_AGENT_NUMBER && service !== "__skip_send";
+      console.log(`  - Overall store condition met: ${storeCondition}`);
+
+      // Store AI message before sending to user
+      if (supabaseAdapter && thread_id && process.env.A1BASE_AGENT_NUMBER && service !== "__skip_send") {
+        const messageContentForDb = { text: finalMessage };
+        // Generate a unique ID for this AI message part
+        const aiMessageId = `ai-reply-${thread_id}-${Date.now()}-${index}`;
+
+        try {
+          await supabaseAdapter.storeMessage(
+            thread_id,
+            process.env.A1BASE_AGENT_NUMBER, // Sender is the AI agent
+            aiMessageId,                     // A unique ID for this AI message part
+            messageContentForDb,             // Content of the message
+            'text',                          // Message type
+            service || 'whatsapp',           // Service (default to whatsapp if not provided)
+            messageContentForDb              // Rich content can be same as content for text messages
+          );
+        } catch (dbError) {
+          console.error('Failed to store AI message to DB:', dbError);
+          // Decide if you want to stop or continue if DB store fails
+        }
+      }
+
+      // Send message through A1Base
+      // Skip sending if we're using the special skip marker
+      if (service !== "__skip_send") {
+        const messageContent = finalMessage;
+        const messageData = {
+          content: messageContent,
+          from: process.env.A1BASE_AGENT_NUMBER!,
+          service: "whatsapp" as const,
+        };
+
+        if (thread_type === "group" && thread_id) {
+          await client.sendGroupMessage(process.env.A1BASE_ACCOUNT_ID!, {
+            ...messageData,
+            thread_id,
+          });
+        } else if (thread_type === "individual" && sender_number) {
+          await client.sendIndividualMessage(process.env.A1BASE_ACCOUNT_ID!, {
+            ...messageData,
+            to: sender_number,
+          });
+        }
       }
     }
 
