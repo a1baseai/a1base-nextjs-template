@@ -142,7 +142,7 @@ export default function DebugPage() {
     setIsUpdatingProfileName(true);
     
     try {
-      const response = await fetch("/api/whatsapp/update-profile", {
+      const response = await fetch("/api/messaging/profile/update-name", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -187,7 +187,7 @@ export default function DebugPage() {
     setIsUpdatingProfilePicture(true);
     
     try {
-      const response = await fetch("/api/whatsapp/update-profile", {
+      const response = await fetch("/api/messaging/profile/update-picture", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

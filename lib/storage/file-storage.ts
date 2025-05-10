@@ -10,6 +10,7 @@
  */
 
 import { AgentProfileSettings, InformationSection } from '../agent-profile/types';
+import { AgentMemorySettingsData } from '../agent-memory/types';
 import { defaultAgentProfileSettings } from '../agent-profile/agent-profile-settings';
 import { defaultBaseInformation } from '../agent-profile/agent-base-information';
 
@@ -199,6 +200,73 @@ export const loadBaseInformation = async (): Promise<InformationSection[] | null
     return null;
   } catch (error) {
     console.error('❌ Error loading base information via API:', error);
+    return null;
+  }
+};
+
+/**
+ * Save agent memory settings via API
+ * 
+ * @param settings AgentMemorySettingsData object to save
+ * @returns Promise that resolves to true if successfully saved, false otherwise
+ */
+export const saveAgentMemorySettings = async (settings: AgentMemorySettingsData): Promise<boolean> => {
+  try {
+    const response = await fetch(`${getBaseUrl()}/api/agent-memory-settings`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ settings }),
+    });
+    
+    return response.ok;
+  } catch (error) {
+    console.error('Error saving agent memory settings via API:', error);
+    return false;
+  }
+};
+
+/**
+ * Load agent memory settings
+ * 
+ * @returns Promise that resolves to the settings object or null if not found
+ */
+export const loadAgentMemorySettings = async (): Promise<AgentMemorySettingsData | null> => {
+  // If we're running on the server side in an API route, access the file directly
+  if (typeof window === 'undefined') {
+    try {
+      const dataDir = path.join(process.cwd(), 'data');
+      const filePath = path.join(dataDir, 'agent-memory-settings.json');
+      
+      if (!fs.existsSync(filePath)) {
+        return null;
+      }
+      
+      const data = fs.readFileSync(filePath, 'utf8');
+      const settings = JSON.parse(data);
+      
+      return {
+        ...settings,
+        _source: 'server_direct_file'
+      };
+    } catch (error) {
+      console.error('❌ [SERVER] Error loading agent memory settings from file:', error);
+      return null;
+    }
+  }
+  
+  // Client-side or non-API server code: use API endpoint
+  try {
+    const response = await fetch(`${getBaseUrl()}/api/agent-memory-settings`);
+    
+    if (response.ok) {
+      const data = await response.json();
+      return data.settings;
+    }    
+    return null;
+  } catch (error) {
+    console.error('❌ Error loading agent memory settings via API:', error);
     return null;
   }
 };

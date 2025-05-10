@@ -1,0 +1,26 @@
+{
+  "memoryCollectionEnabled": true,
+  "informationToSave": "key_details_and_preferences",
+  "memoryTypeNote": "This is basic memory collection. More advanced capabilities, potentially leveraging tools like mem0.ai, will be explored for future enhancements.",
+  "fields": [
+    {
+      "name": "memoryCollectionEnabled",
+      "label": "Enable Memory Collection",
+      "type": "toggle",
+      "description": "Allow the agent to remember information from conversations."
+    },
+    {
+      "name": "informationToSave",
+      "label": "Information to Save",
+      "type": "select",
+      "options": [
+        {"value": "key_details_and_preferences", "label": "Key Details & User Preferences"},
+        {"value": "summarized_exchanges", "label": "Summarized Conversation Exchanges"},
+        {"value": "off", "label": "Only Explicitly Marked Items"}
+      ],
+      "description": "Specify what kind of information the agent should retain."
+    }
+  ],
+  "title": "Agent Memory Settings",
+  "description": "Configure how the agent remembers information to personalize interactions and improve assistance over time."
+}
