@@ -29,7 +29,6 @@
     "finalMessage": "Thank you for sharing this information. I've saved your details and I'm ready to help you achieve your goals. What would you like assistance with today?"
   },
   "settings": {
-    "skipForReturningUsers": true,
     "captureUserPreferences": true,
     "askForName": true,
     "askForBusinessType": true

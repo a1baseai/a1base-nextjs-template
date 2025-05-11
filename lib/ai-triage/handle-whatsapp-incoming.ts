@@ -114,11 +114,18 @@ async function processOnboardingConversation(
       );
     }
 
+
+    
+
     const requiredFields = onboardingFlow.agenticSettings.userFields
       .filter((field) => field.required)
       .map((field) => field.id);
 
+    console.log("[Onboarding] Required fields:", requiredFields)
+
     const formattedMessages = formatMessagesForOpenAI(threadMessages);
+
+    
 
     const extractionPrompt = `
       Based on the conversation, extract the following information about the user:
@@ -131,8 +138,11 @@ async function processOnboardingConversation(
       Example response format: { "name": "John Doe", "email": "john@example.com", "business_type": "Tech", "goals": "Increase productivity" }
       DO NOT include any explanations, markdown formatting, or anything outside the JSON object.`;
 
+    console.log("[Onboarding] Extraction prompt:", extractionPrompt)
+
     const extraction = await openaiClient.chat.completions.create({
-      model: "gpt-4",
+      model: "gpt-4.1",
+      response_format: { type: "json_object" },
       messages: [
         { role: "system" as const, content: extractionPrompt },
         ...formattedMessages,
@@ -145,6 +155,7 @@ async function processOnboardingConversation(
     const extractionContent = extraction.choices[0]?.message?.content || "{}";
     console.log("[Onboarding] Raw extraction content:", extractionContent);
     const extractedInfo = extractJsonFromString(extractionContent);
+
 
     const isComplete = requiredFields.every(
       (field) =>
@@ -209,14 +220,17 @@ async function handleAgenticOnboardingFollowUp(
       `[Onboarding] Processing ${formattedMessages.length} messages for agentic follow-up`
     );
 
-    console.log("Formatted messages:")
-    console.log(formattedMessages)
-    console.log("Thread messages:")
-    console.log(threadMessages)
+    // console.log("Formatted messages:")
+    // console.log(formattedMessages)
+    // console.log("Thread messages:")
+    // console.log(threadMessages)
 
     const { extractedInfo, isComplete } = await processOnboardingConversation(
       threadMessages
     );
+
+    console.log("[Onboarding] Extraction results:", extractedInfo);
+    console.log("[Onboarding] Onboarding complete:", isComplete);
 
     if (senderNumber && Object.keys(extractedInfo).length > 0 && adapter) {
       await saveOnboardingInfoToDatabase(
@@ -238,7 +252,7 @@ async function handleAgenticOnboardingFollowUp(
       );
     } else {
       const completion = await openaiClient.chat.completions.create({
-        model: "gpt-4",
+        model: "gpt-4.1",
         messages: [
           { role: "system" as const, content: systemPrompt },
           ...formattedMessages,

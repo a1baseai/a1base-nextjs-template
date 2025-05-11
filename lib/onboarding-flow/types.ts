@@ -38,12 +38,9 @@ export interface GroupAgenticSettings {
 export interface OnboardingFlow {
   enabled: boolean;
   messages: OnboardingMessage[];
-  mode: 'agentic';
+  mode: "agentic";
   agenticSettings: AgenticSettings;
   settings: {
-    // General settings for the onboarding flow
-    skipForReturningUsers: boolean;
-    // Additional optional settings specific to the onboarding flow
     captureUserPreferences?: boolean;
     askForName?: boolean;
     askForBusinessType?: boolean;
@@ -52,7 +49,7 @@ export interface OnboardingFlow {
 
 export interface GroupOnboardingFlow {
   enabled: boolean;
-  mode: 'agentic';
+  mode: "agentic";
   agenticSettings: GroupAgenticSettings;
 }
 
@@ -60,51 +57,52 @@ export const defaultOnboardingFlow: OnboardingFlow = {
   enabled: true,
   messages: [
     {
-      id: '1',
-      text: 'Hi there! 👋 I\'m your new AI assistant. Welcome!',
+      id: "1",
+      text: "Hi there! 👋 I'm your new AI assistant. Welcome!",
       waitForResponse: false,
-      order: 1
+      order: 1,
     },
     {
-      id: '2',
-      text: 'I\'m here to help with answering your questions and supporting your business needs.',
+      id: "2",
+      text: "I'm here to help with answering your questions and supporting your business needs.",
       waitForResponse: false,
-      order: 2
+      order: 2,
     },
     {
-      id: '3',
-      text: 'What can I help you with today?',
+      id: "3",
+      text: "What can I help you with today?",
       waitForResponse: true,
-      order: 3
-    }
+      order: 3,
+    },
   ],
-  mode: 'agentic',
+  mode: "agentic",
   agenticSettings: {
-    systemPrompt: 'You are conducting an onboarding conversation with a new user. Your goal is to make them feel welcome and collect some basic information that will help you assist them better in the future. Be friendly, professional, and conversational.',
+    systemPrompt:
+      "You are conducting an onboarding conversation with a new user. Your goal is to make them feel welcome and collect some basic information that will help you assist them better in the future. Be friendly, professional, and conversational.",
     userFields: [
       {
-        _internalReactKey: 'name-field', // Stable key for React rendering
-        id: 'name',
-        label: 'Full Name',
+        _internalReactKey: "name-field", // Stable key for React rendering
+        id: "name",
+        label: "Full Name",
         required: true,
-        description: 'Ask for the user\'s full name'
+        description: "Ask for the user's full name",
       },
       {
-        _internalReactKey: 'email-field', // Stable key for React rendering
-        id: 'email',
-        label: 'Email Address',
+        _internalReactKey: "email-field", // Stable key for React rendering
+        id: "email",
+        label: "Email Address",
         required: true,
-        description: 'Ask for the user\'s email address'
-      }
+        description: "Ask for the user's email address",
+      },
     ],
-    finalMessage: 'Thank you for sharing this information. I\'ve saved your details and I\'m ready to help you achieve your goals.'
+    finalMessage:
+      "Thank you for sharing this information. I've saved your details and I'm ready to help you achieve your goals.",
   },
   settings: {
-    skipForReturningUsers: true,
     captureUserPreferences: false,
     askForName: false,
-    askForBusinessType: false
-  }
+    askForBusinessType: false,
+  },
 };
 
 // Group onboarding flow must be loaded from a file

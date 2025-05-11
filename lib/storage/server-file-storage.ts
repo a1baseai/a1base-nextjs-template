@@ -51,8 +51,8 @@ export const loadOnboardingFlowFromFile = async (): Promise<OnboardingFlow | nul
     const flowData = JSON.parse(data) as OnboardingFlow;
     
     // Log the complete file contents
-    console.log('📃 INDIVIDUAL ONBOARDING FLOW FILE CONTENTS:');
-    console.log(JSON.stringify(flowData, null, 2));
+    // console.log('📃 INDIVIDUAL ONBOARDING FLOW FILE CONTENTS:');
+    // console.log(JSON.stringify(flowData, null, 2));
     
     return flowData;
   } catch (error) {
