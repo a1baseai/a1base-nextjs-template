@@ -8,9 +8,9 @@ import { A1BaseAPI } from "a1base-node";
 import { ThreadMessage } from "@/types/chat";
 import { loadOnboardingFlow } from "../onboarding-flow/onboarding-storage";
 import { OnboardingFlow } from "../onboarding-flow/types";
-import OpenAI from 'openai';
 import { SupabaseAdapter } from "../supabase/adapter";
 import { getInitializedAdapter } from "../supabase/config";
+import { generateAgentResponse } from "../services/openai";
 
 // Initialize A1Base client
 const client = new A1BaseAPI({
@@ -18,11 +18,6 @@ const client = new A1BaseAPI({
     apiKey: process.env.A1BASE_API_KEY!,
     apiSecret: process.env.A1BASE_API_SECRET!,
   },
-});
-
-// Initialize OpenAI client
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
 });
 
 /**
@@ -72,36 +67,30 @@ export function createAgenticOnboardingPrompt(
 /**
  * Generate a conversational onboarding message using OpenAI
  * @param systemPrompt The system prompt containing onboarding instructions
+ * @param service The service being used
  * @returns A conversational, user-friendly onboarding message
  */
-async function generateOnboardingMessage(systemPrompt: string): Promise<string> {
+async function generateOnboardingMessage(systemPrompt: string, service?: string): Promise<string> {
   try {
-    // Console log removed
-    
-    const messages = [
-      {
-        role: "system" as const,
-        content: systemPrompt
-      },
-      {
-        role: "user" as const,
-        content: "Hello!"
-      }
-    ];
-    console.log("Onboarding prompt messages:", JSON.stringify(messages, null, 2));
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4.1",
-      messages: messages,
-      temperature: 0.7,
-    });
-    
-    const generatedMessage = completion.choices[0]?.message?.content || 
-      "Hello! I'm your assistant. To get started, could you please tell me your name?";
-    
-    // Console log removed
-    return generatedMessage;
+    // console.log("[generateOnboardingMessage] System prompt for onboarding:", systemPrompt);
+
+    // Use generateAgentResponse. For an initial onboarding message, there are no prior threadMessages.
+    // The systemPrompt created by createAgenticOnboardingPrompt will be the main driver.
+    // We provide a simple initial user message like "Hello!" to kick off the AI's response generation
+    // based on the detailed system prompt.
+    const generatedMessage = await generateAgentResponse(
+      [], // No prior messages
+      "Hello!", // Initial user-like prompt to elicit response from the system prompt
+      "individual", // Assuming onboarding starts as individual, can be adjusted if needed
+      [], // No participants needed for this direct system prompt driven response
+      [], // No projects needed
+      service // Pass service through
+    );
+
+    // console.log("[generateOnboardingMessage] Generated onboarding message:", generatedMessage);
+    return generatedMessage || "Hello! I'm your assistant. To get started, could you please tell me your name?";
   } catch (error) {
-    console.error('Error generating onboarding message:', error);
+    // console.error('[generateOnboardingMessage] Error generating onboarding message:', error);
     return "Hello! I'm your assistant. To help you get set up, could you please tell me your name?";
   }
 }
@@ -138,7 +127,7 @@ export async function StartOnboarding(
     // Console log removed
     
     // Generate a conversational message using the system prompt
-    const conversationalMessageText = await generateOnboardingMessage(systemPrompt);
+    const conversationalMessageText = await generateOnboardingMessage(systemPrompt, service);
     
     // Create a single message with the conversational prompt
     const onboardingMessage = { text: conversationalMessageText, waitForResponse: true };

@@ -2,6 +2,11 @@ import { ThreadMessage } from "@/types/chat";
 import OpenAI from "openai";
 import { getSystemPrompt } from "../agent/system-prompt";
 import { generateRichChatContext } from "./chat-context";
+import {
+  isSupabaseConfigured,
+  getInitializedAdapter,
+} from "../supabase/config";
+import { SupabaseAdapter } from "../supabase/adapter";
 
 // Don't initialize during build time
 const isBuildTime =
@@ -98,41 +103,45 @@ Return valid JSON with only that single key "responseType" and value as one of t
 }
 
 /**
- * Generate an introduction message for the AI agent when first joining a conversation.
- * Uses the agent profile settings to craft a contextual introduction.
+ * Generate an introduction from the AI agent
  */
 export async function generateAgentIntroduction(
-  incomingMessage: string,
-  userName?: string
+  userPrompt?: string, // This is more like a system instruction for introduction
+  threadType: string = "individual",
+  participants: any[] = [],
+  projects: any[] = []
 ): Promise<string> {
-  if (!userName) {
-    return "Hey there!";
-  }
-
-  // Get the system prompt with custom settings
   const systemPromptContent = await getSystemPrompt();
-
-  const conversation = [
-    {
-      role: "system" as const,
-      content: systemPromptContent,
-    },
-    {
-      role: "user" as const,
-      content: incomingMessage,
-    },
-  ];
-
-  console.log(
-    "generateAgentIntroduction prompt messages:",
-    JSON.stringify(conversation, null, 2)
+  const richContext = generateRichChatContext(
+    threadType,
+    [], // No messages for a fresh introduction context
+    participants,
+    projects
   );
-  const completion = await getOpenAI().chat.completions.create({
-    model: "gpt-4",
-    messages: conversation,
-  });
+  const introSystemMessageWithContext = systemPromptContent + richContext;
 
-  return completion.choices[0]?.message?.content || "Hello!";
+  // console.log(
+  //   "generateAgentIntroduction prompt messages (sent to OpenAI):",
+  //   JSON.stringify(
+  //     [
+  //       { role: "system", content: introSystemMessageWithContext },
+  //       { role: "user", content: userPrompt || "Introduce yourself." }, // User prompt for intro
+  //     ],
+  //     null,
+  //     2
+  //   )
+  // );
+
+  // Call generateAgentResponse with an empty message list and the constructed prompt
+  // The userPrompt for generateAgentIntroduction acts as the 'userPrompt' for generateAgentResponse in this specific context
+  return generateAgentResponse(
+    [], // No prior messages for introduction
+    userPrompt || "Introduce yourself briefly and state your purpose.", // This acts as the userPrompt for the system's intro
+    threadType,
+    participants,
+    projects,
+    undefined // service - not typically available/relevant for a fresh intro
+  );
 }
 
 /**
@@ -143,16 +152,22 @@ export async function generateAgentResponse(
   userPrompt?: string,
   threadType: string = "individual",
   participants: any[] = [],
-  projects: any[] = []
+  projects: any[] = [],
+  service?: string // Added service parameter
 ): Promise<string> {
   // Try to extract the user's name from the latest message
   const userName = threadMessages.find(
     (msg) => msg.sender_number !== process.env.A1BASE_AGENT_NUMBER
   )?.sender_name;
 
-  if (!userName) {
-    return "Hey there!";
+  if (!userName && threadMessages.length > 0) {
+    // Check threadMessages.length to ensure it's not an intro call with no user
+    // This case might occur if the first message is from the agent, or if sender_name is missing
+    // For now, let's have a generic fallback if we can't find a user name in a populated thread
+    // console.warn("[generateAgentResponse] Could not determine userName from threadMessages.");
+    // Depending on desired behavior, could return a generic greeting or error
   }
+  // If threadMessages is empty (like in an intro), userName will be undefined, which is handled by the intro prompt itself.
 
   // Get the system prompt with custom settings
   const systemPromptContent = await getSystemPrompt();
@@ -163,7 +178,59 @@ export async function generateAgentResponse(
     projects
   );
   // Combine the base system prompt with the rich context
-  const enhancedSystemPrompt = systemPromptContent + richContext;
+  let enhancedSystemPrompt = systemPromptContent + richContext;
+
+  // --- BEGIN MODIFICATION: Fetch and add Supabase onboarding data ---
+  if (isSupabaseConfigured()) {
+    const supabaseAdapter = getInitializedAdapter();
+    if (supabaseAdapter) {
+      let onboardingData: Record<string, any> | null = null;
+      try {
+        if (
+          threadType === "group" &&
+          service &&
+          threadMessages.length > 0 &&
+          threadMessages[0].thread_id
+        ) {
+          // console.log(`[generateAgentResponse] Fetching group onboarding data for thread_id: ${threadMessages[0].thread_id}, service: ${service}`);
+          onboardingData = await supabaseAdapter.getChatOnboardingData(
+            threadMessages[0].thread_id,
+            service
+          );
+        } else if (threadType === "individual") {
+          const userPhoneNumber = threadMessages.find(
+            (msg) => msg.sender_number !== process.env.A1BASE_AGENT_NUMBER
+          )?.sender_number;
+          if (userPhoneNumber) {
+            // console.log(`[generateAgentResponse] Fetching individual onboarding data for user: ${userPhoneNumber}`);
+            onboardingData = await supabaseAdapter.getUserOnboardingData(
+              userPhoneNumber
+            );
+          }
+        }
+
+        if (onboardingData && Object.keys(onboardingData).length > 0) {
+          // console.log("[generateAgentResponse] Successfully fetched onboarding data:", onboardingData);
+          const onboardingContext = `\n\n--- Onboarding Data Context ---\n${JSON.stringify(
+            onboardingData,
+            null,
+            2
+          )}\n--- End Onboarding Data Context ---`;
+          enhancedSystemPrompt += onboardingContext;
+        } else {
+          // console.log("[generateAgentResponse] No onboarding data found or data is empty.");
+        }
+      } catch (error) {
+        // console.error("[generateAgentResponse] Error fetching onboarding data from Supabase:", error);
+        // Proceed without onboarding data if an error occurs
+      }
+    } else {
+      // console.warn("[generateAgentResponse] Supabase is configured, but adapter is not initialized.");
+    }
+  } else {
+    // console.log("[generateAgentResponse] Supabase not configured. Skipping onboarding data fetch.");
+  }
+  // --- END MODIFICATION ---
 
   const conversationForOpenAI: OpenAI.Chat.ChatCompletionMessageParam[] = [];
   conversationForOpenAI.push({
@@ -194,10 +261,6 @@ export async function generateAgentResponse(
       userId: msg.sender_number, // Using phone number as userId for context
       sent_at: msg.timestamp,
     };
-
-    console.log("====== STRUCTURED CONTENT ======");
-    console.log(structuredContent);
-    console.log("====== END STRUCTURED CONTENT ======");
 
     return {
       role:

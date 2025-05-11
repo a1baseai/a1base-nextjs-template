@@ -235,7 +235,8 @@ export async function DefaultReplyToMessage(
       basicWorkflowsPrompt.simple_response.user,
       thread_type,
       participants,
-      projects
+      projects,
+      service // Pass the service parameter here
     );
     console.log("[DefaultReplyToMessage] AI response generated.");
 
