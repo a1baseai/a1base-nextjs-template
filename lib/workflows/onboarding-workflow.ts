@@ -29,9 +29,13 @@ const openai = new OpenAI({
  * Creates a system prompt for onboarding based on the onboarding settings
  * 
  * @param onboardingFlow The complete onboarding flow configuration
+ * @param existingData Optional. An object containing already collected user data.
  * @returns The formatted system prompt for the AI
  */
-export function createAgenticOnboardingPrompt(onboardingFlow: OnboardingFlow): string {
+export function createAgenticOnboardingPrompt(
+  onboardingFlow: OnboardingFlow,
+  existingData?: Record<string, any>
+): string {
   if (!onboardingFlow.agenticSettings) {
     throw new Error("Agentic settings not available in the onboarding flow");
   }
@@ -39,8 +43,19 @@ export function createAgenticOnboardingPrompt(onboardingFlow: OnboardingFlow): s
   // Use the configured system prompt for onboarding
   const systemPrompt = onboardingFlow.agenticSettings.systemPrompt;
   
+  // Filter userFields to only include those not yet collected or empty
+  const fieldsToCollect = onboardingFlow.agenticSettings.userFields.filter(field => {
+    return !existingData || !existingData[field.id] || existingData[field.id] === "";
+  });
+
+  // If all required fields are collected (or no fields were defined to be collected),
+  // instruct AI to use the final message.
+  if (fieldsToCollect.length === 0) {
+    return `${systemPrompt}\n\nAll required information has been collected. Now, respond with: ${onboardingFlow.agenticSettings.finalMessage}`;
+  }
+  
   // Convert user fields to instructions for the AI
-  const fieldInstructions = onboardingFlow.agenticSettings.userFields
+  const fieldInstructions = fieldsToCollect
     .map(field => {
       const requiredText = field.required ? "(required)" : "(optional)";
       return `- ${field.description} ${requiredText}. Store as '${field.id}'.`;
@@ -75,7 +90,7 @@ async function generateOnboardingMessage(systemPrompt: string): Promise<string> 
     ];
     console.log("Onboarding prompt messages:", JSON.stringify(messages, null, 2));
     const completion = await openai.chat.completions.create({
-      model: "gpt-4",
+      model: "gpt-4.1",
       messages: messages,
       temperature: 0.7,
     });

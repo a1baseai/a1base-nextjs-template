@@ -74,22 +74,36 @@ function formatMessagesForOpenAI(
  * Extracts JSON from a string, attempting to find a valid JSON object within.
  */
 function extractJsonFromString(content: string): Record<string, any> {
-  let jsonContent = content;
-  if (content.includes("{") && content.includes("}")) {
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
+  let jsonContent = ""; // Initialize to empty
+
+  // Attempt to extract from ```json ... ``` block first
+  const codeBlockMatch = content.match(/```json\s*([\s\S]*?)\s*```/);
+  if (codeBlockMatch && codeBlockMatch[1]) {
+    jsonContent = codeBlockMatch[1].trim();
+  } else if (content.includes("{") && content.includes("}")) { // Fallback to looking for raw JSON object
+    const jsonMatch = content.match(/\{[\s\S]*?\}/); // Use non-greedy match for content within braces
     if (jsonMatch) {
-      jsonContent = jsonMatch[0];
+      jsonContent = jsonMatch[0].trim(); // Trim the matched string
     }
   }
+
+  // If no potential JSON was extracted, or it's empty/invalid after trimming, return.
+  if (!jsonContent || (!jsonContent.startsWith('{') && !jsonContent.startsWith('['))) {
+    // console.warn("[JSON Extraction] No JSON content found or extracted content is not JSON. Original:", content, "Extracted:", jsonContent);
+    return {};
+  }
+
   try {
     return JSON.parse(jsonContent);
   } catch (e) {
-    console.error(
-      "[JSON Extraction] Error parsing content:",
-      e,
-      "Original content:",
-      content
-    );
+    // console.error(
+    //   "[JSON Extraction] Error parsing content:",
+    //   e,
+    //   "Original content:",
+    //   content,
+    //   "Attempted to parse:",
+    //   jsonContent
+    // );
     return {};
   }
 }
@@ -114,18 +128,11 @@ async function processOnboardingConversation(
       );
     }
 
-
-    
-
     const requiredFields = onboardingFlow.agenticSettings.userFields
       .filter((field) => field.required)
       .map((field) => field.id);
 
-    console.log("[Onboarding] Required fields:", requiredFields)
-
     const formattedMessages = formatMessagesForOpenAI(threadMessages);
-
-    
 
     const extractionPrompt = `
       Based on the conversation, extract the following information about the user:
@@ -138,11 +145,8 @@ async function processOnboardingConversation(
       Example response format: { "name": "John Doe", "email": "john@example.com", "business_type": "Tech", "goals": "Increase productivity" }
       DO NOT include any explanations, markdown formatting, or anything outside the JSON object.`;
 
-    console.log("[Onboarding] Extraction prompt:", extractionPrompt)
-
     const extraction = await openaiClient.chat.completions.create({
       model: "gpt-4.1",
-      response_format: { type: "json_object" },
       messages: [
         { role: "system" as const, content: extractionPrompt },
         ...formattedMessages,
@@ -150,12 +154,9 @@ async function processOnboardingConversation(
       temperature: 0.2,
     });
 
-    console.log("[Onboarding] Extraction response:", extraction.choices[0]?.message?.content);
-
     const extractionContent = extraction.choices[0]?.message?.content || "{}";
     console.log("[Onboarding] Raw extraction content:", extractionContent);
     const extractedInfo = extractJsonFromString(extractionContent);
-
 
     const isComplete = requiredFields.every(
       (field) =>
@@ -212,18 +213,12 @@ async function handleAgenticOnboardingFollowUp(
 ): Promise<{ text: string; waitForResponse: boolean }> {
   console.log("[Onboarding] Handling agentic follow-up onboarding message");
   try {
-    const onboardingFlow = await loadOnboardingFlow();
-    const systemPrompt = createAgenticOnboardingPrompt(onboardingFlow);
+    const onboardingFlow = await loadOnboardingFlow(); // Load flow once
     const formattedMessages = formatMessagesForOpenAI(threadMessages);
 
     console.log(
       `[Onboarding] Processing ${formattedMessages.length} messages for agentic follow-up`
     );
-
-    // console.log("Formatted messages:")
-    // console.log(formattedMessages)
-    // console.log("Thread messages:")
-    // console.log(threadMessages)
 
     const { extractedInfo, isComplete } = await processOnboardingConversation(
       threadMessages
@@ -231,6 +226,7 @@ async function handleAgenticOnboardingFollowUp(
 
     console.log("[Onboarding] Extraction results:", extractedInfo);
     console.log("[Onboarding] Onboarding complete:", isComplete);
+    console.log("[Onboarding] Formatted Messages:", formattedMessages);
 
     if (senderNumber && Object.keys(extractedInfo).length > 0 && adapter) {
       await saveOnboardingInfoToDatabase(
@@ -251,8 +247,12 @@ async function handleAgenticOnboardingFollowUp(
         `[Onboarding] Onboarding completed for user with phone number ${senderNumber}`
       );
     } else {
+      // Generate the system prompt dynamically using the extractedInfo
+      const systemPrompt = createAgenticOnboardingPrompt(onboardingFlow, extractedInfo);
+      console.log("[Onboarding] Generated dynamic system prompt:", systemPrompt);
+
       const completion = await openaiClient.chat.completions.create({
-        model: "gpt-4.1",
+        model: "gpt-4.1", // Consider making model configurable or using a constant
         messages: [
           { role: "system" as const, content: systemPrompt },
           ...formattedMessages,
