@@ -4,17 +4,19 @@ import { getSystemPrompt } from "../agent/system-prompt";
 import { generateRichChatContext } from "./chat-context";
 
 // Don't initialize during build time
-const isBuildTime = process.env.NODE_ENV === 'production' && process.env.NEXT_PHASE === 'phase-production-build';
+const isBuildTime =
+  process.env.NODE_ENV === "production" &&
+  process.env.NEXT_PHASE === "phase-production-build";
 
 // Create a lazy-loaded OpenAI client that will only be initialized at runtime
 let openai: OpenAI;
 export const getOpenAI = () => {
   if (!openai) {
     if (!process.env.OPENAI_API_KEY) {
-      console.error('OpenAI API error: No API key provided');
+      console.error("OpenAI API error: No API key provided");
     }
     openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY || 'dummy-key-for-build-time',
+      apiKey: process.env.OPENAI_API_KEY || "dummy-key-for-build-time",
     });
   }
   return openai;
@@ -31,14 +33,14 @@ type ChatRole = "system" | "user" | "assistant" | "function";
  *  - handleEmailAction: Draft email and await user approval for sending (DISABLED)
  *  - taskActionConfirmation: Confirm with user before proceeding with requested task (i.e before sending an email)
  * =======================================================================
- */   
+ */
 export async function triageMessageIntent(
   threadMessages: ThreadMessage[]
 ): Promise<{
   responseType:
     | "simpleResponse"
     // | "handleEmailAction" (DISABLED)
-    | "onboardingFlow"
+    | "onboardingFlow";
 }> {
   // Convert thread messages to OpenAI chat format
   const conversationContext = threadMessages.map((msg) => ({
@@ -109,7 +111,7 @@ export async function generateAgentIntroduction(
 
   // Get the system prompt with custom settings
   const systemPromptContent = await getSystemPrompt();
-  
+
   const conversation = [
     {
       role: "system" as const,
@@ -121,7 +123,10 @@ export async function generateAgentIntroduction(
     },
   ];
 
-  console.log("generateAgentIntroduction prompt messages:", JSON.stringify(conversation, null, 2));
+  console.log(
+    "generateAgentIntroduction prompt messages:",
+    JSON.stringify(conversation, null, 2)
+  );
   const completion = await getOpenAI().chat.completions.create({
     model: "gpt-4",
     messages: conversation,
@@ -136,14 +141,14 @@ export async function generateAgentIntroduction(
 export async function generateAgentResponse(
   threadMessages: ThreadMessage[],
   userPrompt?: string,
-  threadType: string = 'individual',
+  threadType: string = "individual",
   participants: any[] = [],
   projects: any[] = []
 ): Promise<string> {
   // Try to extract the user's name from the latest message
   const userName = threadMessages.find(
     (msg) => msg.sender_number !== process.env.A1BASE_AGENT_NUMBER
-    )?.sender_name;
+  )?.sender_name;
 
   if (!userName) {
     return "Hey there!";
@@ -151,10 +156,15 @@ export async function generateAgentResponse(
 
   // Get the system prompt with custom settings
   const systemPromptContent = await getSystemPrompt();
-  const richContext = generateRichChatContext(threadType, threadMessages, participants, projects);
+  const richContext = generateRichChatContext(
+    threadType,
+    threadMessages,
+    participants,
+    projects
+  );
   // Combine the base system prompt with the rich context
   const enhancedSystemPrompt = systemPromptContent + richContext;
-  
+
   const conversationForOpenAI: OpenAI.Chat.ChatCompletionMessageParam[] = [];
   conversationForOpenAI.push({
     role: "system" as const,
@@ -171,7 +181,10 @@ export async function generateAgentResponse(
     let messageCoreContent = msg.content; // This is the raw message content
     // Append sender's name to content if it's a group chat and sender is not the agent
     // This name will also be part of the 'actual_content' in the JSON
-    if (threadType === "group" && msg.sender_number !== process.env.A1BASE_AGENT_NUMBER) {
+    if (
+      threadType === "group" &&
+      msg.sender_number !== process.env.A1BASE_AGENT_NUMBER
+    ) {
       messageCoreContent = `${msg.sender_name} said: ${messageCoreContent}`;
     }
 
@@ -182,19 +195,32 @@ export async function generateAgentResponse(
       sent_at: msg.timestamp,
     };
 
+    console.log("====== STRUCTURED CONTENT ======");
+    console.log(structuredContent);
+    console.log("====== END STRUCTURED CONTENT ======");
+
     return {
-      role: msg.sender_number === process.env.A1BASE_AGENT_NUMBER ? ("assistant" as const) : ("user" as const),
+      role:
+        msg.sender_number === process.env.A1BASE_AGENT_NUMBER
+          ? ("assistant" as const)
+          : ("user" as const),
       content: JSON.stringify(structuredContent), // Content is now a stringified JSON object
     };
   });
 
   conversationForOpenAI.push(...formattedOpenAIMessages);
 
-  console.log("generateAgentResponse prompt messages (sent to OpenAI):", JSON.stringify(conversationForOpenAI, null, 2));
+  console.log(
+    "generateAgentResponse prompt messages (sent to OpenAI):",
+    JSON.stringify(conversationForOpenAI, null, 2)
+  );
   const completion = await getOpenAI().chat.completions.create({
     model: "gpt-4",
     messages: conversationForOpenAI,
   });
 
-  return completion.choices[0]?.message?.content || "Sorry, I couldn't generate a response";
+  return (
+    completion.choices[0]?.message?.content ||
+    "Sorry, I couldn't generate a response"
+  );
 }

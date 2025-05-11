@@ -140,6 +140,8 @@ async function processOnboardingConversation(
       temperature: 0.2,
     });
 
+    console.log("[Onboarding] Extraction response:", extraction.choices[0]?.message?.content);
+
     const extractionContent = extraction.choices[0]?.message?.content || "{}";
     console.log("[Onboarding] Raw extraction content:", extractionContent);
     const extractedInfo = extractJsonFromString(extractionContent);
@@ -206,6 +208,11 @@ async function handleAgenticOnboardingFollowUp(
     console.log(
       `[Onboarding] Processing ${formattedMessages.length} messages for agentic follow-up`
     );
+
+    console.log("Formatted messages:")
+    console.log(formattedMessages)
+    console.log("Thread messages:")
+    console.log(threadMessages)
 
     const { extractedInfo, isComplete } = await processOnboardingConversation(
       threadMessages

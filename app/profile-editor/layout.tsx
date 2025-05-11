@@ -19,6 +19,7 @@ import {
   FolderCog,
   Save,
   CheckCircle2,
+  Brain,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -80,6 +81,12 @@ export default function ProfileEditorLayout({
       icon: <Users className="h-5 w-5" />,
       href: "/profile-editor/profile-settings",
       variant: pathname.includes("/profile-settings") ? "default" : "ghost",
+    },
+    {
+      title: "Agent Memory",
+      icon: <Brain className="h-5 w-5" />,
+      href: "/profile-editor/memory",
+      variant: pathname.includes("/memory") ? "default" : "ghost",
     },
     {
       title: "Base Information",
@@ -209,6 +216,7 @@ export default function ProfileEditorLayout({
             <h1 className="text-2xl font-bold">
               {pathname.includes("/get-started") && "Get Started"}
               {pathname.includes("/profile-settings") && "Profile Settings"}
+              {pathname.includes("/memory") && "Agent Memory"}
               {pathname.includes("/base-information") && "Base Information"}
               {pathname.includes("/onboarding-flow") &&
                 "Individual Chat Onboarding"}
@@ -225,6 +233,8 @@ export default function ProfileEditorLayout({
                 "Set up your AI agent with a guided flow"}
               {pathname.includes("/profile-settings") &&
                 "Configure your agent's identity and appearance"}
+              {pathname.includes("/memory") &&
+                "Configure how your agent remembers information from conversations"}
               {pathname.includes("/base-information") &&
                 "Provide base knowledge for your agent"}
               {pathname.includes("/onboarding-flow") &&

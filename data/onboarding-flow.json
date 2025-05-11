@@ -8,31 +8,22 @@
         "id": "name",
         "label": "Full Name",
         "required": true,
-        "description": "Ask for the user's full name"
+        "description": "Ask for the user's full name",
+        "_internalReactKey": "08f1c521-7231-4405-9eb1-2eb258a9591e"
       },
       {
         "id": "email",
         "label": "Email Address",
         "required": true,
-        "description": "Ask for the user's email address"
-      },
-      {
-        "id": "business_type",
-        "label": "Business Type",
-        "required": false,
-        "description": "Ask what industry or business type they're in"
-      },
-      {
-        "id": "goals",
-        "label": "Goals",
-        "required": false,
-        "description": "Ask what they hope to accomplish with the AI assistant"
+        "description": "Ask for the user's email address",
+        "_internalReactKey": "9de6c6f7-d49c-4df9-afe9-e7282aacd973"
       },
       {
         "id": "big_dream",
         "label": "BigDream",
         "required": true,
-        "description": "Ask the user for what their biggest dream for their project/startup is"
+        "description": "Ask the user for what their biggest dream for their project/startup is",
+        "_internalReactKey": "0cc13807-b784-4e23-b160-1540391e1239"
       }
     ],
     "finalMessage": "Thank you for sharing this information. I've saved your details and I'm ready to help you achieve your goals. What would you like assistance with today?"

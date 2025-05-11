@@ -86,21 +86,23 @@ export default function ProfileSettingsEditor() {
     if (!profileSettings) return;
     
     try {
-      // Save to API
-      await apiSaveProfileSettings(profileSettings);
+      // Save to server via API
+      const success = await apiSaveProfileSettings(profileSettings);
       
-      // Save to localStorage as backup
-      saveToLocalStorage(LOCAL_STORAGE_KEYS.AGENT_PROFILE, profileSettings);
-      
-      setHasChanges(false);
-      toast.success("Profile settings saved successfully!");
+      if (success) {
+        toast.success("Profile settings saved successfully");
+        setHasChanges(false);
+      } else {
+        // If server save fails, try local storage
+        saveToLocalStorage(LOCAL_STORAGE_KEYS.AGENT_PROFILE, profileSettings);
+        toast.warning("Saved to browser only. Server save failed.");
+      }
     } catch (error) {
       console.error("Error saving profile settings:", error);
+      toast.error("Failed to save profile settings");
       
-      // Try to save to localStorage even if API fails
+      // Fall back to local storage on error
       saveToLocalStorage(LOCAL_STORAGE_KEYS.AGENT_PROFILE, profileSettings);
-      
-      toast.error("Failed to save to server, but saved locally");
     }
   };
 
@@ -446,6 +448,8 @@ export default function ProfileSettingsEditor() {
               />
             </div>
           </div>
+          
+
         </CardContent>
         <CardFooter className="flex justify-between">
 
