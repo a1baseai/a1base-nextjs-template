@@ -55,20 +55,11 @@ function normalizePhoneNumber(phoneNumber: string): string {
   return phoneNumber.replace(/\+|\s/g, "");
 }
 
-/**
- * Formats messages for OpenAI API.
- */
-function formatMessagesForOpenAI(
-  threadMessages: MessageRecord[]
-): { role: "user" | "assistant"; content: string }[] {
-  return threadMessages.map((msg) => ({
-    role:
-      msg.sender_number === process.env.A1BASE_AGENT_NUMBER
-        ? "assistant"
-        : "user",
-    content: msg.content,
-  }));
-}
+// Import the unified formatMessagesForOpenAI from OpenAI service
+import { formatMessagesForOpenAI } from "../services/openai";
+import { ThreadMessage } from "@/types/chat";
+
+// The formatMessagesForOpenAI function is now imported from ../services/openai.ts
 
 /**
  * Extracts JSON from a string, attempting to find a valid JSON object within.
@@ -80,7 +71,8 @@ function extractJsonFromString(content: string): Record<string, any> {
   const codeBlockMatch = content.match(/```json\s*([\s\S]*?)\s*```/);
   if (codeBlockMatch && codeBlockMatch[1]) {
     jsonContent = codeBlockMatch[1].trim();
-  } else if (content.includes("{") && content.includes("}")) { // Fallback to looking for raw JSON object
+  } else if (content.includes("{") && content.includes("}")) {
+    // Fallback to looking for raw JSON object
     const jsonMatch = content.match(/\{[\s\S]*?\}/); // Use non-greedy match for content within braces
     if (jsonMatch) {
       jsonContent = jsonMatch[0].trim(); // Trim the matched string
@@ -88,7 +80,10 @@ function extractJsonFromString(content: string): Record<string, any> {
   }
 
   // If no potential JSON was extracted, or it's empty/invalid after trimming, return.
-  if (!jsonContent || (!jsonContent.startsWith('{') && !jsonContent.startsWith('['))) {
+  if (
+    !jsonContent ||
+    (!jsonContent.startsWith("{") && !jsonContent.startsWith("["))
+  ) {
     // console.warn("[JSON Extraction] No JSON content found or extracted content is not JSON. Original:", content, "Extracted:", jsonContent);
     return {};
   }
@@ -132,7 +127,8 @@ async function processOnboardingConversation(
       .filter((field) => field.required)
       .map((field) => field.id);
 
-    const formattedMessages = formatMessagesForOpenAI(threadMessages);
+    // Pass the thread type as 'individual' for onboarding conversations
+    const formattedMessages = formatMessagesForOpenAI(threadMessages, 'individual');
 
     const extractionPrompt = `
       Based on the conversation, extract the following information about the user:
@@ -145,6 +141,8 @@ async function processOnboardingConversation(
       Example response format: { "name": "John Doe", "email": "john@example.com", "business_type": "Tech", "goals": "Increase productivity" }
       DO NOT include any explanations, markdown formatting, or anything outside the JSON object.`;
 
+
+    console.log("OpenaAI completion happening at processOnboardingConversation function")  
     const extraction = await openaiClient.chat.completions.create({
       model: "gpt-4.1",
       messages: [
@@ -214,11 +212,13 @@ async function handleAgenticOnboardingFollowUp(
   console.log("[Onboarding] Handling agentic follow-up onboarding message");
   try {
     const onboardingFlow = await loadOnboardingFlow(); // Load flow once
-    const formattedMessages = formatMessagesForOpenAI(threadMessages);
+    // Pass the thread type as 'individual' for onboarding follow-up
+    const formattedMessages = formatMessagesForOpenAI(threadMessages, 'individual');
 
     console.log(
       `[Onboarding] Processing ${formattedMessages.length} messages for agentic follow-up`
     );
+
 
     const { extractedInfo, isComplete } = await processOnboardingConversation(
       threadMessages
@@ -248,19 +248,32 @@ async function handleAgenticOnboardingFollowUp(
       );
     } else {
       // Generate the system prompt dynamically using the extractedInfo
-      const systemPrompt = createAgenticOnboardingPrompt(onboardingFlow, extractedInfo);
-      console.log("[Onboarding] Generated dynamic system prompt:", systemPrompt);
+      const systemPrompt = createAgenticOnboardingPrompt(
+        onboardingFlow,
+        extractedInfo
+      );
+      console.log(
+        "[Onboarding] Generated dynamic system prompt:",
+        systemPrompt
+      );
 
-      const completion = await openaiClient.chat.completions.create({
+      console.log("[Onboarding] fomrattedmessages:", formattedMessages)
+
+      console.log("OpenaAI completion happening at handleAgenticOnboardingFollowUp function")
+
+      const response = await openaiClient.responses.create({
         model: "gpt-4.1", // Consider making model configurable or using a constant
-        messages: [
+        input: [
           { role: "system" as const, content: systemPrompt },
           ...formattedMessages,
         ],
         temperature: 0.7,
       });
+
+
+      console.log("OpenaAI response", response)
       responseContent =
-        completion.choices[0]?.message?.content ||
+        response.output_text ||
         "I'm sorry, I couldn't process your message. Could you please try again?";
       console.log(`[Onboarding] Generated agentic follow-up response`);
     }
@@ -526,6 +539,7 @@ async function manageIndividualOnboardingProcess(
   chatId: string | null
 ): Promise<boolean> {
   // Returns true if onboarding message was sent
+  console.log("manageIndividualOnboardingProcess START")
   const { thread_id, sender_number, thread_type, service } = webhookData;
 
   const isOnboardingInProgress = threadMessages.length > 1; // User has sent at least one message after initial contact
@@ -577,9 +591,25 @@ async function manageIndividualOnboardingProcess(
       // Given StartOnboarding is from `../workflows/onboarding-workflow`, it likely expects `MessageRecord[]` or a derivative.
       // The original code used `__skip_send` for StartOnboarding directly.
 
+      // Convert MessageRecord[] to ThreadMessage[] to satisfy type requirements
+      const threadMessagesForOnboarding = threadMessages.map(msg => ({
+        ...msg,
+        // Ensure message_type is one of the expected types
+        message_type: (msg.message_type === 'text' || 
+                      msg.message_type === 'rich_text' || 
+                      msg.message_type === 'image' || 
+                      msg.message_type === 'video' || 
+                      msg.message_type === 'audio' || 
+                      msg.message_type === 'location' || 
+                      msg.message_type === 'reaction' || 
+                      msg.message_type === 'group_invite') 
+                      ? msg.message_type 
+                      : 'unsupported_message_type'
+      })) as ThreadMessage[];
+      
       const onboardingResponse: OnboardingResponse | undefined =
         await StartOnboarding(
-          threadMessages, // Pass the original threadMessages
+          threadMessagesForOnboarding, // Pass the converted threadMessages
           thread_type as "individual" | "group",
           thread_id,
           sender_number,

@@ -55,26 +55,7 @@ export interface GroupOnboardingFlow {
 
 export const defaultOnboardingFlow: OnboardingFlow = {
   enabled: true,
-  messages: [
-    {
-      id: "1",
-      text: "Hi there! 👋 I'm your new AI assistant. Welcome!",
-      waitForResponse: false,
-      order: 1,
-    },
-    {
-      id: "2",
-      text: "I'm here to help with answering your questions and supporting your business needs.",
-      waitForResponse: false,
-      order: 2,
-    },
-    {
-      id: "3",
-      text: "What can I help you with today?",
-      waitForResponse: true,
-      order: 3,
-    },
-  ],
+  messages: [],
   mode: "agentic",
   agenticSettings: {
     systemPrompt:

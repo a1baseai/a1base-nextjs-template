@@ -8,6 +8,13 @@ import {
 } from "../supabase/config";
 import { SupabaseAdapter } from "../supabase/adapter";
 
+/**
+ * Normalizes a phone number by removing '+' and spaces.
+ */
+function normalizePhoneNumber(phoneNumber: string): string {
+  return phoneNumber.replace(/\+|\s/g, "");
+}
+
 // Don't initialize during build time
 const isBuildTime =
   process.env.NODE_ENV === "production" &&
@@ -29,6 +36,68 @@ export const getOpenAI = () => {
 
 // Add type for OpenAI chat roles
 type ChatRole = "system" | "user" | "assistant" | "function";
+
+/**
+ * Formats messages for OpenAI API with support for both individual and group chats.
+ * Uses phone number normalization for better matching.
+ * Works with both ThreadMessage and MessageRecord types.
+ * 
+ * @param messages - Array of message objects with required properties
+ * @param threadType - Type of thread ('individual' or 'group')
+ * @returns Array of formatted messages for OpenAI API
+ */
+export function formatMessagesForOpenAI<T extends {
+  content: string;
+  sender_number: string;
+  sender_name?: string;
+  timestamp?: string;
+  message_type?: any; // Make message_type optional and accept any type
+}>(
+  messages: T[],
+  threadType: string = "individual"
+): { role: "user" | "assistant"; content: string }[] {
+  console.log("🔄 formatMessagesForOpenAI function called with:", {
+    messageCount: messages.length,
+    threadType
+  });
+
+  const normalizedAgentNumber = normalizePhoneNumber(
+    process.env.A1BASE_AGENT_NUMBER || ""
+  );
+
+  const formattedMessages = messages.map((msg) => {
+    const normalizedSenderNumber = normalizePhoneNumber(msg.sender_number);
+    const isAssistant = normalizedSenderNumber === normalizedAgentNumber;
+    
+    let messageCoreContent = msg.content;
+    
+    // Append sender's name to content if it's a group chat and sender is not the agent
+    // Only if sender_name is available
+    if (threadType === "group" && !isAssistant && msg.sender_name) {
+      messageCoreContent = `${msg.sender_name} said: ${messageCoreContent}`;
+    }
+
+    // Create structured content with metadata
+    const structuredContent: any = {
+      message: messageCoreContent,
+    };
+    
+    // Add optional fields if they exist
+    if (msg.sender_name) structuredContent.userName = msg.sender_name;
+    if (msg.sender_number) structuredContent.userId = msg.sender_number;
+    if (msg.timestamp) structuredContent.sent_at = msg.timestamp;
+
+    return {
+      role: isAssistant ? "assistant" : "user",
+      // content: JSON.stringify(structuredContent),
+      content: messageCoreContent
+
+    };
+  });
+
+  console.log("✅ formatMessagesForOpenAI output:", formattedMessages);
+  return formattedMessages;
+}
 
 /**
  * ============= OPENAI CALL TO TRIAGE THE MESSAGE INTENT ================
@@ -72,9 +141,11 @@ Rules:
 Return valid JSON with only that single key "responseType" and value as one of the allowed strings.
 `;
 
+
+  console.log("OpenaAI completion happening at triageMessageIntent");
   // Use a faster model for triage to reduce latency
   const completion = await getOpenAI().chat.completions.create({
-    model: "gpt-3.5-turbo",
+    model: "gpt-4.1",
     messages: [
       { role: "system", content: triagePrompt },
       ...conversationContext,
@@ -179,6 +250,16 @@ export async function generateAgentResponse(
   );
   // Combine the base system prompt with the rich context
   let enhancedSystemPrompt = systemPromptContent + richContext;
+  
+  // If a specific user prompt is provided, add it to the system prompt
+  if (userPrompt) {
+    enhancedSystemPrompt += `\n\n--- User Specific Instructions ---\n${userPrompt}\n--- End User Specific Instructions ---`;
+  }
+  // We don't need this line anymore as we'll use our unified formatMessagesForOpenAI function later
+  console.log("generateAgentResponse threadMessages")
+  console.log(threadMessages)
+  console.log("generateAgentResponse threadMessages end")
+  
 
   // --- BEGIN MODIFICATION: Fetch and add Supabase onboarding data ---
   if (isSupabaseConfigured()) {
@@ -232,44 +313,25 @@ export async function generateAgentResponse(
   }
   // --- END MODIFICATION ---
 
+
+  console.log("enhancedSystemPrompt")
+  console.log(enhancedSystemPrompt)
+  console.log("enhancedSystemPrompt end")
+
   const conversationForOpenAI: OpenAI.Chat.ChatCompletionMessageParam[] = [];
   conversationForOpenAI.push({
     role: "system" as const,
     content: enhancedSystemPrompt, // System prompt content is a plain string
   });
 
-  // If a specific user prompt is provided, add it as a plain string content message
-  if (userPrompt) {
-    conversationForOpenAI.push({ role: "user" as const, content: userPrompt });
-  }
+  // The userPrompt is now added to the system prompt instead of as a separate message
 
-  // Format existing thread messages for OpenAI
-  const formattedOpenAIMessages = threadMessages.map((msg) => {
-    let messageCoreContent = msg.content; // This is the raw message content
-    // Append sender's name to content if it's a group chat and sender is not the agent
-    // This name will also be part of the 'actual_content' in the JSON
-    if (
-      threadType === "group" &&
-      msg.sender_number !== process.env.A1BASE_AGENT_NUMBER
-    ) {
-      messageCoreContent = `${msg.sender_name} said: ${messageCoreContent}`;
-    }
+  // Format existing thread messages for OpenAI using our unified function
+  const formattedOpenAIMessages = formatMessagesForOpenAI(threadMessages, threadType);
 
-    const structuredContent = {
-      message: messageCoreContent, // Ensure NO `(Sent at...)` string here
-      userName: msg.sender_name,
-      userId: msg.sender_number, // Using phone number as userId for context
-      sent_at: msg.timestamp,
-    };
-
-    return {
-      role:
-        msg.sender_number === process.env.A1BASE_AGENT_NUMBER
-          ? ("assistant" as const)
-          : ("user" as const),
-      content: JSON.stringify(structuredContent), // Content is now a stringified JSON object
-    };
-  });
+  console.log("FORMATTED OPENAI MESSAGES IN OPENAI.TS")
+  console.log(formattedOpenAIMessages)
+  console.log("FORMATTED OPENAI MESSAGES IN OPENAI.TS END")
 
   conversationForOpenAI.push(...formattedOpenAIMessages);
 
@@ -277,8 +339,10 @@ export async function generateAgentResponse(
     "generateAgentResponse prompt messages (sent to OpenAI):",
     JSON.stringify(conversationForOpenAI, null, 2)
   );
+
+  console.log("OpenaAI completion happening at generateAgentResponse function")
   const completion = await getOpenAI().chat.completions.create({
-    model: "gpt-4",
+    model: "gpt-4.1",
     messages: conversationForOpenAI,
   });
 

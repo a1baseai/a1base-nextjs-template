@@ -403,8 +403,13 @@ async function sendGroupOnboardingPrompt(threadId: string, fieldDescription: str
           { role: "user" as const, content: `You are Felicie, an AI assistant. Your task is to ask the group a question to gather specific information. Considering the preceding conversation history (if any) and your persona defined in the system prompt, ask the group about: "${fieldDescription}". Ensure your question is natural, friendly, conversational, and specifically avoids repeating questions or topics already covered in the history. Ask only the question itself, do not add any preamble.` }
         ];
 
+        console.log("GROUP ONBOARDING MESSAGESFORAI")
+        console.log(messagesForAI)
+
+        
+        console.log("OpenaAI completion happening at sendGroupOnboardingPrompt function")
         const completion = await getOpenAI().chat.completions.create({
-          model: "gpt-4o-mini", 
+          model: "gpt-4.1", 
           messages: messagesForAI as any, 
           temperature: 0.7,
           max_tokens: 150,

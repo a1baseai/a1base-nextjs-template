@@ -22,7 +22,7 @@ const client = new A1BaseAPI({
 
 /**
  * Creates a system prompt for onboarding based on the onboarding settings
- * 
+ *
  * @param onboardingFlow The complete onboarding flow configuration
  * @param existingData Optional. An object containing already collected user data.
  * @returns The formatted system prompt for the AI
@@ -34,32 +34,42 @@ export function createAgenticOnboardingPrompt(
   if (!onboardingFlow.agenticSettings) {
     throw new Error("Agentic settings not available in the onboarding flow");
   }
-  
+
   // Use the configured system prompt for onboarding
   const systemPrompt = onboardingFlow.agenticSettings.systemPrompt;
-  
+
   // Filter userFields to only include those not yet collected or empty
-  const fieldsToCollect = onboardingFlow.agenticSettings.userFields.filter(field => {
-    return !existingData || !existingData[field.id] || existingData[field.id] === "";
-  });
+  const fieldsToCollect = onboardingFlow.agenticSettings.userFields.filter(
+    (field) => {
+      return (
+        !existingData ||
+        !existingData[field.id] ||
+        existingData[field.id] === ""
+      );
+    }
+  );
 
   // If all required fields are collected (or no fields were defined to be collected),
   // instruct AI to use the final message.
   if (fieldsToCollect.length === 0) {
     return `${systemPrompt}\n\nAll required information has been collected. Now, respond with: ${onboardingFlow.agenticSettings.finalMessage}`;
   }
-  
+
   // Convert user fields to instructions for the AI
   const fieldInstructions = fieldsToCollect
-    .map(field => {
+    .map((field) => {
       const requiredText = field.required ? "(required)" : "(optional)";
       return `- ${field.description} ${requiredText}. Store as '${field.id}'.`;
     })
     .join("\n");
-  
+
+  console.log("[Onboarding] Fields to collect:", fieldsToCollect);
+
   // Combine system prompt with field instructions
   const aiPrompt = `${systemPrompt}\n\nCollect the following information:\n${fieldInstructions}\n\nAfter collecting all required information, respond with: ${onboardingFlow.agenticSettings.finalMessage}`;
-  
+
+  console.log("[Onboarding] Generated agentic follow-up prompt:", aiPrompt);
+
   // Console log removed
   return aiPrompt;
 }
@@ -70,10 +80,16 @@ export function createAgenticOnboardingPrompt(
  * @param service The service being used
  * @returns A conversational, user-friendly onboarding message
  */
-async function generateOnboardingMessage(systemPrompt: string, service?: string): Promise<string> {
+async function generateOnboardingMessage(
+  systemPrompt: string,
+  service?: string
+): Promise<string> {
+  console.log("[generateOnboardingMessage] Function started");
+  console.log("[generateOnboardingMessage] System prompt received:", systemPrompt);
+  
   try {
-    // console.log("[generateOnboardingMessage] System prompt for onboarding:", systemPrompt);
-
+    console.log("[generateOnboardingMessage] Preparing to call generateAgentResponse");
+    
     // Use generateAgentResponse. For an initial onboarding message, there are no prior threadMessages.
     // The systemPrompt created by createAgenticOnboardingPrompt will be the main driver.
     // We provide a simple initial user message like "Hello!" to kick off the AI's response generation
@@ -87,10 +103,20 @@ async function generateOnboardingMessage(systemPrompt: string, service?: string)
       service // Pass service through
     );
 
-    // console.log("[generateOnboardingMessage] Generated onboarding message:", generatedMessage);
-    return generatedMessage || "Hello! I'm your assistant. To get started, could you please tell me your name?";
+    console.log("[generateOnboardingMessage] Response received from generateAgentResponse");
+    console.log("[generateOnboardingMessage] Generated onboarding message:", generatedMessage);
+    
+    if (!generatedMessage) {
+      console.log("[generateOnboardingMessage] No message generated, using fallback");
+    }
+    
+    return (
+      generatedMessage ||
+      "Hello! I'm your assistant. To get started, could you please tell me your name?"
+    );
   } catch (error) {
-    // console.error('[generateOnboardingMessage] Error generating onboarding message:', error);
+    console.error('[generateOnboardingMessage] Error generating onboarding message:', error);
+    console.log('[generateOnboardingMessage] Using fallback message due to error');
     return "Hello! I'm your assistant. To help you get set up, could you please tell me your name?";
   }
 }
@@ -104,15 +130,15 @@ export async function StartOnboarding(
   threadMessages: ThreadMessage[],
   thread_type: "individual" | "group",
   thread_id?: string,
-  sender_number?: string, 
+  sender_number?: string,
   service?: string
-): Promise<{ messages: { text: string, waitForResponse: boolean }[] }> {
+): Promise<{ messages: { text: string; waitForResponse: boolean }[] }> {
   // Console log removed
 
   try {
     // Safely load the onboarding flow
     const onboardingFlow = await loadOnboardingFlow();
-  
+
     // If onboarding is disabled, just skip
     if (!onboardingFlow.enabled) {
       // Console log removed
@@ -120,53 +146,74 @@ export async function StartOnboarding(
     }
 
     // Console log removed
-    
+
     // Create the system prompt for onboarding
     const systemPrompt = createAgenticOnboardingPrompt(onboardingFlow);
-    
+
     // Console log removed
-    
+
     // Generate a conversational message using the system prompt
-    const conversationalMessageText = await generateOnboardingMessage(systemPrompt, service);
-    
+    const conversationalMessageText = await generateOnboardingMessage(
+      systemPrompt,
+      service
+    );
+
     // Create a single message with the conversational prompt
-    const onboardingMessage = { text: conversationalMessageText, waitForResponse: true };
+    const onboardingMessage = {
+      text: conversationalMessageText,
+      waitForResponse: true,
+    };
 
     // Store AI message before sending to user
-    if (thread_id && process.env.A1BASE_AGENT_NUMBER && process.env.SUPABASE_URL && process.env.SUPABASE_KEY) {
+    if (
+      thread_id &&
+      process.env.A1BASE_AGENT_NUMBER &&
+      process.env.SUPABASE_URL &&
+      process.env.SUPABASE_KEY
+    ) {
       const supabaseAdapter = await getInitializedAdapter();
-      
-      if (!supabaseAdapter) { 
-        console.error("[StartOnboarding] Supabase adapter not initialized. Cannot store AI message.");
+
+      if (!supabaseAdapter) {
+        console.error(
+          "[StartOnboarding] Supabase adapter not initialized. Cannot store AI message."
+        );
         // Optionally handle this error, e.g., by returning or throwing
       } else {
         const messageContentForDb = { text: conversationalMessageText };
         const aiMessageId = `ai-onboarding-${Date.now()}`;
 
-        console.log(`[StartOnboarding] Attempting to store initial AI onboarding message. Thread ID: ${thread_id}, Service: ${service}, Type: ${thread_type}, AI Message ID: ${aiMessageId}`);
+        console.log(
+          `[StartOnboarding] Attempting to store initial AI onboarding message. Thread ID: ${thread_id}, Service: ${service}, Type: ${thread_type}, AI Message ID: ${aiMessageId}`
+        );
         try {
           await supabaseAdapter.storeMessage(
-            thread_id, 
-            process.env.A1BASE_AGENT_NUMBER, 
-            aiMessageId, 
-            messageContentForDb, 
-            'text', 
-            service || 'whatsapp', 
-            messageContentForDb 
+            thread_id,
+            process.env.A1BASE_AGENT_NUMBER,
+            aiMessageId,
+            messageContentForDb,
+            "text",
+            service || "whatsapp",
+            messageContentForDb
           );
-          console.log(`[StartOnboarding] Successfully stored initial AI onboarding message. AI Message ID: ${aiMessageId}`);
+          console.log(
+            `[StartOnboarding] Successfully stored initial AI onboarding message. AI Message ID: ${aiMessageId}`
+          );
         } catch (storeError) {
-          console.error(`[StartOnboarding] Error storing initial AI onboarding message. AI Message ID: ${aiMessageId}, Error:`, storeError);
+          console.error(
+            `[StartOnboarding] Error storing initial AI onboarding message. AI Message ID: ${aiMessageId}, Error:`,
+            storeError
+          );
         }
       }
     }
-    
+
     // For WhatsApp or other channels, send the message through A1Base
     // Skip sending if we're using the special skip marker
-    if ((thread_type === "group" || thread_type === "individual") && 
-        service !== "web-ui" && 
-        service !== "__skip_send") {
-      
+    if (
+      (thread_type === "group" || thread_type === "individual") &&
+      service !== "web-ui" &&
+      service !== "__skip_send"
+    ) {
       // Console log removed
       const messageData = {
         content: onboardingMessage.text,
@@ -188,13 +235,14 @@ export async function StartOnboarding(
     } else if (service === "__skip_send") {
       // Console log removed
     }
-    
+
     // Return the conversational message for the web UI or other channels
     return { messages: [onboardingMessage] };
   } catch (error) {
-    console.error('Error in onboarding workflow:', error);
-    const errorMessage = "Sorry, I encountered an error starting the onboarding process.";
-    
+    console.error("Error in onboarding workflow:", error);
+    const errorMessage =
+      "Sorry, I encountered an error starting the onboarding process.";
+
     // Handle error similarly to DefaultReplyToMessage
     if (service !== "web-ui" && service !== "__skip_send") {
       const errorMessageData = {
@@ -202,7 +250,7 @@ export async function StartOnboarding(
         from: process.env.A1BASE_AGENT_NUMBER!,
         service: "whatsapp" as const,
       };
-      
+
       if (thread_type === "group" && thread_id) {
         await client.sendGroupMessage(process.env.A1BASE_ACCOUNT_ID!, {
           ...errorMessageData,
@@ -215,7 +263,7 @@ export async function StartOnboarding(
         });
       }
     }
-    
+
     return { messages: [{ text: errorMessage, waitForResponse: false }] };
   }
 }

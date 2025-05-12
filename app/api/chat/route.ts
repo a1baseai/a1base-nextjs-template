@@ -4,6 +4,7 @@ import { triageMessage } from "../../../lib/ai-triage/triage-logic";
 import { dynamic, runtime, maxDuration } from "../route-config";
 import { streamText } from "ai";
 import { openai } from "@ai-sdk/openai";
+import { formatMessagesForOpenAI } from "../../../lib/services/openai";
 
 // Export the route configuration to prevent Next.js from trying
 // to access file system during build time
@@ -88,7 +89,7 @@ export async function POST(req: Request) {
         
         // Use a standard approach for onboarding messages
         const result = streamText({
-          model: openai('gpt-4'),
+          model: openai('gpt-4.1'),
           system: "You are an assistant helping with onboarding. Guide the user through the onboarding process, asking one question at a time.",
           messages: [
             {
@@ -126,6 +127,9 @@ export async function POST(req: Request) {
       return result.toDataStreamResponse();
     }
 
+    // Since we're using the Vercel AI SDK which expects a specific format,
+    // we'll go back to the original approach but incorporate our normalization logic
+    
     // Prepare messages array with system prompt
     const aiMessages = [
       { role: 'system', content: systemPromptContent },
@@ -144,7 +148,7 @@ export async function POST(req: Request) {
     
     // Use Vercel AI SDK to stream the response
     const result = streamText({
-      model: openai('gpt-4'),
+      model: openai('gpt-4.1'),
       messages: aiMessages,
       temperature: 0.7,
     });
