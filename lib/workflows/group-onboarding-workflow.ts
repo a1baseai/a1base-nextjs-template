@@ -11,7 +11,7 @@ import { loadGroupOnboardingFlow } from "../onboarding-flow/group-onboarding-sto
 import { WebhookPayload } from "@/app/api/messaging/incoming/route";
 import { getInitializedAdapter } from "../supabase/config";
 import { getOpenAI } from "../services/openai";
-import { ThreadMessage } from "../supabase/adapter"; // Import ThreadMessage type
+import { ThreadMessage } from "../supabase/types"; // Import ThreadMessage type
 
 // Use the existing database types
 interface MessageRecord {

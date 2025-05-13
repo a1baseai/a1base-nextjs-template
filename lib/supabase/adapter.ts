@@ -1,5 +1,11 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { Database } from "./types";
+import {
+  Database,
+  ThreadParticipant,
+  ThreadMessage,
+  ThreadProject,
+  ThreadData,
+} from "./types";
 import { CONVERSATION_USERS_TABLE, CHATS_TABLE } from "./config";
 
 /**
@@ -9,65 +15,11 @@ import { CONVERSATION_USERS_TABLE, CHATS_TABLE } from "./config";
 // Import WebhookPayload type
 import { WebhookPayload } from "@/app/api/messaging/incoming/route";
 const MAX_CONTEXT_MESSAGES = 30;
-/**
- * Interface for participant data in a thread
- */
-interface ThreadParticipant extends Record<string, unknown> {
-  user_id: string;
-  phone_number: string;
-  name: string;
-  service?: string;
-  metadata?: Record<string, any>;
-  created_at?: string;
-  preferences?: Record<string, any>;
-}
 
 /**
- * Interface for message data in a thread
+ * SupabaseAdapter class provides an interface for database operations
+ * using Supabase as the backend database.
  */
-export interface ThreadMessage extends Record<string, unknown> {
-  message_id: string;
-  external_id?: string;
-  content: string;
-  message_type: string;
-  message_content: Record<string, any>;
-  service?: string;
-  sender_id?: string;
-  sender_number: string;
-  sender_name: string;
-  sender_service?: string;
-  sender_metadata?: Record<string, any>;
-  timestamp: string;
-}
-
-/**
- * Interface for project data associated with a thread
- */
-interface ThreadProject {
-  id: string;
-  name: string;
-  description?: string;
-  created_at: string;
-  is_live?: boolean;
-}
-
-/**
- * Interface for thread data returned by getThread
- */
-export interface ThreadData {
-  id: string;
-  external_id?: string;
-  type?: string;
-  name?: string;
-  service?: string;
-  created_at?: string;
-  metadata?: Record<string, any>;
-  messages: ThreadMessage[];
-  participants: ThreadParticipant[];
-  projects: ThreadProject[];
-  sender?: ThreadParticipant | null;
-}
-
 export class SupabaseAdapter {
   private supabase: SupabaseClient<Database>;
   private isInitialized: boolean = false;

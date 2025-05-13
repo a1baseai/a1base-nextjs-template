@@ -120,3 +120,64 @@ export interface Database {
     }
   }
 }
+
+// Interfaces moved from adapter.ts for better organization
+
+/**
+ * Interface for participant data in a thread
+ */
+export interface ThreadParticipant extends Record<string, unknown> {
+  user_id: string;
+  phone_number: string;
+  name: string;
+  service?: string;
+  metadata?: Record<string, any>;
+  created_at?: string;
+  preferences?: Record<string, any>;
+}
+
+/**
+ * Interface for message data in a thread
+ */
+export interface ThreadMessage extends Record<string, unknown> {
+  message_id: string;
+  external_id?: string;
+  content: string;
+  message_type: string;
+  message_content: Record<string, any>;
+  service?: string;
+  sender_id?: string;
+  sender_number: string;
+  sender_name: string;
+  sender_service?: string;
+  sender_metadata?: Record<string, any>;
+  timestamp: string;
+}
+
+/**
+ * Interface for project data associated with a thread
+ */
+export interface ThreadProject {
+  id: string;
+  name: string;
+  description?: string;
+  created_at: string;
+  is_live?: boolean;
+}
+
+/**
+ * Interface for thread data returned by getThread
+ */
+export interface ThreadData {
+  id: string;
+  external_id?: string;
+  type?: string;
+  name?: string;
+  service?: string;
+  created_at?: string;
+  metadata?: Record<string, any>;
+  messages: ThreadMessage[];
+  participants: ThreadParticipant[];
+  projects: ThreadProject[];
+  sender?: ThreadParticipant | null;
+}
