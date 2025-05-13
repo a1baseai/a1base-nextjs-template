@@ -390,7 +390,7 @@ export class SupabaseAdapter {
         `
         )
         .eq("chat_id", chat.id)
-        .order("created_at", { ascending: false })
+        .order("created_at", { ascending: true })
         .limit(40)
         .then((result) => {
           return result;

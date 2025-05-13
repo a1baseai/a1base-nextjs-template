@@ -261,19 +261,21 @@ async function handleAgenticOnboardingFollowUp(
 
       console.log("OpenaAI completion happening at handleAgenticOnboardingFollowUp function")
 
-      const response = await openaiClient.responses.create({
-        model: "gpt-4.1", // Consider making model configurable or using a constant
-        input: [
-          { role: "system" as const, content: systemPrompt },
-          ...formattedMessages,
+      const response = await openaiClient.chat.completions.create({
+        model: "gpt-4.1",
+        messages: [
+          {
+            role: "system",
+            content: systemPrompt
+          },
+          ...formattedMessages
         ],
-        temperature: 0.7,
+        max_tokens: 1000,
       });
 
-
-      console.log("OpenaAI response", response)
+      console.log("OpenAI chat completion response", response);
       responseContent =
-        response.output_text ||
+        response.choices[0]?.message?.content ||
         "I'm sorry, I couldn't process your message. Could you please try again?";
       console.log(`[Onboarding] Generated agentic follow-up response`);
     }
