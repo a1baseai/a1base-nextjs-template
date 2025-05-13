@@ -11,7 +11,7 @@ import { SupabaseAdapter } from "../supabase/adapter";
 /**
  * Normalizes a phone number by removing '+' and spaces.
  */
-function normalizePhoneNumber(phoneNumber: string): string {
+export function normalizePhoneNumber(phoneNumber: string): string {
   return phoneNumber.replace(/\+|\s/g, "");
 }
 
@@ -255,10 +255,6 @@ export async function generateAgentResponse(
   if (userPrompt) {
     enhancedSystemPrompt += `\n\n--- User Specific Instructions ---\n${userPrompt}\n--- End User Specific Instructions ---`;
   }
-  // We don't need this line anymore as we'll use our unified formatMessagesForOpenAI function later
-  console.log("generateAgentResponse threadMessages");
-  console.log(threadMessages);
-  console.log("generateAgentResponse threadMessages end");
 
   // --- BEGIN MODIFICATION: Fetch and add Supabase onboarding data ---
   if (isSupabaseConfigured()) {
@@ -312,10 +308,6 @@ export async function generateAgentResponse(
   }
   // --- END MODIFICATION ---
 
-  console.log("enhancedSystemPrompt");
-  console.log(enhancedSystemPrompt);
-  console.log("enhancedSystemPrompt end");
-
   const conversationForOpenAI: OpenAI.Chat.ChatCompletionMessageParam[] = [];
   conversationForOpenAI.push({
     role: "system" as const,
@@ -330,18 +322,9 @@ export async function generateAgentResponse(
     threadType
   );
 
-  console.log("FORMATTED OPENAI MESSAGES IN OPENAI.TS");
-  console.log(formattedOpenAIMessages);
-  console.log("FORMATTED OPENAI MESSAGES IN OPENAI.TS END");
-
   conversationForOpenAI.push(...formattedOpenAIMessages);
 
-  console.log(
-    "generateAgentResponse prompt messages (sent to OpenAI):",
-    conversationForOpenAI
-  );
-
-  console.log("OpenaAI completion happening at generateAgentResponse function");
+  console.log("OpenAI completion happening at generateAgentResponse function");
   const completion = await getOpenAI().chat.completions.create({
     model: "gpt-4.1",
     messages: conversationForOpenAI,

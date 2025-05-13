@@ -1,6 +1,8 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { Database } from './types'
 import { SupabaseAdapter } from './adapter'
+
+export { SupabaseAdapter }
 
 /**
  * Environment variables for Supabase configuration
@@ -16,53 +18,48 @@ const supabaseKey = process.env.SUPABASE_KEY
 export const CONVERSATION_USERS_TABLE = 'conversation_users' as const
 export const CHATS_TABLE = 'chats' as const
 
-// Track the initialized adapter instance
-let initializedAdapter: SupabaseAdapter | null = null
-
 /**
  * Check if Supabase is configured in the environment
  */
 export function isSupabaseConfigured(): boolean {
-  return Boolean(supabaseUrl && supabaseKey)
+  return !!supabaseUrl && !!supabaseKey
 }
 
+let initializedAdapter: SupabaseAdapter | null = null
+
 /**
- * Initialize and get the Supabase adapter instance if configured
- * Returns null if Supabase is not configured
+ * Initializes and returns the Supabase adapter instance.
+ * Ensures that the adapter is initialized only once.
  */
-export async function initializeDatabase(): Promise<SupabaseAdapter | null> {
-  // If already initialized, return the existing instance
+export const getInitializedAdapter = async (): Promise<SupabaseAdapter | null> => {
+  if (!isSupabaseConfigured()) {
+    return null
+  }
+
   if (initializedAdapter) {
     return initializedAdapter
   }
 
-  // Check if Supabase is configured
-  if (!isSupabaseConfigured()) {
-    // Console log removed - Supabase not configured, using in-memory storage
-    return null
-  }
-
   try {
-    // Console log removed - Initializing Supabase connection...
     const adapter = new SupabaseAdapter(supabaseUrl!, supabaseKey!)
     await adapter.init()
-    
-    // Store the initialized instance
     initializedAdapter = adapter
-    // Console log removed - Successfully initialized Supabase database
-    return adapter
+    console.log("[SupabaseAdapter] Supabase adapter class instance initialized and ready.")
+    return initializedAdapter
   } catch (error) {
-    console.error('Failed to initialize Supabase adapter:', error)
+    console.error("[SupabaseAdapter] Supabase adapter class instance failed to initialize:", error)
     return null
   }
 }
 
 /**
- * Get the initialized adapter instance or null if not initialized
- * This should be used after initializeDatabase() has been called
+ * Initializes the database if Supabase is configured.
+ * This function primarily demonstrates initializing the adapter.
  */
-export function getInitializedAdapter(): SupabaseAdapter | null {
-  return initializedAdapter
+export async function initializeDatabase() {
+  if (isSupabaseConfigured()) {
+    await getInitializedAdapter()
+  }
 }
 
 /**
@@ -71,4 +68,4 @@ export function getInitializedAdapter(): SupabaseAdapter | null {
  */
 export const supabase = isSupabaseConfigured() 
   ? createClient<Database>(supabaseUrl!, supabaseKey!)
-  : null 
+  : null

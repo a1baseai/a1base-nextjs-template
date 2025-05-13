@@ -21,7 +21,7 @@ const MAX_CONTEXT_MESSAGES = 30;
  * using Supabase as the backend database.
  */
 export class SupabaseAdapter {
-  private supabase: SupabaseClient<Database>;
+  public readonly supabase: SupabaseClient<Database>;
   private isInitialized: boolean = false;
 
   constructor(supabaseUrl: string, supabaseKey: string) {
@@ -1077,10 +1077,10 @@ export class SupabaseAdapter {
    */
   async processWebhookPayload(
     payload: WebhookPayload
-  ): Promise<{ success: boolean; isNewChat: boolean }> {
+  ): Promise<{ success: boolean; isNewChat: boolean; chatId: string | null }> {
+    let chatId: string | null = null; // Variable to store chatId
     try {
       // Console log removed - Processing webhook
-
       // 1. Get or create user
       const userId = await this.getUserFromWebhook(
         payload.sender_number,
@@ -1109,7 +1109,7 @@ export class SupabaseAdapter {
         isNewChat = true; // Chat doesn't exist yet, so it's new
       }
 
-      const chatId = await this.getChatFromWebhook(
+      chatId = await this.getChatFromWebhook(
         payload.thread_id,
         payload.thread_type,
         payload.service,
@@ -1149,10 +1149,490 @@ export class SupabaseAdapter {
 
       // Console log removed - Successfully stored message
 
-      return { success: true, isNewChat };
+      return { success: true, isNewChat, chatId };
     } catch (error) {
       console.error("Error processing webhook payload:", error);
-      return { success: false, isNewChat: false };
+      return { success: false, isNewChat: false, chatId: null };
+    }
+  }
+
+  // Method to upsert user memory value in the memory jsonb field of conversation_users table
+  async upsertUserMemoryValue(
+    userId: string,
+    fieldId: string,
+    value: string
+  ): Promise<{ data: any; error: any }> { // Return data and error for consistency
+    
+    console.log("upsertUserMemoryValue", userId, fieldId, value)
+    
+    // Check if userId is a phone number and normalize it
+    let userIdentifier = userId;
+    if (userId.includes('+') || /^\d+$/.test(userId)) {
+      // This appears to be a phone number, normalize it by removing '+' and spaces
+      userIdentifier = userId.replace(/\+|\s/g, "");
+      console.log(`Normalized phone number from ${userId} to ${userIdentifier}`);
+      
+      // Get the user id from the phone number
+      const { data: userRecord, error: userLookupError } = await this.supabase
+        .from(CONVERSATION_USERS_TABLE)
+        .select('id')
+        .eq('phone_number', userIdentifier)
+        .single();
+      
+      if (userLookupError) {
+        console.error(
+          `[SupabaseAdapter] Error finding user with phone number ${userIdentifier}:`,
+          userLookupError
+        );
+        return { data: null, error: userLookupError };
+      }
+      
+      if (userRecord) {
+        userIdentifier = userRecord.id;
+        console.log(`Found user ID ${userIdentifier} for phone number`);
+      } else {
+        console.error(`No user found with phone number ${userIdentifier}`);
+        return { data: null, error: new Error(`No user found with phone number ${userIdentifier}`) };
+      }
+    }
+    
+    // First get the current memory object
+    const { data: currentUser, error: fetchError } = await this.supabase
+      .from(CONVERSATION_USERS_TABLE)
+      .select('memory')
+      .eq('id', userIdentifier)
+      .single();
+    
+    if (fetchError) {
+      console.error(
+        `[SupabaseAdapter] Error fetching user for memory update ${userIdentifier}:`,
+        fetchError
+      );
+      return { data: null, error: fetchError };
+    }
+    
+    // Initialize or update the memory object
+    const memory = currentUser?.memory || {};
+    memory[fieldId] = {
+      value,
+      updated_at: new Date().toISOString(),
+    };
+    
+    // Update the memory field
+    const { data, error } = await this.supabase
+      .from(CONVERSATION_USERS_TABLE)
+      .update({ memory })
+      .eq('id', userIdentifier)
+      .select(); // Get the updated record
+    
+    if (error) {
+      console.error(
+        `[SupabaseAdapter] Error upserting user memory for user ${userIdentifier}, field ${fieldId}:`,
+        error
+      );
+    }
+    return { data, error };
+  }
+
+  // Method to upsert chat thread memory value in the memory jsonb field of chats table
+  async upsertChatThreadMemoryValue(
+    chatId: string,
+    fieldId: string,
+    value: string
+  ): Promise<{ data: any; error: any }> { // Return data and error for consistency
+    
+    // First get the current memory object
+    const { data: currentChat, error: fetchError } = await this.supabase
+      .from(CHATS_TABLE)
+      .select('memory')
+      .eq('id', chatId)
+      .single();
+    
+    if (fetchError) {
+      console.error(
+        `[SupabaseAdapter] Error fetching chat for memory update ${chatId}:`,
+        fetchError
+      );
+      return { data: null, error: fetchError };
+    }
+    
+    // Initialize or update the memory object
+    const memory = currentChat?.memory || {};
+    memory[fieldId] = {
+      value,
+      updated_at: new Date().toISOString(),
+    };
+    
+    // Update the memory field
+    const { data, error } = await this.supabase
+      .from(CHATS_TABLE)
+      .update({ memory })
+      .eq('id', chatId)
+      .select(); // Get the updated record
+    
+    if (error) {
+      console.error(
+        `[SupabaseAdapter] Error upserting chat memory for chat ${chatId}, field ${fieldId}:`,
+        error
+      );
+    }
+    return { data, error };
+  }
+
+  /**
+   * Get user memory value from memory jsonb field in conversation_users table
+   * @param userId User ID or phone number
+   * @param fieldId Field ID in memory
+   * @returns The memory value or null if not found
+   */
+  async getUserMemoryValue(
+    userId: string,
+    fieldId: string
+  ): Promise<{ data: any; error: any }> {
+    try {
+      // Check if userId is a phone number and normalize it
+      let userIdentifier = userId;
+      if (userId.includes('+') || /^\d+$/.test(userId)) {
+        // This appears to be a phone number, normalize it by removing '+' and spaces
+        userIdentifier = userId.replace(/\+|\s/g, "");
+        
+        // Get the user id from the phone number
+        const { data: userRecord, error: userLookupError } = await this.supabase
+          .from(CONVERSATION_USERS_TABLE)
+          .select('id')
+          .eq('phone_number', userIdentifier)
+          .single();
+        
+        if (userLookupError) {
+          console.error(
+            `[SupabaseAdapter] Error finding user with phone number ${userIdentifier}:`,
+            userLookupError
+          );
+          return { data: null, error: userLookupError };
+        }
+        
+        if (userRecord) {
+          userIdentifier = userRecord.id;
+        } else {
+          console.error(`No user found with phone number ${userIdentifier}`);
+          return { data: null, error: new Error(`No user found with phone number ${userIdentifier}`) };
+        }
+      }
+
+      const { data, error } = await this.supabase
+        .from(CONVERSATION_USERS_TABLE)
+        .select('memory')
+        .eq('id', userIdentifier)
+        .single();
+
+      if (error) {
+        console.error(
+          `[SupabaseAdapter] Error getting user memory for user ${userIdentifier}, field ${fieldId}:`,
+          error
+        );
+        return { data: null, error };
+      }
+
+      // Return the specific field value from the memory object
+      const memoryValue = data?.memory && data.memory[fieldId] ? data.memory[fieldId].value : null;
+      return { data: memoryValue, error: null };
+    } catch (error) {
+      console.error(
+        `[SupabaseAdapter] Exception getting user memory for user ${userId}, field ${fieldId}:`,
+        error
+      );
+      return { data: null, error };
+    }
+  }
+
+  /**
+   * Delete user memory value from memory jsonb field in conversation_users table
+   * @param userId User ID or phone number
+   * @param fieldId Field ID to delete from memory
+   * @returns Success status
+   */
+  async deleteUserMemoryValue(
+    userId: string,
+    fieldId: string
+  ): Promise<{ success: boolean; error: any }> {
+    try {
+      // Check if userId is a phone number and normalize it
+      let userIdentifier = userId;
+      if (userId.includes('+') || /^\d+$/.test(userId)) {
+        // This appears to be a phone number, normalize it by removing '+' and spaces
+        userIdentifier = userId.replace(/\+|\s/g, "");
+        
+        // Get the user id from the phone number
+        const { data: userRecord, error: userLookupError } = await this.supabase
+          .from(CONVERSATION_USERS_TABLE)
+          .select('id')
+          .eq('phone_number', userIdentifier)
+          .single();
+        
+        if (userLookupError) {
+          console.error(
+            `[SupabaseAdapter] Error finding user with phone number ${userIdentifier}:`,
+            userLookupError
+          );
+          return { success: false, error: userLookupError };
+        }
+        
+        if (userRecord) {
+          userIdentifier = userRecord.id;
+        } else {
+          console.error(`No user found with phone number ${userIdentifier}`);
+          return { success: false, error: new Error(`No user found with phone number ${userIdentifier}`) };
+        }
+      }
+      
+      // First get the current memory object
+      const { data: currentUser, error: fetchError } = await this.supabase
+        .from(CONVERSATION_USERS_TABLE)
+        .select('memory')
+        .eq('id', userIdentifier)
+        .single();
+
+      if (fetchError) {
+        console.error(
+          `[SupabaseAdapter] Error fetching user for memory deletion ${userIdentifier}:`,
+          fetchError
+        );
+        return { success: false, error: fetchError };
+      }
+
+      // If no memory or the field doesn't exist, nothing to delete
+      if (!currentUser?.memory || !currentUser.memory[fieldId]) {
+        return { success: true, error: null };
+      }
+
+      // Create a new memory object without the specified field
+      const memory = { ...currentUser.memory };
+      delete memory[fieldId];
+
+      // Update the memory field
+      const { error } = await this.supabase
+        .from(CONVERSATION_USERS_TABLE)
+        .update({ memory })
+        .eq('id', userIdentifier);
+
+      if (error) {
+        console.error(
+          `[SupabaseAdapter] Error deleting user memory for user ${userIdentifier}, field ${fieldId}:`,
+          error
+        );
+        return { success: false, error };
+      }
+
+      return { success: true, error: null };
+    } catch (error) {
+      console.error(
+        `[SupabaseAdapter] Exception deleting user memory for user ${userId}, field ${fieldId}:`,
+        error
+      );
+      return { success: false, error };
+    }
+  }
+
+  /**
+   * Get chat thread memory value from memory jsonb field in chats table
+   * @param chatId Chat ID
+   * @param fieldId Field ID in memory
+   * @returns The memory value or null if not found
+   */
+  async getChatMemoryValue(
+    chatId: string,
+    fieldId: string
+  ): Promise<{ data: any; error: any }> {
+    try {
+      const { data, error } = await this.supabase
+        .from(CHATS_TABLE)
+        .select('memory')
+        .eq('id', chatId)
+        .single();
+
+      if (error) {
+        console.error(
+          `[SupabaseAdapter] Error getting chat memory for chat ${chatId}, field ${fieldId}:`,
+          error
+        );
+        return { data: null, error };
+      }
+
+      // Return the specific field value from the memory object
+      const memoryValue = data?.memory && data.memory[fieldId] ? data.memory[fieldId].value : null;
+      return { data: memoryValue, error: null };
+    } catch (error) {
+      console.error(
+        `[SupabaseAdapter] Exception getting chat memory for chat ${chatId}, field ${fieldId}:`,
+        error
+      );
+      return { data: null, error };
+    }
+  }
+
+  /**
+   * Delete chat thread memory value from memory jsonb field in chats table
+   * @param chatId Chat ID
+   * @param fieldId Field ID to delete from memory
+   * @returns Success status
+   */
+  async deleteChatMemoryValue(
+    chatId: string,
+    fieldId: string
+  ): Promise<{ success: boolean; error: any }> {
+    try {
+      // First get the current memory object
+      const { data: currentChat, error: fetchError } = await this.supabase
+        .from(CHATS_TABLE)
+        .select('memory')
+        .eq('id', chatId)
+        .single();
+
+      if (fetchError) {
+        console.error(
+          `[SupabaseAdapter] Error fetching chat for memory deletion ${chatId}:`,
+          fetchError
+        );
+        return { success: false, error: fetchError };
+      }
+
+      // If no memory or the field doesn't exist, nothing to delete
+      if (!currentChat?.memory || !currentChat.memory[fieldId]) {
+        return { success: true, error: null };
+      }
+
+      // Create a new memory object without the specified field
+      const memory = { ...currentChat.memory };
+      delete memory[fieldId];
+
+      // Update the memory field
+      const { error } = await this.supabase
+        .from(CHATS_TABLE)
+        .update({ memory })
+        .eq('id', chatId);
+
+      if (error) {
+        console.error(
+          `[SupabaseAdapter] Error deleting chat memory for chat ${chatId}, field ${fieldId}:`,
+          error
+        );
+        return { success: false, error };
+      }
+
+      return { success: true, error: null };
+    } catch (error) {
+      console.error(
+        `[SupabaseAdapter] Exception deleting chat memory for chat ${chatId}, field ${fieldId}:`,
+        error
+      );
+      return { success: false, error };
+    }
+  }
+
+  /**
+   * @description Gets all memory values for a user
+   * @param userId User ID or phone number
+   * @returns All memory values for the user
+   */
+  async getAllUserMemoryValues(userId: string): Promise<Record<string, any>> {
+    try {
+      // Check if userId is a phone number and normalize it
+      let userIdentifier = userId;
+      if (userId.includes('+') || /^\d+$/.test(userId)) {
+        // This appears to be a phone number, normalize it by removing '+' and spaces
+        userIdentifier = userId.replace(/\+|\s/g, "");
+        
+        // Get the user id from the phone number
+        const { data: userRecord, error: userLookupError } = await this.supabase
+          .from(CONVERSATION_USERS_TABLE)
+          .select('id')
+          .eq('phone_number', userIdentifier)
+          .single();
+        
+        if (userLookupError) {
+          console.error(
+            `[SupabaseAdapter] Error finding user with phone number ${userIdentifier}:`,
+            userLookupError
+          );
+          return {};
+        }
+        
+        if (userRecord) {
+          userIdentifier = userRecord.id;
+        } else {
+          console.error(`No user found with phone number ${userIdentifier}`);
+          return {};
+        }
+      }
+
+      const { data, error } = await this.supabase
+        .from(CONVERSATION_USERS_TABLE)
+        .select('memory')
+        .eq('id', userIdentifier)
+        .single();
+
+      if (error) {
+        console.error(
+          `[SupabaseAdapter] Error getting all user memory values for user ${userIdentifier}:`,
+          error
+        );
+        return {};
+      }
+
+      // Transform the memory object to return just the values, not the metadata
+      const result: Record<string, any> = {};
+      if (data?.memory) {
+        Object.keys(data.memory).forEach(key => {
+          result[key] = data.memory[key]?.value;
+        });
+      }
+
+      return result;
+    } catch (error) {
+      console.error(
+        `[SupabaseAdapter] Exception getting all user memory values for user ${userId}:`,
+        error
+      );
+      return {};
+    }
+  }
+
+  /**
+   * @description Gets all memory values for a chat
+   * @param chatId Chat ID
+   * @returns All memory values for the chat
+   */
+  async getAllChatMemoryValues(chatId: string): Promise<Record<string, any>> {
+    try {
+      const { data, error } = await this.supabase
+        .from(CHATS_TABLE)
+        .select('memory')
+        .eq('id', chatId)
+        .single();
+
+      if (error) {
+        console.error(
+          `[SupabaseAdapter] Error getting all chat memory values for chat ${chatId}:`,
+          error
+        );
+        return {};
+      }
+
+      // Transform the memory object to return just the values, not the metadata
+      const result: Record<string, any> = {};
+      if (data?.memory) {
+        Object.keys(data.memory).forEach(key => {
+          result[key] = data.memory[key]?.value;
+        });
+      }
+
+      return result;
+    } catch (error) {
+      console.error(
+        `[SupabaseAdapter] Exception getting all chat memory values for chat ${chatId}:`,
+        error
+      );
+      return {};
     }
   }
 }

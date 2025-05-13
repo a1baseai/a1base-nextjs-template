@@ -23,6 +23,7 @@ import {
 } from "../workflows/group-onboarding-workflow";
 import { getSplitMessageSetting } from "../settings/message-settings";
 import { saveMessage, userCheck } from "../data/message-storage"; // userCheck is imported but not used in the original, keeping it.
+import { processMessageForMemoryUpdates } from '../agent-memory/memory-processor'; // Added import
 
 // --- CONSTANTS ---
 export const MAX_CONTEXT_MESSAGES = 10;
@@ -364,26 +365,28 @@ async function persistIncomingMessage(
       console.log(
         `[MessageStore] Storing user message via processWebhookPayload. Thread ID: ${thread_id}, Message ID: ${message_id}`
       );
-      const { success, isNewChat, chat } = await adapter.processWebhookPayload(
+      const { success, isNewChat, chatId: processedChatId } = await adapter.processWebhookPayload(
         webhookData
       );
       isNewChatInDb = isNewChat ?? false; // Default to false if undefined
 
-      if (success && chat) {
-        chatId = chat.id;
+      if (success && processedChatId) { 
+        // Use the chatId returned by processWebhookPayload
+        chatId = processedChatId;
         console.log(
           `[MessageStore] processWebhookPayload success. Chat ID: ${chatId}, Is New Chat: ${isNewChatInDb}`
         );
-      } else if (success && !chat && thread_id) {
-        // If successful but chat object not returned, try fetching thread
+      } else if (success && !processedChatId && thread_id) {
+        // This case might be less likely now if processWebhookPayload always returns a chatId (even if null on failure)
+        // Kept for safety, but ideally processWebhookPayload is consistent.
         const threadData = await adapter.getThread(thread_id);
         if (threadData) chatId = threadData.id;
         console.log(
-          `[MessageStore] processWebhookPayload success (chat object not in response). Fetched thread. Chat ID: ${chatId}`
+          `[MessageStore] processWebhookPayload success (chatId not in response or null). Fetched thread. Chat ID: ${chatId}`
         );
       } else {
         console.error(
-          `[MessageStore] Failed to store webhook data via Supabase for message ${message_id}. Success: ${success}`
+          `[MessageStore] Failed to store webhook data via Supabase for message ${message_id}. Success: ${success}, Processed Chat ID: ${processedChatId}`
         );
       }
       // Store in memory as a redundant measure or if Supabase failed partially
@@ -656,9 +659,9 @@ export async function handleWhatsAppIncoming(
   webhookData: WebhookPayload
 ): Promise<object> {
   if (isSupabaseConfigured()) {
-    await initializeDatabase();
+    await initializeDatabase(); // This initializes the singleton instance in config.ts
   }
-  const adapter = getInitializedAdapter();
+  const adapter = await getInitializedAdapter(); // Added await here
 
   const {
     thread_id,
@@ -680,6 +683,37 @@ export async function handleWhatsAppIncoming(
     timestamp,
     service,
   });
+
+  // --- Early Memory Update Processing ---
+  if (content && content.trim() !== "") {
+    try {
+      console.log(`[MemoryProcessor] Checking message from ${sender_number} in chat ${thread_id} for memory updates.`);
+      const memorySuggestions = await processMessageForMemoryUpdates(
+        content,
+        sender_number, // Using sender_number as userId
+        thread_id,     // Using thread_id as chatId
+        openaiClient,
+        adapter        // Pass the adapter instance
+      );
+      
+      console.log("Response from OpenAI for memory updates:", JSON.stringify(memorySuggestions, null, 2));
+
+      if (memorySuggestions.userMemoryUpdates.length > 0) {
+        console.log(`[MemoryProcessor] Suggested User Memory Updates for ${sender_number}:`, JSON.stringify(memorySuggestions.userMemoryUpdates, null, 2));
+        // TODO: Persist these user memory updates
+      }
+      if (memorySuggestions.chatMemoryUpdates.length > 0) {
+        console.log(`[MemoryProcessor] Suggested Chat Memory Updates for ${thread_id}:`, JSON.stringify(memorySuggestions.chatMemoryUpdates, null, 2));
+        // TODO: Persist these chat memory updates
+      }
+      if (memorySuggestions.userMemoryUpdates.length === 0 && memorySuggestions.chatMemoryUpdates.length === 0) {
+        console.log(`[MemoryProcessor] No memory updates suggested for message: "${content}"`);
+      }
+    } catch (memError) {
+      console.error('[MemoryProcessor] Error during memory update processing:', memError);
+    }
+  }
+  // --- End Early Memory Update Processing ---
 
   // 1. Skip processing for agent's own messages
   if (sender_number === process.env.A1BASE_AGENT_NUMBER) {

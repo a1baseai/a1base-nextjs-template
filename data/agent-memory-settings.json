@@ -10,6 +10,11 @@
       "id": "default-user-interests",
       "title": "Key Goals/Interests",
       "description": "User's primary goals for interacting or their main topics of interest (e.g., Learning Python, Project Management Tips)."
+    },
+    {
+      "id": "1747119626018",
+      "title": "Annoying things AI agent should avoid",
+      "description": "Mark down any time the user gets annoyed, or flags annoyance. "
     }
   ],
   "chatMemoryEnabled": true,
@@ -28,5 +33,6 @@
   "memoryTypeNote": "User memory is persistent across chats. Chat thread memory is scoped to the current conversation.",
   "fields": [],
   "title": "Agent Memory Settings",
-  "description": "Configure agent memory for user-level and chat-specific contexts."
+  "description": "Configure agent memory for user-level and chat-specific contexts.",
+  "_source": "server_direct_file"
 }
