@@ -1024,13 +1024,13 @@ export class SupabaseAdapter {
     this.ensureInitialized();
 
     console.log("!!! EXTERNAL ID ", externalId);
-    
+
     try {
       const { data, error } = await this.supabase
         .from(CHATS_TABLE) // CHATS_TABLE should be imported from './config' or defined
         .select("*")
         .eq("external_id", externalId)
-        
+
         .single();
 
       console.log("Supabase query result:", data);
@@ -1047,7 +1047,7 @@ export class SupabaseAdapter {
       console.log("Get Chats Onboarding Data", data?.metadata);
       return data?.metadata || null;
     } catch (error) {
-      console.log("Get Chats Onboarding Data Error", error)
+      console.log("Get Chats Onboarding Data Error", error);
       return null;
     }
   }
@@ -1161,24 +1161,25 @@ export class SupabaseAdapter {
     userId: string,
     fieldId: string,
     value: string
-  ): Promise<{ data: any; error: any }> { // Return data and error for consistency
-    
-    console.log("upsertUserMemoryValue", userId, fieldId, value)
-    
-    // Check if userId is a phone number and normalize it
+  ): Promise<{ data: any; error: any }> {
+    // Return data and error for consistency
+
+   // Check if userId is a phone number and normalize it
     let userIdentifier = userId;
-    if (userId.includes('+') || /^\d+$/.test(userId)) {
+    if (userId.includes("+") || /^\d+$/.test(userId)) {
       // This appears to be a phone number, normalize it by removing '+' and spaces
       userIdentifier = userId.replace(/\+|\s/g, "");
-      console.log(`Normalized phone number from ${userId} to ${userIdentifier}`);
-      
+      console.log(
+        `Normalized phone number from ${userId} to ${userIdentifier}`
+      );
+
       // Get the user id from the phone number
       const { data: userRecord, error: userLookupError } = await this.supabase
         .from(CONVERSATION_USERS_TABLE)
-        .select('id')
-        .eq('phone_number', userIdentifier)
+        .select("id")
+        .eq("phone_number", userIdentifier)
         .single();
-      
+
       if (userLookupError) {
         console.error(
           `[SupabaseAdapter] Error finding user with phone number ${userIdentifier}:`,
@@ -1186,23 +1187,26 @@ export class SupabaseAdapter {
         );
         return { data: null, error: userLookupError };
       }
-      
+
       if (userRecord) {
         userIdentifier = userRecord.id;
         console.log(`Found user ID ${userIdentifier} for phone number`);
       } else {
         console.error(`No user found with phone number ${userIdentifier}`);
-        return { data: null, error: new Error(`No user found with phone number ${userIdentifier}`) };
+        return {
+          data: null,
+          error: new Error(`No user found with phone number ${userIdentifier}`),
+        };
       }
     }
-    
+
     // First get the current memory object
     const { data: currentUser, error: fetchError } = await this.supabase
       .from(CONVERSATION_USERS_TABLE)
-      .select('memory')
-      .eq('id', userIdentifier)
+      .select("memory")
+      .eq("id", userIdentifier)
       .single();
-    
+
     if (fetchError) {
       console.error(
         `[SupabaseAdapter] Error fetching user for memory update ${userIdentifier}:`,
@@ -1210,21 +1214,21 @@ export class SupabaseAdapter {
       );
       return { data: null, error: fetchError };
     }
-    
+
     // Initialize or update the memory object
     const memory = currentUser?.memory || {};
     memory[fieldId] = {
       value,
       updated_at: new Date().toISOString(),
     };
-    
+
     // Update the memory field
     const { data, error } = await this.supabase
       .from(CONVERSATION_USERS_TABLE)
       .update({ memory })
-      .eq('id', userIdentifier)
+      .eq("id", userIdentifier)
       .select(); // Get the updated record
-    
+
     if (error) {
       console.error(
         `[SupabaseAdapter] Error upserting user memory for user ${userIdentifier}, field ${fieldId}:`,
@@ -1239,15 +1243,18 @@ export class SupabaseAdapter {
     chatId: string,
     fieldId: string,
     value: string
-  ): Promise<{ data: any; error: any }> { // Return data and error for consistency
-    
+  ): Promise<{ data: any; error: any }> {
+    // Return data and error for consistency
+
+    console.log("upsertChatThreadMemoryValue");
+
     // First get the current memory object
     const { data: currentChat, error: fetchError } = await this.supabase
       .from(CHATS_TABLE)
-      .select('memory')
-      .eq('id', chatId)
+      .select("*")
+      .eq("external_id", chatId)
       .single();
-    
+
     if (fetchError) {
       console.error(
         `[SupabaseAdapter] Error fetching chat for memory update ${chatId}:`,
@@ -1255,21 +1262,21 @@ export class SupabaseAdapter {
       );
       return { data: null, error: fetchError };
     }
-    
+
     // Initialize or update the memory object
     const memory = currentChat?.memory || {};
     memory[fieldId] = {
       value,
       updated_at: new Date().toISOString(),
     };
-    
+
     // Update the memory field
     const { data, error } = await this.supabase
       .from(CHATS_TABLE)
       .update({ memory })
-      .eq('id', chatId)
+      .eq("external_id", chatId)
       .select(); // Get the updated record
-    
+
     if (error) {
       console.error(
         `[SupabaseAdapter] Error upserting chat memory for chat ${chatId}, field ${fieldId}:`,
@@ -1292,17 +1299,17 @@ export class SupabaseAdapter {
     try {
       // Check if userId is a phone number and normalize it
       let userIdentifier = userId;
-      if (userId.includes('+') || /^\d+$/.test(userId)) {
+      if (userId.includes("+") || /^\d+$/.test(userId)) {
         // This appears to be a phone number, normalize it by removing '+' and spaces
         userIdentifier = userId.replace(/\+|\s/g, "");
-        
+
         // Get the user id from the phone number
         const { data: userRecord, error: userLookupError } = await this.supabase
           .from(CONVERSATION_USERS_TABLE)
-          .select('id')
-          .eq('phone_number', userIdentifier)
+          .select("id")
+          .eq("phone_number", userIdentifier)
           .single();
-        
+
         if (userLookupError) {
           console.error(
             `[SupabaseAdapter] Error finding user with phone number ${userIdentifier}:`,
@@ -1310,19 +1317,24 @@ export class SupabaseAdapter {
           );
           return { data: null, error: userLookupError };
         }
-        
+
         if (userRecord) {
           userIdentifier = userRecord.id;
         } else {
           console.error(`No user found with phone number ${userIdentifier}`);
-          return { data: null, error: new Error(`No user found with phone number ${userIdentifier}`) };
+          return {
+            data: null,
+            error: new Error(
+              `No user found with phone number ${userIdentifier}`
+            ),
+          };
         }
       }
 
       const { data, error } = await this.supabase
         .from(CONVERSATION_USERS_TABLE)
-        .select('memory')
-        .eq('id', userIdentifier)
+        .select("memory")
+        .eq("id", userIdentifier)
         .single();
 
       if (error) {
@@ -1334,7 +1346,10 @@ export class SupabaseAdapter {
       }
 
       // Return the specific field value from the memory object
-      const memoryValue = data?.memory && data.memory[fieldId] ? data.memory[fieldId].value : null;
+      const memoryValue =
+        data?.memory && data.memory[fieldId]
+          ? data.memory[fieldId].value
+          : null;
       return { data: memoryValue, error: null };
     } catch (error) {
       console.error(
@@ -1358,17 +1373,17 @@ export class SupabaseAdapter {
     try {
       // Check if userId is a phone number and normalize it
       let userIdentifier = userId;
-      if (userId.includes('+') || /^\d+$/.test(userId)) {
+      if (userId.includes("+") || /^\d+$/.test(userId)) {
         // This appears to be a phone number, normalize it by removing '+' and spaces
         userIdentifier = userId.replace(/\+|\s/g, "");
-        
+
         // Get the user id from the phone number
         const { data: userRecord, error: userLookupError } = await this.supabase
           .from(CONVERSATION_USERS_TABLE)
-          .select('id')
-          .eq('phone_number', userIdentifier)
+          .select("id")
+          .eq("phone_number", userIdentifier)
           .single();
-        
+
         if (userLookupError) {
           console.error(
             `[SupabaseAdapter] Error finding user with phone number ${userIdentifier}:`,
@@ -1376,20 +1391,25 @@ export class SupabaseAdapter {
           );
           return { success: false, error: userLookupError };
         }
-        
+
         if (userRecord) {
           userIdentifier = userRecord.id;
         } else {
           console.error(`No user found with phone number ${userIdentifier}`);
-          return { success: false, error: new Error(`No user found with phone number ${userIdentifier}`) };
+          return {
+            success: false,
+            error: new Error(
+              `No user found with phone number ${userIdentifier}`
+            ),
+          };
         }
       }
-      
+
       // First get the current memory object
       const { data: currentUser, error: fetchError } = await this.supabase
         .from(CONVERSATION_USERS_TABLE)
-        .select('memory')
-        .eq('id', userIdentifier)
+        .select("memory")
+        .eq("id", userIdentifier)
         .single();
 
       if (fetchError) {
@@ -1413,7 +1433,7 @@ export class SupabaseAdapter {
       const { error } = await this.supabase
         .from(CONVERSATION_USERS_TABLE)
         .update({ memory })
-        .eq('id', userIdentifier);
+        .eq("id", userIdentifier);
 
       if (error) {
         console.error(
@@ -1446,8 +1466,8 @@ export class SupabaseAdapter {
     try {
       const { data, error } = await this.supabase
         .from(CHATS_TABLE)
-        .select('memory')
-        .eq('id', chatId)
+        .select("memory")
+        .eq("id", chatId)
         .single();
 
       if (error) {
@@ -1459,7 +1479,10 @@ export class SupabaseAdapter {
       }
 
       // Return the specific field value from the memory object
-      const memoryValue = data?.memory && data.memory[fieldId] ? data.memory[fieldId].value : null;
+      const memoryValue =
+        data?.memory && data.memory[fieldId]
+          ? data.memory[fieldId].value
+          : null;
       return { data: memoryValue, error: null };
     } catch (error) {
       console.error(
@@ -1484,8 +1507,8 @@ export class SupabaseAdapter {
       // First get the current memory object
       const { data: currentChat, error: fetchError } = await this.supabase
         .from(CHATS_TABLE)
-        .select('memory')
-        .eq('id', chatId)
+        .select("memory")
+        .eq("id", chatId)
         .single();
 
       if (fetchError) {
@@ -1509,7 +1532,7 @@ export class SupabaseAdapter {
       const { error } = await this.supabase
         .from(CHATS_TABLE)
         .update({ memory })
-        .eq('id', chatId);
+        .eq("id", chatId);
 
       if (error) {
         console.error(
@@ -1538,17 +1561,17 @@ export class SupabaseAdapter {
     try {
       // Check if userId is a phone number and normalize it
       let userIdentifier = userId;
-      if (userId.includes('+') || /^\d+$/.test(userId)) {
+      if (userId.includes("+") || /^\d+$/.test(userId)) {
         // This appears to be a phone number, normalize it by removing '+' and spaces
         userIdentifier = userId.replace(/\+|\s/g, "");
-        
+
         // Get the user id from the phone number
         const { data: userRecord, error: userLookupError } = await this.supabase
           .from(CONVERSATION_USERS_TABLE)
-          .select('id')
-          .eq('phone_number', userIdentifier)
+          .select("id")
+          .eq("phone_number", userIdentifier)
           .single();
-        
+
         if (userLookupError) {
           console.error(
             `[SupabaseAdapter] Error finding user with phone number ${userIdentifier}:`,
@@ -1556,7 +1579,7 @@ export class SupabaseAdapter {
           );
           return {};
         }
-        
+
         if (userRecord) {
           userIdentifier = userRecord.id;
         } else {
@@ -1567,8 +1590,8 @@ export class SupabaseAdapter {
 
       const { data, error } = await this.supabase
         .from(CONVERSATION_USERS_TABLE)
-        .select('memory')
-        .eq('id', userIdentifier)
+        .select("memory")
+        .eq("id", userIdentifier)
         .single();
 
       if (error) {
@@ -1582,7 +1605,7 @@ export class SupabaseAdapter {
       // Transform the memory object to return just the values, not the metadata
       const result: Record<string, any> = {};
       if (data?.memory) {
-        Object.keys(data.memory).forEach(key => {
+        Object.keys(data.memory).forEach((key) => {
           result[key] = data.memory[key]?.value;
         });
       }
@@ -1606,8 +1629,8 @@ export class SupabaseAdapter {
     try {
       const { data, error } = await this.supabase
         .from(CHATS_TABLE)
-        .select('memory')
-        .eq('id', chatId)
+        .select("memory")
+        .eq("id", chatId)
         .single();
 
       if (error) {
@@ -1621,7 +1644,7 @@ export class SupabaseAdapter {
       // Transform the memory object to return just the values, not the metadata
       const result: Record<string, any> = {};
       if (data?.memory) {
-        Object.keys(data.memory).forEach(key => {
+        Object.keys(data.memory).forEach((key) => {
           result[key] = data.memory[key]?.value;
         });
       }

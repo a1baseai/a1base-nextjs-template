@@ -23,7 +23,7 @@ import {
 } from "../workflows/group-onboarding-workflow";
 import { getSplitMessageSetting } from "../settings/message-settings";
 import { saveMessage, userCheck } from "../data/message-storage"; // userCheck is imported but not used in the original, keeping it.
-import { processMessageForMemoryUpdates } from '../agent-memory/memory-processor'; // Added import
+import { processMessageForMemoryUpdates } from "../agent-memory/memory-processor"; // Added import
 
 // --- CONSTANTS ---
 export const MAX_CONTEXT_MESSAGES = 10;
@@ -129,7 +129,10 @@ async function processOnboardingConversation(
       .map((field) => field.id);
 
     // Pass the thread type as 'individual' for onboarding conversations
-    const formattedMessages = formatMessagesForOpenAI(threadMessages, 'individual');
+    const formattedMessages = formatMessagesForOpenAI(
+      threadMessages,
+      "individual"
+    );
 
     const extractionPrompt = `
       Based on the conversation, extract the following information about the user:
@@ -142,8 +145,9 @@ async function processOnboardingConversation(
       Example response format: { "name": "John Doe", "email": "john@example.com", "business_type": "Tech", "goals": "Increase productivity" }
       DO NOT include any explanations, markdown formatting, or anything outside the JSON object.`;
 
-
-    console.log("OpenaAI completion happening at processOnboardingConversation function")  
+    console.log(
+      "OpenaAI completion happening at processOnboardingConversation function"
+    );
     const extraction = await openaiClient.chat.completions.create({
       model: "gpt-4.1",
       messages: [
@@ -214,12 +218,14 @@ async function handleAgenticOnboardingFollowUp(
   try {
     const onboardingFlow = await loadOnboardingFlow(); // Load flow once
     // Pass the thread type as 'individual' for onboarding follow-up
-    const formattedMessages = formatMessagesForOpenAI(threadMessages, 'individual');
+    const formattedMessages = formatMessagesForOpenAI(
+      threadMessages,
+      "individual"
+    );
 
     console.log(
       `[Onboarding] Processing ${formattedMessages.length} messages for agentic follow-up`
     );
-
 
     const { extractedInfo, isComplete } = await processOnboardingConversation(
       threadMessages
@@ -258,18 +264,20 @@ async function handleAgenticOnboardingFollowUp(
         systemPrompt
       );
 
-      console.log("[Onboarding] fomrattedmessages:", formattedMessages)
+      console.log("[Onboarding] fomrattedmessages:", formattedMessages);
 
-      console.log("OpenaAI completion happening at handleAgenticOnboardingFollowUp function")
+      console.log(
+        "OpenaAI completion happening at handleAgenticOnboardingFollowUp function"
+      );
 
       const response = await openaiClient.chat.completions.create({
         model: "gpt-4.1",
         messages: [
           {
             role: "system",
-            content: systemPrompt
+            content: systemPrompt,
           },
-          ...formattedMessages
+          ...formattedMessages,
         ],
         max_tokens: 1000,
       });
@@ -365,12 +373,14 @@ async function persistIncomingMessage(
       console.log(
         `[MessageStore] Storing user message via processWebhookPayload. Thread ID: ${thread_id}, Message ID: ${message_id}`
       );
-      const { success, isNewChat, chatId: processedChatId } = await adapter.processWebhookPayload(
-        webhookData
-      );
+      const {
+        success,
+        isNewChat,
+        chatId: processedChatId,
+      } = await adapter.processWebhookPayload(webhookData);
       isNewChatInDb = isNewChat ?? false; // Default to false if undefined
 
-      if (success && processedChatId) { 
+      if (success && processedChatId) {
         // Use the chatId returned by processWebhookPayload
         chatId = processedChatId;
         console.log(
@@ -544,7 +554,7 @@ async function manageIndividualOnboardingProcess(
   chatId: string | null
 ): Promise<boolean> {
   // Returns true if onboarding message was sent
-  console.log("manageIndividualOnboardingProcess START")
+  console.log("manageIndividualOnboardingProcess START");
   const { thread_id, sender_number, thread_type, service } = webhookData;
 
   const isOnboardingInProgress = threadMessages.length > 1; // User has sent at least one message after initial contact
@@ -597,21 +607,22 @@ async function manageIndividualOnboardingProcess(
       // The original code used `__skip_send` for StartOnboarding directly.
 
       // Convert MessageRecord[] to ThreadMessage[] to satisfy type requirements
-      const threadMessagesForOnboarding = threadMessages.map(msg => ({
+      const threadMessagesForOnboarding = threadMessages.map((msg) => ({
         ...msg,
         // Ensure message_type is one of the expected types
-        message_type: (msg.message_type === 'text' || 
-                      msg.message_type === 'rich_text' || 
-                      msg.message_type === 'image' || 
-                      msg.message_type === 'video' || 
-                      msg.message_type === 'audio' || 
-                      msg.message_type === 'location' || 
-                      msg.message_type === 'reaction' || 
-                      msg.message_type === 'group_invite') 
-                      ? msg.message_type 
-                      : 'unsupported_message_type'
+        message_type:
+          msg.message_type === "text" ||
+          msg.message_type === "rich_text" ||
+          msg.message_type === "image" ||
+          msg.message_type === "video" ||
+          msg.message_type === "audio" ||
+          msg.message_type === "location" ||
+          msg.message_type === "reaction" ||
+          msg.message_type === "group_invite"
+            ? msg.message_type
+            : "unsupported_message_type",
       })) as ThreadMessage[];
-      
+
       const onboardingResponse: OnboardingResponse | undefined =
         await StartOnboarding(
           threadMessagesForOnboarding, // Pass the converted threadMessages
@@ -662,7 +673,7 @@ export async function handleWhatsAppIncoming(
     await initializeDatabase(); // This initializes the singleton instance in config.ts
   }
   const adapter = await getInitializedAdapter(); // Added await here
-
+  console.log("WebhookData:", webhookData);
   const {
     thread_id,
     message_id,
@@ -687,30 +698,44 @@ export async function handleWhatsAppIncoming(
   // --- Early Memory Update Processing ---
   if (content && content.trim() !== "") {
     try {
-      console.log(`[MemoryProcessor] Checking message from ${sender_number} in chat ${thread_id} for memory updates.`);
+      console.log(
+        `[MemoryProcessor] Checking message from ${sender_number} in chat ${thread_id} for memory updates.`
+      );
       const memorySuggestions = await processMessageForMemoryUpdates(
         content,
         sender_number, // Using sender_number as userId
-        thread_id,     // Using thread_id as chatId
+        thread_id, // Using thread_id as chatId
         openaiClient,
-        adapter        // Pass the adapter instance
+        adapter // Pass the adapter instance
       );
-      
-      console.log("Response from OpenAI for memory updates:", JSON.stringify(memorySuggestions, null, 2));
 
       if (memorySuggestions.userMemoryUpdates.length > 0) {
-        console.log(`[MemoryProcessor] Suggested User Memory Updates for ${sender_number}:`, JSON.stringify(memorySuggestions.userMemoryUpdates, null, 2));
+        console.log(
+          `[MemoryProcessor] Suggested User Memory Updates for ${sender_number}:`,
+          JSON.stringify(memorySuggestions.userMemoryUpdates, null, 2)
+        );
         // TODO: Persist these user memory updates
       }
       if (memorySuggestions.chatMemoryUpdates.length > 0) {
-        console.log(`[MemoryProcessor] Suggested Chat Memory Updates for ${thread_id}:`, JSON.stringify(memorySuggestions.chatMemoryUpdates, null, 2));
+        console.log(
+          `[MemoryProcessor] Suggested Chat Memory Updates for ${thread_id}:`,
+          JSON.stringify(memorySuggestions.chatMemoryUpdates, null, 2)
+        );
         // TODO: Persist these chat memory updates
       }
-      if (memorySuggestions.userMemoryUpdates.length === 0 && memorySuggestions.chatMemoryUpdates.length === 0) {
-        console.log(`[MemoryProcessor] No memory updates suggested for message: "${content}"`);
+      if (
+        memorySuggestions.userMemoryUpdates.length === 0 &&
+        memorySuggestions.chatMemoryUpdates.length === 0
+      ) {
+        console.log(
+          `[MemoryProcessor] No memory updates suggested for message: "${content}"`
+        );
       }
     } catch (memError) {
-      console.error('[MemoryProcessor] Error during memory update processing:', memError);
+      console.error(
+        "[MemoryProcessor] Error during memory update processing:",
+        memError
+      );
     }
   }
   // --- End Early Memory Update Processing ---

@@ -58,11 +58,6 @@ export function formatMessagesForOpenAI<
   messages: T[],
   threadType: string = "individual"
 ): { role: "user" | "assistant"; content: string }[] {
-  console.log("🔄 formatMessagesForOpenAI function called with:", {
-    messageCount: messages.length,
-    threadType,
-  });
-
   const normalizedAgentNumber = normalizePhoneNumber(
     process.env.A1BASE_AGENT_NUMBER || ""
   );
@@ -96,7 +91,6 @@ export function formatMessagesForOpenAI<
     };
   });
 
-  console.log("✅ formatMessagesForOpenAI output:", formattedMessages);
   return formattedMessages;
 }
 

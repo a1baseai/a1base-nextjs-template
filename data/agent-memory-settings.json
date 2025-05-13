@@ -28,6 +28,11 @@
       "id": "default-chat-summary",
       "title": "Brief Conversation Summary",
       "description": "A short summary of the key points or decisions made so far in this thread."
+    },
+    {
+      "id": "1747141795099",
+      "title": "Group annoyance",
+      "description": "Save anything the group finds annoying"
     }
   ],
   "memoryTypeNote": "User memory is persistent across chats. Chat thread memory is scoped to the current conversation.",

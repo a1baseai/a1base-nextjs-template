@@ -73,9 +73,6 @@ Respond ONLY with a JSON object. The JSON object must contain two keys: "userMem
 
 If no updates are identified for a category, provide an empty array for that key. Only include fields for which a direct and clear update is present in the message. Do not infer values that are not clearly stated. If the message is a question, it's unlikely to update memory unless it explicitly states new information. Focus on factual updates.`;
 
-    console.log("MEMORY SYSTEM MESSAGE");
-    console.log(systemMessage);
-
     // User message for the AI, providing context and the message to analyze
     const aiUserMessage = `User Message (from user ${userId} in chat ${chatId}):
 "${messageContent}"
@@ -100,9 +97,6 @@ ${JSON.stringify(
 
 Please analyze the user message and provide necessary updates in the specified JSON format.`;
 
-console.log("MEMORY AI MESSAGE")
-console.log(aiUserMessage)
-
     // console.log('[MemoryProcessor] AI Prompt:', aiUserMessage); // For debugging the prompt
 
     const response = await openaiClient.chat.completions.create({
@@ -114,8 +108,6 @@ console.log(aiUserMessage)
       response_format: { type: "json_object" },
       temperature: 0.2, // Lower temperature for more factual, less creative output
     });
-
-    console.log("Response from OpenAI for memory updates:", response);
 
     const aiResponseContent = response.choices[0]?.message?.content;
     if (!aiResponseContent) {
