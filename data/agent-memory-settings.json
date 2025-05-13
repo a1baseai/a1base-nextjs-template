@@ -1,26 +1,32 @@
 {
-  "memoryCollectionEnabled": true,
-  "informationToSave": "key_details_and_preferences",
-  "memoryTypeNote": "This is basic memory collection. More advanced capabilities, potentially leveraging tools like mem0.ai, will be explored for future enhancements.",
-  "fields": [
+  "userMemoryEnabled": true,
+  "userMemoryFields": [
     {
-      "name": "memoryCollectionEnabled",
-      "label": "Enable Memory Collection",
-      "type": "toggle",
-      "description": "Allow the agent to remember information from conversations."
+      "id": "default-user-role",
+      "title": "User's Role/Industry",
+      "description": "The professional role or industry the user works in (e.g., Software Engineer, Healthcare)."
     },
     {
-      "name": "informationToSave",
-      "label": "Information to Save",
-      "type": "select",
-      "options": [
-        {"value": "key_details_and_preferences", "label": "Key Details & User Preferences"},
-        {"value": "summarized_exchanges", "label": "Summarized Conversation Exchanges"},
-        {"value": "off", "label": "Only Explicitly Marked Items"}
-      ],
-      "description": "Specify what kind of information the agent should retain."
+      "id": "default-user-interests",
+      "title": "Key Goals/Interests",
+      "description": "User's primary goals for interacting or their main topics of interest (e.g., Learning Python, Project Management Tips)."
     }
   ],
+  "chatMemoryEnabled": true,
+  "chatThreadMemoryFields": [
+    {
+      "id": "default-chat-topic",
+      "title": "Current Discussion Topic",
+      "description": "The main subject or problem being discussed in the current chat session (e.g., Debugging a specific function, Brainstorming ideas for X)."
+    },
+    {
+      "id": "default-chat-summary",
+      "title": "Brief Conversation Summary",
+      "description": "A short summary of the key points or decisions made so far in this thread."
+    }
+  ],
+  "memoryTypeNote": "User memory is persistent across chats. Chat thread memory is scoped to the current conversation.",
+  "fields": [],
   "title": "Agent Memory Settings",
-  "description": "Configure how the agent remembers information to personalize interactions and improve assistance over time."
+  "description": "Configure agent memory for user-level and chat-specific contexts."
 }

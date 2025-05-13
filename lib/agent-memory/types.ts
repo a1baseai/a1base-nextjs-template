@@ -3,8 +3,14 @@ export interface AgentMemorySettingFieldOption {
   label: string;
 }
 
+export interface CustomMemoryField {
+  id: string; // Unique ID for React keys and stable updates
+  title: string;
+  description: string;
+}
+
 export interface AgentMemorySettingField {
-  name: "memoryCollectionEnabled" | "informationToSave";
+  name: never;
   label: string;
   type: "toggle" | "select";
   description: string;
@@ -12,8 +18,10 @@ export interface AgentMemorySettingField {
 }
 
 export interface AgentMemorySettingsData {
-  memoryCollectionEnabled: boolean;
-  informationToSave: string;
+  userMemoryEnabled: boolean;
+  userMemoryFields: CustomMemoryField[];
+  chatMemoryEnabled: boolean;
+  chatThreadMemoryFields: CustomMemoryField[];
   memoryTypeNote: string;
   fields: AgentMemorySettingField[];
   title: string;

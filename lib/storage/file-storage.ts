@@ -211,6 +211,25 @@ export const loadBaseInformation = async (): Promise<InformationSection[] | null
  * @returns Promise that resolves to true if successfully saved, false otherwise
  */
 export const saveAgentMemorySettings = async (settings: AgentMemorySettingsData): Promise<boolean> => {
+  // If we're running on the server side in an API route, access the file directly
+  if (typeof window === 'undefined') {
+    try {
+      const dataDir = path.join(process.cwd(), 'data');
+      // Ensure the data directory exists
+      if (!fs.existsSync(dataDir)) {
+        fs.mkdirSync(dataDir, { recursive: true });
+      }
+      const filePath = path.join(dataDir, 'agent-memory-settings.json');
+      fs.writeFileSync(filePath, JSON.stringify(settings, null, 2), 'utf8');
+      // console.log('[SERVER] Successfully saved agent memory settings to file:', filePath);
+      return true;
+    } catch (error) {
+      console.error('❌ [SERVER] Error saving agent memory settings to file:', error);
+      return false;
+    }
+  }
+
+  // Client-side or non-API server code: use API endpoint
   try {
     const response = await fetch(`${getBaseUrl()}/api/agent-memory-settings`, {
       method: 'POST',
