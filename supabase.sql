@@ -12,6 +12,7 @@ CREATE TABLE public.conversation_users (
   phone_number text NULL,
   service text NULL,
   metadata jsonb NULL,
+  memory jsonb NULL DEFAULT '{}'::jsonb,
   CONSTRAINT conversation_users_pkey PRIMARY KEY (id)
 ) WITH (OIDS=FALSE);
 CREATE INDEX IF NOT EXISTS idx_users_phone ON public.conversation_users USING btree (phone_number);
@@ -24,6 +25,7 @@ CREATE TABLE public.chats (
   external_id text NULL,
   service text NULL,
   metadata jsonb NULL,
+  memory jsonb NULL DEFAULT '{}'::jsonb,
   CONSTRAINT chats_pkey PRIMARY KEY (id),
   CONSTRAINT chats_type_check CHECK ((type = ANY (ARRAY['individual'::text, 'group'::text])))
 ) WITH (OIDS=FALSE);
