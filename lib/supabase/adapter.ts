@@ -8,7 +8,7 @@ import { CONVERSATION_USERS_TABLE, CHATS_TABLE } from "./config";
  */
 // Import WebhookPayload type
 import { WebhookPayload } from "@/app/api/messaging/incoming/route";
-
+const MAX_CONTEXT_MESSAGES = 30;
 /**
  * Interface for participant data in a thread
  */
@@ -391,7 +391,7 @@ export class SupabaseAdapter {
         )
         .eq("chat_id", chat.id)
         .order("created_at", { ascending: true })
-        .limit(40)
+        .limit(MAX_CONTEXT_MESSAGES)
         .then((result) => {
           return result;
         });
