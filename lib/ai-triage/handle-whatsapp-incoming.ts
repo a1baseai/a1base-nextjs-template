@@ -695,50 +695,57 @@ export async function handleWhatsAppIncoming(
     service,
   });
 
-  // --- Early Memory Update Processing ---
+  // --- Start Memory Update Processing (non-blocking) ---
+  // Launch memory processing in parallel without awaiting the result
+  let memoryProcessingPromise: Promise<void> | null = null;
   if (content && content.trim() !== "") {
-    try {
-      console.log(
-        `[MemoryProcessor] Checking message from ${sender_number} in chat ${thread_id} for memory updates.`
-      );
-      const memorySuggestions = await processMessageForMemoryUpdates(
-        content,
-        sender_number, // Using sender_number as userId
-        thread_id, // Using thread_id as chatId
-        openaiClient,
-        adapter // Pass the adapter instance
-      );
+    console.log(
+      `[MemoryProcessor] Starting parallel memory processing for ${sender_number} in chat ${thread_id}`
+    );
+    
+    // Create a promise that runs memory processing but doesn't block the main flow
+    memoryProcessingPromise = (async () => {
+      try {
+        const memorySuggestions = await processMessageForMemoryUpdates(
+          content,
+          sender_number, // Using sender_number as userId
+          thread_id, // Using thread_id as chatId
+          openaiClient,
+          adapter // Pass the adapter instance
+        );
 
-      if (memorySuggestions.userMemoryUpdates.length > 0) {
-        console.log(
-          `[MemoryProcessor] Suggested User Memory Updates for ${sender_number}:`,
-          JSON.stringify(memorySuggestions.userMemoryUpdates, null, 2)
+        if (memorySuggestions.userMemoryUpdates.length > 0) {
+          console.log(
+            `[MemoryProcessor] Suggested User Memory Updates for ${sender_number}:`,
+            JSON.stringify(memorySuggestions.userMemoryUpdates, null, 2)
+          );
+        }
+        if (memorySuggestions.chatMemoryUpdates.length > 0) {
+          console.log(
+            `[MemoryProcessor] Suggested Chat Memory Updates for ${thread_id}:`,
+            JSON.stringify(memorySuggestions.chatMemoryUpdates, null, 2)
+          );
+        }
+        if (
+          memorySuggestions.userMemoryUpdates.length === 0 &&
+          memorySuggestions.chatMemoryUpdates.length === 0
+        ) {
+          console.log(
+            `[MemoryProcessor] No memory updates suggested for message: "${content}"`
+          );
+        }
+        console.log(`[MemoryProcessor] Memory processing completed for ${thread_id}`);
+      } catch (memError) {
+        console.error(
+          "[MemoryProcessor] Error during memory update processing:",
+          memError
         );
-        // TODO: Persist these user memory updates
       }
-      if (memorySuggestions.chatMemoryUpdates.length > 0) {
-        console.log(
-          `[MemoryProcessor] Suggested Chat Memory Updates for ${thread_id}:`,
-          JSON.stringify(memorySuggestions.chatMemoryUpdates, null, 2)
-        );
-        // TODO: Persist these chat memory updates
-      }
-      if (
-        memorySuggestions.userMemoryUpdates.length === 0 &&
-        memorySuggestions.chatMemoryUpdates.length === 0
-      ) {
-        console.log(
-          `[MemoryProcessor] No memory updates suggested for message: "${content}"`
-        );
-      }
-    } catch (memError) {
-      console.error(
-        "[MemoryProcessor] Error during memory update processing:",
-        memError
-      );
-    }
+    })();
+    
+    // We do NOT await the promise here, allowing it to run in parallel
   }
-  // --- End Early Memory Update Processing ---
+  // --- End Memory Update Processing Initiation ---
 
   // 1. Skip processing for agent's own messages
   if (sender_number === process.env.A1BASE_AGENT_NUMBER) {

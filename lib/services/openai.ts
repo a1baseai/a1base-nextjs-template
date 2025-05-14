@@ -319,10 +319,15 @@ export async function generateAgentResponse(
   conversationForOpenAI.push(...formattedOpenAIMessages);
 
   console.log("OpenAI completion happening at generateAgentResponse function");
+
+  console.log("conversationForOpenAI", conversationForOpenAI);
+
   const completion = await getOpenAI().chat.completions.create({
     model: "gpt-4.1",
     messages: conversationForOpenAI,
   });
+
+  console.log("conversationForOpenAI completion", completion);
 
   return (
     completion.choices[0]?.message?.content ||

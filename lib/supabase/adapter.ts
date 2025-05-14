@@ -342,11 +342,17 @@ export class SupabaseAdapter {
         `
         )
         .eq("chat_id", chat.id)
-        .order("created_at", { ascending: true })
+        .order("created_at", { ascending: false })
         .limit(MAX_CONTEXT_MESSAGES)
         .then((result) => {
+          if (result.data) {
+            // Reverse the array to have newest messages at the bottom
+            result.data = result.data.reverse();
+          }
           return result;
         });
+
+      console.log("messages from adapter", messages);
 
       if (messagesError) throw messagesError;
 
@@ -1217,10 +1223,55 @@ export class SupabaseAdapter {
 
     // Initialize or update the memory object
     const memory = currentUser?.memory || {};
-    memory[fieldId] = {
-      value,
-      updated_at: new Date().toISOString(),
-    };
+
+    // Check if we have an existing value for this field
+    const existingMemory = memory[fieldId];
+    if (existingMemory && existingMemory.value && typeof existingMemory.value === 'string') {
+      // If value is identical, no need to update
+      if (existingMemory.value === value) {
+        console.log(`Memory value unchanged for user ${userIdentifier}, field ${fieldId}`);
+        return { data: currentUser, error: null };
+      }
+      
+      // For fields that might contain lists or multiple facts, attempt to integrate
+      // rather than replace completely
+      if (fieldId.includes('preferences') || 
+          fieldId.includes('likes') || 
+          fieldId.includes('dislikes') || 
+          fieldId.includes('topics') ||
+          /\d+/.test(fieldId)) { // Numeric IDs often used for fact storage
+      
+        console.log(`Integrating memory for user ${userIdentifier}, field ${fieldId}`);
+        console.log(`Existing: "${existingMemory.value}"`);
+        console.log(`New: "${value}"`);
+        
+        // If the existing value doesn't already contain the new value
+        if (!existingMemory.value.toLowerCase().includes(value.toLowerCase())) {
+          // Create an integrated memory that combines both
+          memory[fieldId] = {
+            value: `${existingMemory.value}. ${value}`,
+            updated_at: new Date().toISOString(),
+            previous_value: existingMemory.value
+          };
+        } else {
+          console.log(`New value already contained in existing memory`);
+          return { data: currentUser, error: null };
+        }
+      } else {
+        // For other fields, replace but keep history
+        memory[fieldId] = {
+          value,
+          updated_at: new Date().toISOString(),
+          previous_value: existingMemory.value
+        };
+      }
+    } else {
+      // No existing memory, create a new one
+      memory[fieldId] = {
+        value,
+        updated_at: new Date().toISOString(),
+      };
+    }
 
     // Update the memory field
     const { data, error } = await this.supabase
@@ -1265,10 +1316,55 @@ export class SupabaseAdapter {
 
     // Initialize or update the memory object
     const memory = currentChat?.memory || {};
-    memory[fieldId] = {
-      value,
-      updated_at: new Date().toISOString(),
-    };
+
+    // Check if we have an existing value for this field
+    const existingMemory = memory[fieldId];
+    if (existingMemory && existingMemory.value && typeof existingMemory.value === 'string') {
+      // If value is identical, no need to update
+      if (existingMemory.value === value) {
+        console.log(`Memory value unchanged for chat ${chatId}, field ${fieldId}`);
+        return { data: currentChat, error: null };
+      }
+      
+      // For fields that might contain lists or multiple facts, attempt to integrate
+      // rather than replace completely
+      if (fieldId.includes('preferences') || 
+          fieldId.includes('likes') || 
+          fieldId.includes('dislikes') || 
+          fieldId.includes('topics') ||
+          /\d+/.test(fieldId)) { // Numeric IDs often used for fact storage
+      
+        console.log(`Integrating memory for chat ${chatId}, field ${fieldId}`);
+        console.log(`Existing: "${existingMemory.value}"`);
+        console.log(`New: "${value}"`);
+        
+        // If the existing value doesn't already contain the new value
+        if (!existingMemory.value.toLowerCase().includes(value.toLowerCase())) {
+          // Create an integrated memory that combines both
+          memory[fieldId] = {
+            value: `${existingMemory.value}. ${value}`,
+            updated_at: new Date().toISOString(),
+            previous_value: existingMemory.value
+          };
+        } else {
+          console.log(`New value already contained in existing memory`);
+          return { data: currentChat, error: null };
+        }
+      } else {
+        // For other fields, replace but keep history
+        memory[fieldId] = {
+          value,
+          updated_at: new Date().toISOString(),
+          previous_value: existingMemory.value
+        };
+      }
+    } else {
+      // No existing memory, create a new one
+      memory[fieldId] = {
+        value,
+        updated_at: new Date().toISOString(),
+      };
+    }
 
     // Update the memory field
     const { data, error } = await this.supabase
