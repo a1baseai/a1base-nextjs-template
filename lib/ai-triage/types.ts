@@ -28,8 +28,16 @@ export type TriageParams = {
 };
 
 export type TriageResult = {
-  type: "default" | "email" | "onboarding";
+  type: "default" | "email" | "onboarding" | "project";
   success: boolean;
   message?: string;
-  data?: string[] | { subject?: string; body?: string };
+  data?: string[] | { subject?: string; body?: string } | {
+    projectAction: "create" | "update" | "complete" | "reference" | "updateAttributes";
+    projectName?: string;
+    projectDescription?: string;
+    projectId?: string;
+    updates?: Record<string, any>;
+    attributeUpdates?: Record<string, any>;
+    replaceAttributes?: boolean;
+  };
 };

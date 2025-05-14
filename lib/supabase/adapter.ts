@@ -857,7 +857,8 @@ export class SupabaseAdapter {
   async createProject(
     name: string,
     description: string,
-    chatId: string
+    chatId: string,
+    attributes?: Record<string, any>
   ): Promise<string | null> {
     this.ensureInitialized();
 
@@ -870,6 +871,7 @@ export class SupabaseAdapter {
           chat_id: chatId,
           created_at: new Date().toISOString(),
           is_live: true,
+          attributes: attributes || {},
         })
         .select("id")
         .single();
@@ -885,7 +887,7 @@ export class SupabaseAdapter {
   // Update an existing project
   async updateProject(
     projectId: string,
-    updates: { is_live?: boolean; name?: string; description?: string }
+    updates: { is_live?: boolean; name?: string; description?: string; attributes?: Record<string, any> }
   ): Promise<boolean> {
     this.ensureInitialized();
 
@@ -904,6 +906,42 @@ export class SupabaseAdapter {
       return true;
     } catch (error) {
       // Console log removed - Error updating project
+      return false;
+    }
+  }
+
+  // Update project attributes - can merge with existing attributes or replace completely
+  async updateProjectAttributes(
+    projectId: string,
+    attributes: Record<string, any>,
+    replace: boolean = false
+  ): Promise<boolean> {
+    this.ensureInitialized();
+
+    try {
+      // If we're merging (not replacing), get the current attributes first
+      if (!replace) {
+        const project = await this.getProjectById(projectId);
+        if (project && project.attributes) {
+          // Merge with existing attributes
+          attributes = { ...project.attributes, ...attributes };
+        }
+      }
+
+      // Update with the new or merged attributes
+      const { error } = await this.supabase
+        .from("projects")
+        .update({ attributes })
+        .eq("id", projectId);
+
+      if (error) {
+        console.error("Error updating project attributes:", error);
+        throw error;
+      }
+      
+      return true;
+    } catch (error) {
+      console.error("Error updating project attributes:", error);
       return false;
     }
   }

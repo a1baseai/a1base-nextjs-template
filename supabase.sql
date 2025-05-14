@@ -84,6 +84,7 @@ CREATE TABLE public.projects (
   description text NULL,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   is_live boolean NULL,
+  attributes jsonb NULL DEFAULT '{}'::jsonb,
   CONSTRAINT projects_pkey PRIMARY KEY (id),
   CONSTRAINT projects_chat_id_fkey FOREIGN KEY (chat_id) REFERENCES public.chats(id)
 ) WITH (OIDS=FALSE);

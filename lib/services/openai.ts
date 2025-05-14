@@ -106,44 +106,68 @@ export function formatMessagesForOpenAI<
 export async function triageMessageIntent(
   threadMessages: ThreadMessage[]
 ): Promise<{
-  responseType:
-    | "simpleResponse"
-    // | "handleEmailAction" (DISABLED)
-    | "onboardingFlow";
+  responseType: "simpleResponse" | "onboardingFlow" | "createProject" | "updateProject" | "completeProject" | "referenceProject" | "noReply" | "updateProjectAttributes";
+  projectName?: string;
+  projectDescription?: string;
+  updates?: Record<string, any>;
+  attributes?: Record<string, any>;
+  attributeUpdates?: Record<string, any>;
+  replaceAttributes?: boolean;
 }> {
   // Convert thread messages to OpenAI chat format
-  const conversationContext = threadMessages.map((msg) => ({
-    role:
-      msg.sender_number === process.env.A1BASE_AGENT_NUMBER!
-        ? ("assistant" as const)
-        : ("user" as const),
-    content: msg.content,
-  }));
+  const conversationContext = threadMessages.map((msg) => {
+    const role = msg.sender_number === process.env.A1BASE_AGENT_NUMBER! ? "assistant" : "user";
+    return {
+      role: role as "assistant" | "user",
+      content: msg.content,
+    };
+  });
 
   // Heuristic check: if the latest message clearly contains an email address, return early
   const latestMessage =
     threadMessages[threadMessages.length - 1]?.content.toLowerCase() || "";
 
   const triagePrompt = `
-Based on the conversation, analyze the user's intent and respond with exactly one of these JSON responses:
-{"responseType":"simpleResponse"}
-// {"responseType":"handleEmailAction"} (DISABLED)
+Based on the conversation, and the context of the recent messages analyze the user's intent and respond with a JSON object:
+- "responseType": one of ["simpleResponse", "createProject", "updateProject", "completeProject", "referenceProject", "noReply", "updateProjectAttributes"]
+- Additional fields based on intent.
 
 Rules:
-// - If the user is asking to create, draft, or send an email, select "handleEmailAction" (DISABLED)
-- Select "simpleResponse" for all user messages
+- "createProject": User wants to start a new project (e.g., "start a new project").
+- "updateProject": User wants to modify an existing project metadata (e.g., "update project description").
+- "updateProjectAttributes": User wants to modify project attributes or specific properties (e.g., "add project status", "set project deadline").
+- "completeProject": User indicates a project is done (e.g., "project complete").
+- "referenceProject": User mentions a past project.
+- "noReply": No response required.
+- "simpleResponse": Default for other messages.
 
-Return valid JSON with only that single key "responseType" and value as one of the allowed strings.
+Additional Fields:
+- "createProject": "projectName", "projectDescription" (if provided), "attributes" (optional JSON object with project properties).
+- "updateProject": "projectName" (optional), "updates" (e.g., {"description": "new desc"}).
+- "updateProjectAttributes": "projectName" (optional), "attributeUpdates" (e.g., {"status": "in progress", "priority": "high"}), "replaceAttributes" (boolean, default false).
+- "completeProject": "projectName" (optional).
+- "referenceProject": "projectName".
+
+For attributes, you can create or modify any data structure that seems appropriate, using nested objects if needed.
+Examples: 
+- {"status": "in_progress", "priority": "high"}
+- {"members": ["John", "Mary"], "tasks": [{"title": "Research", "status": "done"}, {"title": "Implementation", "status": "pending"}]}
+
+Return valid JSON.
 `;
 
   console.log("OpenaAI completion happening at triageMessageIntent");
   // Use a faster model for triage to reduce latency
+  // Explicitly type the messages array for OpenAI
+  type OpenAIMessage = { role: "system" | "user" | "assistant"; content: string };
+  const messages: OpenAIMessage[] = [
+    { role: "system", content: triagePrompt },
+    ...conversationContext as OpenAIMessage[],
+  ];
+  
   const completion = await getOpenAI().chat.completions.create({
     model: "gpt-4.1",
-    messages: [
-      { role: "system", content: triagePrompt },
-      ...conversationContext,
-    ],
+    messages,
   });
 
   const content = completion.choices[0]?.message?.content || "";
@@ -152,12 +176,51 @@ Return valid JSON with only that single key "responseType" and value as one of t
   try {
     const parsed = JSON.parse(content);
     const validTypes = [
-      "simpleResponse",
-      // "handleEmailAction", (DISABLED)
+      "simpleResponse", 
+      "onboardingFlow",
+      "createProject",
+      "updateProject",
+      "completeProject",
+      "referenceProject",
+      "noReply",
     ];
 
     if (validTypes.includes(parsed.responseType)) {
-      return { responseType: parsed.responseType };
+      // Format the response based on the type
+      switch(parsed.responseType) {
+        case "createProject":
+          return {
+            responseType: parsed.responseType,
+            projectName: parsed.projectName,
+            projectDescription: parsed.projectDescription,
+            attributes: parsed.attributes
+          };
+        case "updateProject":
+          return {
+            responseType: parsed.responseType,
+            projectName: parsed.projectName,
+            updates: parsed.updates
+          };
+        case "updateProjectAttributes":
+          return {
+            responseType: parsed.responseType,
+            projectName: parsed.projectName,
+            attributeUpdates: parsed.attributeUpdates,
+            replaceAttributes: parsed.replaceAttributes === true
+          };
+        case "completeProject":
+          return {
+            responseType: parsed.responseType,
+            projectName: parsed.projectName
+          };
+        case "referenceProject":
+          return {
+            responseType: parsed.responseType,
+            projectName: parsed.projectName
+          };
+        default:
+          return { responseType: parsed.responseType };
+      }
     }
 
     return { responseType: "simpleResponse" };
