@@ -85,7 +85,7 @@ export function formatMessagesForOpenAI<
     if (msg.timestamp) structuredContent.sent_at = msg.timestamp;
 
     return {
-      role: isAssistant ? "assistant" : "user",
+      role: isAssistant ? "assistant" as const : "user" as const,
       // content: JSON.stringify(structuredContent),
       content: messageCoreContent,
     };
@@ -115,11 +115,10 @@ export async function triageMessageIntent(
   replaceAttributes?: boolean;
 }> {
   // Convert thread messages to OpenAI chat format
-  const conversationContext = threadMessages.map((msg) => {
-    const role = msg.sender_number === process.env.A1BASE_AGENT_NUMBER! ? "assistant" : "user";
+  const conversationContext = threadMessages.map((message) => {
     return {
-      role: role as "assistant" | "user",
-      content: msg.content,
+      role: (message.role || (message.sender_number === process.env.A1BASE_AGENT_NUMBER ? "assistant" : "user")) as "assistant" | "user",
+      content: message.content + (message.timestamp ? ` [${message.timestamp}]` : ""),
     };
   });
 
@@ -326,19 +325,25 @@ export async function generateAgentResponse(
           threadMessages[0].thread_id
         ) {
           // console.log(`[generateAgentResponse] Fetching group onboarding data for thread_id: ${threadMessages[0].thread_id}, service: ${service}`);
-          onboardingData = await supabaseAdapter.getChatOnboardingData(
-            threadMessages[0].thread_id,
-            service
-          );
+          const adapter = await supabaseAdapter;
+          if (adapter) {
+            onboardingData = await adapter.getChatOnboardingData(
+              threadMessages[0].thread_id,
+              service
+            );
+          }
         } else if (threadType === "individual") {
           const userPhoneNumber = threadMessages.find(
             (msg) => msg.sender_number !== process.env.A1BASE_AGENT_NUMBER
           )?.sender_number;
           if (userPhoneNumber) {
             // console.log(`[generateAgentResponse] Fetching individual onboarding data for user: ${userPhoneNumber}`);
-            onboardingData = await supabaseAdapter.getUserOnboardingData(
-              userPhoneNumber
-            );
+            const adapter = await supabaseAdapter;
+            if (adapter) {
+              onboardingData = await adapter.getUserOnboardingData(
+                userPhoneNumber
+              );
+            }
           }
         }
 
@@ -352,6 +357,41 @@ export async function generateAgentResponse(
           enhancedSystemPrompt += onboardingContext;
         } else {
           // console.log("[generateAgentResponse] No onboarding data found or data is empty.");
+        }
+        
+        // Fetch and add projects related to this chat
+        try {
+          if (threadMessages.length > 0 && threadMessages[0].thread_id) {
+            const threadId = threadMessages[0].thread_id;
+            // Use the correct adapter method name
+            const adapter = await supabaseAdapter;
+            const projects = adapter ? await adapter.getProjectsByChat(threadId) : [];
+            
+            if (projects && projects.length > 0) {
+              // console.log(`[generateAgentResponse] Successfully fetched ${projects.length} projects for chat: ${threadId}`);
+              const activeProjects = projects.filter((p: any) => p.is_live === true);
+              const completedProjects = projects.filter((p: any) => p.is_live === false);
+              
+              const projectsContext = `\n\n--- Projects Context ---\n${
+                activeProjects.length > 0 ? 
+                `Active Projects:\n${activeProjects.map((p: any) => 
+                  `- "${p.name}" (ID: ${p.id})\n  Description: ${p.description}\n  Created: ${new Date(p.created_at).toISOString()}\n  Attributes: ${JSON.stringify(p.attributes || {}, null, 2)}`
+                ).join('\n\n')}` : 'No active projects.'
+              }\n\n${
+                completedProjects.length > 0 ? 
+                `Completed Projects:\n${completedProjects.map((p: any) => 
+                  `- "${p.name}" (ID: ${p.id})\n  Description: ${p.description}\n  Completed: ${p.updated_at ? new Date(p.updated_at).toISOString() : 'unknown'}\n  Attributes: ${JSON.stringify(p.attributes || {}, null, 2)}`
+                ).join('\n\n')}` : 'No completed projects.'
+              }\n--- End Projects Context ---`;
+              
+              enhancedSystemPrompt += projectsContext;
+            } else {
+              // console.log(`[generateAgentResponse] No projects found for chat: ${threadId}`);
+            }
+          }
+        } catch (error) {
+          // console.error("[generateAgentResponse] Error fetching projects data:", error);
+          // Proceed without projects data if an error occurs
         }
       } catch (error) {
         // console.error("[generateAgentResponse] Error fetching onboarding data from Supabase:", error);

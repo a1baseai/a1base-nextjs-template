@@ -8,8 +8,6 @@ import { triageMessageIntent } from "../services/openai";
 import { TriageParams, TriageResult } from "./types";
 import { ProjectIntent } from "../workflows/types";
 
-
-
 /**
  * Analyzes a message to determine the user's intent regarding projects
  */
@@ -93,9 +91,6 @@ async function createNewProject(
   thread_id: string,
   latestMessage: MessageRecord
 ): Promise<string | null> {
-  const { defaultName, defaultDescription } =
-    createProjectDefaults(latestMessage);
-
   // Create a new project
   const projectId = await adapter.createProject(
     defaultName,
@@ -325,11 +320,20 @@ export async function triageMessage({
       ? { responseType: "onboardingFlow" }
       : await triageMessageIntent(messages);
     // Based on the triage result, choose the appropriate workflow
-    
+
     // Get the chat ID for project operations
     let chatId = null;
     let adapter = null;
-    if (!isOnboardingTrigger && ["createProject", "updateProject", "completeProject", "referenceProject", "updateProjectAttributes"].includes(triage.responseType)) {
+    if (
+      !isOnboardingTrigger &&
+      [
+        "createProject",
+        "updateProject",
+        "completeProject",
+        "referenceProject",
+        "updateProjectAttributes",
+      ].includes(triage.responseType)
+    ) {
       try {
         adapter = await getInitializedAdapter();
         if (adapter) {
@@ -365,18 +369,22 @@ export async function triageMessage({
         // Handle project creation intent
         let createProjectResult = null;
         let createProjectMessage = "";
-        
+
         if (adapter && chatId) {
           // Create a new project using the adapter
           const projectName = (triage as any).projectName || "New Project";
-          const projectDescription = (triage as any).projectDescription || "Project created from conversation";
+          const projectDescription =
+            (triage as any).projectDescription ||
+            "Project created from conversation";
           const projectAttributes = (triage as any).attributes || {};
-          
+
           try {
             // Mark any existing live projects as complete first
             const existingProjects = await adapter.getProjectsByChat(chatId);
-            const liveProject = existingProjects.find((p) => p.is_live === true);
-            
+            const liveProject = existingProjects.find(
+              (p) => p.is_live === true
+            );
+
             if (liveProject) {
               await adapter.updateProject(liveProject.id, { is_live: false });
               await adapter.logProjectEvent(
@@ -385,7 +393,7 @@ export async function triageMessage({
                 "Project completed due to new project creation"
               );
             }
-            
+
             // Create the new project
             createProjectResult = await adapter.createProject(
               projectName,
@@ -393,7 +401,7 @@ export async function triageMessage({
               chatId,
               projectAttributes
             );
-            
+
             if (createProjectResult) {
               // Log the creation event
               await adapter.logProjectEvent(
@@ -401,7 +409,7 @@ export async function triageMessage({
                 "project_created",
                 `Project created with name: ${projectName}`
               );
-              
+
               createProjectMessage = `Created new project: ${projectName}`;
             }
           } catch (error) {
@@ -411,25 +419,30 @@ export async function triageMessage({
         } else {
           createProjectMessage = "Unable to create project - chat not found";
         }
-        
+
         // Create context message about what was done
-        const createContextProjectName = (triage as any).projectName || "New Project";
-        const createProjectContext = `Project "${createContextProjectName}" was just created. The project is now active. ${createProjectMessage}`.trim();
-        
+        const createContextProjectName =
+          (triage as any).projectName || "New Project";
+        const createProjectContext =
+          `Project "${createContextProjectName}" was just created. The project is now active. ${createProjectMessage}`.trim();
+
         // Add a system message to inform the AI about the project action
-        const createMessagesWithContext = [...messages, {
-          content: createProjectContext,
-          sender_number: process.env.A1BASE_AGENT_NUMBER || "",
-          sender_name: "AI Assistant",
-          thread_id,
-          thread_type,
-          timestamp: new Date().toISOString(),
-          message_id: `system-ctx-${Date.now()}`,
-          message_type: "text" as ThreadMessage["message_type"],
-          message_content: { text: createProjectContext },
-          role: "assistant"
-        } as ThreadMessage];
-        
+        const createMessagesWithContext = [
+          ...messages,
+          {
+            content: createProjectContext,
+            sender_number: process.env.A1BASE_AGENT_NUMBER || "",
+            sender_name: "AI Assistant",
+            thread_id,
+            thread_type,
+            timestamp: new Date().toISOString(),
+            message_id: `system-ctx-${Date.now()}`,
+            message_type: "text" as ThreadMessage["message_type"],
+            message_content: { text: createProjectContext },
+            role: "assistant",
+          } as ThreadMessage,
+        ];
+
         // Still generate a default response even for project creation
         const createProjectResponse = await DefaultReplyToMessage(
           createMessagesWithContext,
@@ -440,7 +453,7 @@ export async function triageMessage({
           participants,
           projects
         );
-        
+
         return {
           type: "project",
           success: createProjectResult !== null,
@@ -449,40 +462,41 @@ export async function triageMessage({
             projectAction: "create",
             projectName: (triage as any).projectName,
             projectDescription: (triage as any).projectDescription,
-            projectId: createProjectResult || undefined
-          }
+            projectId: createProjectResult || undefined,
+          },
         };
-        
+
       case "updateProject":
         // Handle project update intent
         let updateProjectResult = false;
         let updateProjectMessage = "";
-        
+
         if (adapter && chatId && projects.length > 0) {
           // Get the live project or the specified project by name
           const targetProjectName = (triage as any).projectName || "";
           let targetProject;
-          
+
           if (targetProjectName) {
             // Find project by name
-            targetProject = projects.find(p => 
-              p.name.toLowerCase() === targetProjectName.toLowerCase());
+            targetProject = projects.find(
+              (p) => p.name.toLowerCase() === targetProjectName.toLowerCase()
+            );
           } else {
             // Use the live project
-            targetProject = projects.find(p => p.is_live === true);
+            targetProject = projects.find((p) => p.is_live === true);
           }
-          
+
           if (targetProject) {
             try {
               // Get the updates from the triage result
               const updates = (triage as any).updates || {};
-              
+
               // Apply the updates
               updateProjectResult = await adapter.updateProject(
                 targetProject.id,
                 updates
               );
-              
+
               if (updateProjectResult) {
                 // Log the update event
                 await adapter.logProjectEvent(
@@ -490,7 +504,7 @@ export async function triageMessage({
                   "project_updated",
                   `Project updated: ${JSON.stringify(updates)}`
                 );
-                
+
                 updateProjectMessage = `Updated project: ${targetProject.name}`;
               }
             } catch (error) {
@@ -501,29 +515,35 @@ export async function triageMessage({
             updateProjectMessage = "No matching project found";
           }
         } else {
-          updateProjectMessage = "Unable to update project - no active projects";
+          updateProjectMessage =
+            "Unable to update project - no active projects";
         }
-        
+
         // Get the project name for context
-        const updateContextProjectName = (triage as any).projectName || "unknown project";
-        
+        const updateContextProjectName =
+          (triage as any).projectName || "unknown project";
+
         // Create context message about what was done
-        const updateProjectContext = `Project "${updateContextProjectName}" was just updated. ${updateProjectMessage}`.trim();
-        
+        const updateProjectContext =
+          `Project "${updateContextProjectName}" was just updated. ${updateProjectMessage}`.trim();
+
         // Add a system message to inform the AI about the project action
-        const updateMessagesWithContext = [...messages, {
-          content: updateProjectContext,
-          sender_number: process.env.A1BASE_AGENT_NUMBER || "",
-          sender_name: "AI Assistant",
-          thread_id,
-          thread_type,
-          timestamp: new Date().toISOString(),
-          message_id: `system-ctx-${Date.now()}`,
-          message_type: "text" as ThreadMessage["message_type"],
-          message_content: { text: updateProjectContext },
-          role: "assistant"
-        } as ThreadMessage];
-        
+        const updateMessagesWithContext = [
+          ...messages,
+          {
+            content: updateProjectContext,
+            sender_number: process.env.A1BASE_AGENT_NUMBER || "",
+            sender_name: "AI Assistant",
+            thread_id,
+            thread_type,
+            timestamp: new Date().toISOString(),
+            message_id: `system-ctx-${Date.now()}`,
+            message_type: "text" as ThreadMessage["message_type"],
+            message_content: { text: updateProjectContext },
+            role: "assistant",
+          } as ThreadMessage,
+        ];
+
         // Still generate a default response for project update
         const updateProjectResponse = await DefaultReplyToMessage(
           updateMessagesWithContext,
@@ -534,7 +554,7 @@ export async function triageMessage({
           participants,
           projects
         );
-        
+
         return {
           type: "project",
           success: updateProjectResult,
@@ -542,29 +562,30 @@ export async function triageMessage({
           data: {
             projectAction: "update",
             projectName: (triage as any).projectName,
-            updates: (triage as any).updates
-          }
+            updates: (triage as any).updates,
+          },
         };
-        
+
       case "completeProject":
         // Handle project completion intent
         let completeProjectResult = false;
         let completeProjectMessage = "";
-        
+
         if (adapter && chatId && projects.length > 0) {
           // Get the live project or the specified project by name
           const targetProjectName = (triage as any).projectName || "";
           let targetProject;
-          
+
           if (targetProjectName) {
             // Find project by name
-            targetProject = projects.find(p => 
-              p.name.toLowerCase() === targetProjectName.toLowerCase());
+            targetProject = projects.find(
+              (p) => p.name.toLowerCase() === targetProjectName.toLowerCase()
+            );
           } else {
             // Use the live project
-            targetProject = projects.find(p => p.is_live === true);
+            targetProject = projects.find((p) => p.is_live === true);
           }
-          
+
           if (targetProject) {
             try {
               // Mark the project as complete
@@ -572,7 +593,7 @@ export async function triageMessage({
                 targetProject.id,
                 { is_live: false }
               );
-              
+
               if (completeProjectResult) {
                 // Log the completion event
                 await adapter.logProjectEvent(
@@ -580,7 +601,7 @@ export async function triageMessage({
                   "project_completed",
                   `Project marked as complete`
                 );
-                
+
                 completeProjectMessage = `Completed project: ${targetProject.name}`;
               }
             } catch (error) {
@@ -591,29 +612,35 @@ export async function triageMessage({
             completeProjectMessage = "No active project found to complete";
           }
         } else {
-          completeProjectMessage = "Unable to complete project - no active projects";
+          completeProjectMessage =
+            "Unable to complete project - no active projects";
         }
-        
+
         // Get the project name for context
-        const completeContextProjectName = (triage as any).projectName || "unknown project";
-        
+        const completeContextProjectName =
+          (triage as any).projectName || "unknown project";
+
         // Create context message about what was done
-        const completeProjectContext = `Project "${completeContextProjectName}" was just marked as completed. ${completeProjectMessage}`.trim();
-        
+        const completeProjectContext =
+          `Project "${completeContextProjectName}" was just marked as completed. ${completeProjectMessage}`.trim();
+
         // Add a system message to inform the AI about the project action
-        const completeMessagesWithContext = [...messages, {
-          content: completeProjectContext,
-          sender_number: process.env.A1BASE_AGENT_NUMBER || "",
-          sender_name: "AI Assistant",
-          thread_id,
-          thread_type,
-          timestamp: new Date().toISOString(),
-          message_id: `system-ctx-${Date.now()}`,
-          message_type: "text" as ThreadMessage["message_type"],
-          message_content: { text: completeProjectContext },
-          role: "assistant"
-        } as ThreadMessage];
-        
+        const completeMessagesWithContext = [
+          ...messages,
+          {
+            content: completeProjectContext,
+            sender_number: process.env.A1BASE_AGENT_NUMBER || "",
+            sender_name: "AI Assistant",
+            thread_id,
+            thread_type,
+            timestamp: new Date().toISOString(),
+            message_id: `system-ctx-${Date.now()}`,
+            message_type: "text" as ThreadMessage["message_type"],
+            message_content: { text: completeProjectContext },
+            role: "assistant",
+          } as ThreadMessage,
+        ];
+
         // Still generate a default response for project completion
         const completeProjectResponse = await DefaultReplyToMessage(
           completeMessagesWithContext,
@@ -624,57 +651,61 @@ export async function triageMessage({
           participants,
           projects
         );
-        
+
         return {
           type: "project",
           success: completeProjectResult,
           message: completeProjectResponse,
           data: {
             projectAction: "complete",
-            projectName: (triage as any).projectName
-          }
+            projectName: (triage as any).projectName,
+          },
         };
-        
+
       case "updateProjectAttributes":
         // Handle project attribute updates
         let updateAttributesResult = false;
         let updateAttributesMessage = "";
-        
+
         if (adapter && chatId && projects.length > 0) {
           // Get the live project or the specified project by name
           const targetProjectName = (triage as any).projectName || "";
           let targetProject;
-          
+
           if (targetProjectName) {
             // Find project by name
-            targetProject = projects.find(p => 
-              p.name.toLowerCase() === targetProjectName.toLowerCase());
+            targetProject = projects.find(
+              (p) => p.name.toLowerCase() === targetProjectName.toLowerCase()
+            );
           } else {
             // Use the live project
-            targetProject = projects.find(p => p.is_live === true);
+            targetProject = projects.find((p) => p.is_live === true);
           }
-          
+
           if (targetProject) {
             try {
               // Get the attribute updates from the triage result
               const attributeUpdates = (triage as any).attributeUpdates || {};
-              const replaceAttributes = (triage as any).replaceAttributes === true;
-              
+              const replaceAttributes =
+                (triage as any).replaceAttributes === true;
+
               // Update the attributes
               updateAttributesResult = await adapter.updateProjectAttributes(
                 targetProject.id,
                 attributeUpdates,
                 replaceAttributes
               );
-              
+
               if (updateAttributesResult) {
                 // Log the update event
                 await adapter.logProjectEvent(
                   targetProject.id,
                   "project_attributes_updated",
-                  `Project attributes updated: ${JSON.stringify(attributeUpdates)}`
+                  `Project attributes updated: ${JSON.stringify(
+                    attributeUpdates
+                  )}`
                 );
-                
+
                 updateAttributesMessage = `Updated project attributes for: ${targetProject.name}`;
               }
             } catch (error) {
@@ -685,29 +716,35 @@ export async function triageMessage({
             updateAttributesMessage = "No matching project found";
           }
         } else {
-          updateAttributesMessage = "Unable to update project attributes - no active projects";
+          updateAttributesMessage =
+            "Unable to update project attributes - no active projects";
         }
-        
+
         // Get the project name for context
-        const attributesContextProjectName = (triage as any).projectName || "unknown project";
-        
+        const attributesContextProjectName =
+          (triage as any).projectName || "unknown project";
+
         // Create context message about what was done
-        const updateAttributesContext = `Project "${attributesContextProjectName}" attributes were just updated. ${updateAttributesMessage}`.trim();
-        
+        const updateAttributesContext =
+          `Project "${attributesContextProjectName}" attributes were just updated. ${updateAttributesMessage}`.trim();
+
         // Add a system message to inform the AI about the project action
-        const attributesMessagesWithContext = [...messages, {
-          content: updateAttributesContext,
-          sender_number: process.env.A1BASE_AGENT_NUMBER || "",
-          sender_name: "AI Assistant",
-          thread_id,
-          thread_type,
-          timestamp: new Date().toISOString(),
-          message_id: `system-ctx-${Date.now()}`,
-          message_type: "text" as ThreadMessage["message_type"],
-          message_content: { text: updateAttributesContext },
-          role: "assistant"
-        } as ThreadMessage];
-        
+        const attributesMessagesWithContext = [
+          ...messages,
+          {
+            content: updateAttributesContext,
+            sender_number: process.env.A1BASE_AGENT_NUMBER || "",
+            sender_name: "AI Assistant",
+            thread_id,
+            thread_type,
+            timestamp: new Date().toISOString(),
+            message_id: `system-ctx-${Date.now()}`,
+            message_type: "text" as ThreadMessage["message_type"],
+            message_content: { text: updateAttributesContext },
+            role: "assistant",
+          } as ThreadMessage,
+        ];
+
         // Still generate a default response for attribute updates
         const updateAttributesResponse = await DefaultReplyToMessage(
           attributesMessagesWithContext,
@@ -718,7 +755,7 @@ export async function triageMessage({
           participants,
           projects
         );
-        
+
         return {
           type: "project",
           success: updateAttributesResult,
@@ -727,49 +764,53 @@ export async function triageMessage({
             projectAction: "updateAttributes",
             projectName: (triage as any).projectName,
             attributeUpdates: (triage as any).attributeUpdates,
-            replaceAttributes: (triage as any).replaceAttributes === true
-          }
+            replaceAttributes: (triage as any).replaceAttributes === true,
+          },
         };
-        
+
       case "referenceProject":
         // Handle reference to past project
         let referenceProjectResult = null;
-        
+
         if (adapter && chatId && projects.length > 0) {
           // Find the referenced project
           const targetProjectName = (triage as any).projectName || "";
-          
+
           if (targetProjectName) {
-            const referencedProject = projects.find(p => 
-              p.name.toLowerCase() === targetProjectName.toLowerCase());
-              
+            const referencedProject = projects.find(
+              (p) => p.name.toLowerCase() === targetProjectName.toLowerCase()
+            );
+
             if (referencedProject) {
               referenceProjectResult = referencedProject.id;
             }
           }
         }
-        
+
         // Create context message about what was done
-        const referenceResultMessage = referenceProjectResult ? 
-          `Referenced project with ID ${referenceProjectResult}` : 
-          "Could not find the referenced project";
-          
+        const referenceResultMessage = referenceProjectResult
+          ? `Referenced project with ID ${referenceProjectResult}`
+          : "Could not find the referenced project";
+
         const referenceProjectContext = `${referenceResultMessage}`.trim();
-        
+
         // Add a system message to inform the AI about the project action
-        const referenceMessagesWithContext = [...messages, {
-          content: referenceProjectContext,
-          sender_number: process.env.A1BASE_AGENT_NUMBER || "",
-          sender_name: "AI Assistant",
-          thread_id,
-          thread_type,
-          timestamp: new Date().toISOString(),
-          message_id: `system-ctx-${Date.now()}`,
-          message_type: "text" as ThreadMessage["message_type"],
-          message_content: { text: referenceProjectContext },
-          role: "assistant"
-        } as ThreadMessage];
-        
+        const referenceMessagesWithContext = [
+          ...messages,
+          {
+            content: referenceProjectContext,
+            sender_number: process.env.A1BASE_AGENT_NUMBER || "",
+            sender_name: "AI Assistant",
+            thread_id,
+            thread_type,
+            timestamp: new Date().toISOString(),
+            message_id: `system-ctx-${Date.now()}`,
+            message_type: "text" as ThreadMessage["message_type"],
+            message_content: { text: referenceProjectContext },
+            role: "assistant",
+          } as ThreadMessage,
+        ];
+
         // Still generate a default response for project reference
         const referenceProjectResponse = await DefaultReplyToMessage(
           referenceMessagesWithContext,
@@ -780,7 +821,7 @@ export async function triageMessage({
           participants,
           projects
         );
-        
+
         return {
           type: "project",
           success: referenceProjectResult !== null,
@@ -788,8 +829,8 @@ export async function triageMessage({
           data: {
             projectAction: "reference",
             projectName: (triage as any).projectName,
-            projectId: referenceProjectResult || undefined
-          }
+            projectId: referenceProjectResult || undefined,
+          },
         };
 
       case "noReply":
