@@ -20,6 +20,7 @@ import {
   Save,
   CheckCircle2,
   Brain,
+  Shield,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -81,6 +82,12 @@ export default function ProfileEditorLayout({
       icon: <Users className="h-5 w-5" />,
       href: "/profile-editor/profile-settings",
       variant: pathname.includes("/profile-settings") ? "default" : "ghost",
+    },
+    {
+      title: "Safety Settings",
+      icon: <Shield className="h-5 w-5" />,
+      href: "/profile-editor/safety-editor",
+      variant: pathname.includes("/safety-editor") ? "default" : "ghost",
     },
     {
       title: "Agent Memory",

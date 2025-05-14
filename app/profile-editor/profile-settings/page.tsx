@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -208,16 +209,23 @@ export default function ProfileSettingsEditor() {
   };
 
   // If settings haven't loaded yet, show a loading state
-  if (!profileSettings) {
-    return (
-      <div className="flex justify-center items-center h-64">
+  if (!profileSettings) return (
+    <div className="container mx-auto py-10">
+      <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-700"></div>
       </div>
-    );
-  }
+    </div>
+  );
 
   return (
-    <div className="space-y-6">
+    <div className="container mx-auto py-10">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">Profile Settings</h1>
+        <Link href="/profile-editor/safety-editor" className="text-sm text-blue-500 hover:text-blue-700 flex items-center gap-1">
+          <span>Safety Settings</span>
+          <span>&rarr;</span>
+        </Link>
+      </div>
       {/* Profile Settings Card */}
       <Card>
         <CardHeader>
