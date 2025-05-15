@@ -98,15 +98,17 @@ export function formatMessagesForOpenAI<
  * ============= OPENAI CALL TO TRIAGE THE MESSAGE INTENT ================
  * This function returns one of the following responseTypes:
  *  - simpleResponse: Provide a simple response
- *  - followUpResponse: Follow up on the message to gather additional information
- *  - handleEmailAction: Draft email and await user approval for sending (DISABLED)
- *  - taskActionConfirmation: Confirm with user before proceeding with requested task (i.e before sending an email)
+ *  - onboardingFlow: Handle onboarding flow
+ *  - projectFlow: Handle all project-related actions
+ *  - noReply: No reply needed
  * =======================================================================
  */
 export async function triageMessageIntent(
-  threadMessages: ThreadMessage[]
+  threadMessages: ThreadMessage[],
+  projects: any[] = []
 ): Promise<{
-  responseType: "simpleResponse" | "onboardingFlow" | "createProject" | "updateProject" | "completeProject" | "referenceProject" | "noReply" | "updateProjectAttributes";
+  responseType: "simpleResponse" | "onboardingFlow" | "projectFlow" | "noReply";
+  projectAction?: "create" | "update" | "complete" | "reference";
   projectName?: string;
   projectDescription?: string;
   updates?: Record<string, any>;
@@ -125,27 +127,49 @@ export async function triageMessageIntent(
   // Heuristic check: if the latest message clearly contains an email address, return early
   const latestMessage =
     threadMessages[threadMessages.length - 1]?.content.toLowerCase() || "";
+    
+  // Extract existing project names to provide context
+  const existingProjects = projects.map(p => ({
+    name: p.name,
+    description: p.description,
+    is_live: p.is_live,
+    id: p.id
+  }));
+  
+  const existingProjectsContext = existingProjects.length > 0 
+    ? `\nExisting projects in this chat:\n${JSON.stringify(existingProjects, null, 2)}\n` 
+    : "\nNo existing projects in this chat.\n";
 
   const triagePrompt = `
-Based on the conversation, and the context of the recent messages analyze the user's intent and respond with a JSON object:
-- "responseType": one of ["simpleResponse", "createProject", "updateProject", "completeProject", "referenceProject", "noReply", "updateProjectAttributes"]
+Based on the conversation and the context of the recent messages, analyze the user's intent and respond with a JSON object:
+- "responseType": one of ["simpleResponse", "projectFlow", "noReply", "onboardingFlow"]
 - Additional fields based on intent.
 
 Rules:
-- "createProject": User wants to start a new project (e.g., "start a new project").
-- "updateProject": User wants to modify an existing project metadata (e.g., "update project description").
-- "updateProjectAttributes": User wants to modify project attributes or specific properties (e.g., "add project status", "set project deadline").
-- "completeProject": User indicates a project is done (e.g., "project complete").
-- "referenceProject": User mentions a past project.
+- "projectFlow": Used for ALL project-related actions. Use this for any message related to creating, updating, completing, or referencing projects.
 - "noReply": No response required.
-- "simpleResponse": Default for other messages.
+- "onboardingFlow": Related to user onboarding.
+- "simpleResponse": Default for other messages that don't fit the above categories.
 
-Additional Fields:
-- "createProject": "projectName", "projectDescription" (if provided), "attributes" (optional JSON object with project properties).
-- "updateProject": "projectName" (optional), "updates" (e.g., {"description": "new desc"}).
-- "updateProjectAttributes": "projectName" (optional), "attributeUpdates" (e.g., {"status": "in progress", "priority": "high"}), "replaceAttributes" (boolean, default false).
-- "completeProject": "projectName" (optional).
-- "referenceProject": "projectName".
+For "projectFlow" responses, include these additional fields:
+- "projectAction": one of ["create", "update", "complete", "reference"]
+- "projectName": Name of the project (required for "create", optional for others if context makes it clear)
+- "projectDescription": Description of the project (for "create")
+
+Additional context-specific fields:
+- For "create": include "attributes" (a JSON object with all project properties beyond name and description)
+- For "update": if updating basic info, include "updates" (e.g., {"description": "new desc"})
+- For updating properties: include "attributeUpdates" (e.g., {"status": "in progress", "priority": "high"}), "replaceAttributes" (boolean, default false)
+
+${existingProjectsContext}
+
+IMPORTANT DATABASE CONTEXT: In the projects table, the field "is_live" indicates project status:
+- is_live=true means the project is ACTIVE and ongoing
+- is_live=false means the project is COMPLETED
+
+When a user says they've "completed" or "finished" a project, you should set projectAction to "complete" which will update is_live to false.
+
+CRITICAL INSTRUCTION: When analyzing the message, ALWAYS check if it refers to an existing project by comparing project names. If there's ANY similarity between the mentioned project name and an existing project (especially if the project is marked as is_live=true), you MUST set projectAction to "update" rather than "create". Even if the user says "track a project" or uses creation language, if the project name is similar to an existing one, interpret it as an update request.
 
 For attributes, you can create or modify any data structure that seems appropriate, using nested objects if needed.
 Examples: 
@@ -177,53 +201,40 @@ Return valid JSON.
     const validTypes = [
       "simpleResponse", 
       "onboardingFlow",
-      "createProject",
-      "updateProject",
-      "completeProject",
-      "referenceProject",
+      "projectFlow",
       "noReply",
     ];
 
+    console.log("[TRIAGE DEBUG] Raw triage result:", parsed);
+    console.log("[TRIAGE DEBUG] Existing projects context provided:", existingProjects.map(p => ({ name: p.name, is_live: p.is_live })));
+
     if (validTypes.includes(parsed.responseType)) {
-      // Format the response based on the type
-      switch(parsed.responseType) {
-        case "createProject":
-          return {
-            responseType: parsed.responseType,
-            projectName: parsed.projectName,
-            projectDescription: parsed.projectDescription,
-            attributes: parsed.attributes
-          };
-        case "updateProject":
-          return {
-            responseType: parsed.responseType,
-            projectName: parsed.projectName,
-            updates: parsed.updates
-          };
-        case "updateProjectAttributes":
-          return {
-            responseType: parsed.responseType,
-            projectName: parsed.projectName,
-            attributeUpdates: parsed.attributeUpdates,
-            replaceAttributes: parsed.replaceAttributes === true
-          };
-        case "completeProject":
-          return {
-            responseType: parsed.responseType,
-            projectName: parsed.projectName
-          };
-        case "referenceProject":
-          return {
-            responseType: parsed.responseType,
-            projectName: parsed.projectName
-          };
-        default:
-          return { responseType: parsed.responseType };
+      // Special handling for project flow
+      if (parsed.responseType === "projectFlow") {
+        // Create the consolidated project flow response
+        const projectFlowResponse = {
+          responseType: "projectFlow" as const,
+          projectAction: parsed.projectAction as "create" | "update" | "complete" | "reference" | undefined,
+          projectName: parsed.projectName,
+          projectDescription: parsed.projectDescription,
+          updates: parsed.updates,
+          attributes: parsed.attributes,
+          attributeUpdates: parsed.attributeUpdates,
+          replaceAttributes: parsed.replaceAttributes === true
+        };
+        
+        console.log("[TRIAGE DEBUG] Final project flow response:", projectFlowResponse);
+        return projectFlowResponse;
+      } else {
+        // For non-project flows, just return the response type
+        console.log("[TRIAGE DEBUG] Non-project response type:", parsed.responseType);
+        return { responseType: parsed.responseType };
       }
     }
 
     return { responseType: "simpleResponse" };
-  } catch {
+  } catch (error) {
+    console.error("Error parsing triage response:", error);
     // Default to simple response if parsing fails
     return { responseType: "simpleResponse" };
   }

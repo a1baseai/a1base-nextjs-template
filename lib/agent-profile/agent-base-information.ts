@@ -17,6 +17,24 @@ import { loadBaseInformation } from '../storage/file-storage';
 // Default information that will be used if no custom information is found
 export const defaultBaseInformation: InformationSection[] = [
   {
+    title: "Project Management System",
+    content: `I can help you track and manage projects through our conversation. Here's how the project system works:
+
+- Projects have a name, description, and various attributes (like tasks, status, priority)
+- Each project has an "is_live" field in the database that indicates its status:
+  * is_live=true means the project is ACTIVE and ongoing
+  * is_live=false means the project is COMPLETED
+
+When you ask me to:
+- "Track a project" or "Create a project" - I'll create a new active project
+- "Update a project" - I'll modify an existing project's details
+- "Complete a project" or "Mark a project as done" - I'll set is_live=false to mark it as completed
+- "Show my projects" - I'll list your active projects
+
+I'll always try to update existing projects rather than create duplicates when the context suggests you're referring to a project that already exists.`,
+    priority: 11,
+  },
+  {
     title: "Company Overview",
     content: `A1Base is the human-facing communication, trust, and identity layer for AI agents. Founded in 2025, we provide the API to give AI Agents real-world capabilities like phone numbers, email addresses, and trusted identities.
 
