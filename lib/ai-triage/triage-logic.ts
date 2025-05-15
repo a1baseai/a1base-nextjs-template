@@ -447,19 +447,13 @@ export async function triageMessage({
           switch(projectAction) {
             case "create":
               try {
-                // Mark any existing live projects as complete first
-                const liveProject = existingProjects.find(
-                  (p) => p.is_live === true
-                );
-
-                if (liveProject) {
-                  await adapter.updateProject(liveProject.id, { is_live: false });
-                  await adapter.logProjectEvent(
-                    liveProject.id,
-                    "project_completed",
-                    "Project completed due to new project creation"
-                  );
-                }
+                // We no longer automatically mark existing live projects as complete
+                // This allows users to have multiple active projects simultaneously
+                // Projects will only be marked as completed when the user explicitly requests it
+                
+                // Log the number of active projects for debugging
+                const liveProjects = existingProjects.filter(p => p.is_live === true);
+                console.log(`[PROJECT DEBUG] Creating new project. Currently ${liveProjects.length} active projects exist.`);
 
                 // All attributes outside of name and description go into the attributes object
                 const projectAttributes = (triage as any).attributes || {};
