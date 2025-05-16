@@ -27,25 +27,12 @@ import { DefaultReplyToMessage } from "@/lib/workflows/basic_workflow";
 // Define route configuration directly in this file
 import { ThreadMessage } from "@/types/chat";
 
-const CRON_SECRET = process.env.CRON_SECRET;
-// For development environment, use a default secret if not set
+// Removed CRON_SECRET requirement for MVP
 const isDevelopment = process.env.NODE_ENV === 'development';
 
 export const POST = async (request: Request) => {
-  const headersList = await headers();
-  const authHeader = headersList.get("authorization");
-
-  // In development, if CRON_SECRET isn't set, accept any token for testing
-  // In production, verify the authorization header matches the expected Bearer token
-  if (!isDevelopment && CRON_SECRET && authHeader !== `Bearer ${CRON_SECRET}`) {
-    console.log(`[Project Reminders] Auth failed. Expected: Bearer ${CRON_SECRET}, Got: ${authHeader}`);
-    return new NextResponse("Unauthorized", { status: 401 });
-  }
-  
-  // If we're in development and CRON_SECRET isn't set, log a warning
-  if (isDevelopment && !CRON_SECRET) {
-    console.warn("[Project Reminders] CRON_SECRET not set in development environment. Proceeding without authentication check.");
-  }
+  // No authentication required for MVP
+  console.log("[Project Reminders] Starting cron job - no authentication required");
 
   try {
     console.log("[Project Reminders] Starting cron job execution");
