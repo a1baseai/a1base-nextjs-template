@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
-import { dynamic, runtime, maxDuration } from "../route-config";
-
-// Export the route configuration to prevent Next.js from trying
-// to access file system during build time
-export { dynamic, runtime, maxDuration };
+// Define route configuration directly in this file
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+export const maxDuration = 30;
 
 // Path to the triage logic file
 const TRIAGE_LOGIC_PATH = path.join(process.cwd(), "lib", "ai-triage", "triage-logic.ts");

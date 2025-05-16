@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { dynamic, runtime, maxDuration } from '../route-config';
+// Define route configuration directly in this file
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+export const maxDuration = 30;
 import { loadOnboardingFlowFromFile } from '@/lib/storage/server-file-storage';
 import { defaultOnboardingFlow, OnboardingMessage } from '@/lib/onboarding-flow/types';
 import { v4 as uuidv4 } from 'uuid';
-
-// Export the route configuration
-export { dynamic, runtime, maxDuration };
 
 /**
  * GET handler for streaming onboarding flow as chat messages

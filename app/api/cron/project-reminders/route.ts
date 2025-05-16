@@ -24,8 +24,7 @@ import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { getInitializedAdapter } from "@/lib/supabase/config";
 import { DefaultReplyToMessage } from "@/lib/workflows/basic_workflow";
-// Import individual configuration values instead of the object
-import { dynamic, runtime } from "@/app/api/route-config";
+// Define route configuration directly in this file
 import { ThreadMessage } from "@/types/chat";
 
 const CRON_SECRET = process.env.CRON_SECRET;
@@ -174,7 +173,8 @@ export const POST = async (request: Request) => {
   }
 };
 
-// Export configuration values directly
-export { dynamic, runtime };
+// Define route configuration directly in this file
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 // Set maxDuration for this specific route
 export const maxDuration = 60; // Longer timeout for cron job

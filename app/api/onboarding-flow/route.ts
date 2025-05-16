@@ -4,10 +4,10 @@ import {
   saveOnboardingFlowToFile 
 } from '@/lib/storage/server-file-storage';
 import { defaultOnboardingFlow } from '@/lib/onboarding-flow/types';
-import { dynamic, runtime, maxDuration } from '@/app/api/route-config';
-
-// Export the route configuration
-export { dynamic, runtime, maxDuration };
+// Define route configuration directly in this file
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+export const maxDuration = 30;
 
 /**
  * GET handler for retrieving onboarding flow

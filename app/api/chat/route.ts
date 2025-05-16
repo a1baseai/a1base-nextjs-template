@@ -1,14 +1,13 @@
 import { NextResponse } from "next/server";
 import { getSystemPrompt } from "../../../lib/agent/system-prompt";
 import { triageMessage } from "../../../lib/ai-triage/triage-logic";
-import { dynamic, runtime, maxDuration } from "../route-config";
+// Define route configuration directly in this file
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+export const maxDuration = 30;
 import { streamText } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { formatMessagesForOpenAI } from "../../../lib/services/openai";
-
-// Export the route configuration to prevent Next.js from trying
-// to access file system during build time
-export { dynamic, runtime, maxDuration };
 
 // Check if we're in a build context
 const isBuildTime = () => {
