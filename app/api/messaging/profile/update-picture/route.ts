@@ -9,8 +9,12 @@ const client = new A1BaseAPI({
 });
 
 export async function POST(request: NextRequest) {
+
+  
   try {
-    const { imageUrl } = await request.json();
+    const { profilePictureUrl } = await request.json();
+    const imageUrl = profilePictureUrl;
+    
 
     if (!process.env.A1BASE_ACCOUNT_ID) {
       return NextResponse.json(
@@ -50,7 +54,11 @@ export async function POST(request: NextRequest) {
       }
     );
 
+    
+
     const data = await response.json();
+
+    console.log(data);
 
     if (!response.ok) {
       console.error("Error updating WhatsApp profile picture:", data);
