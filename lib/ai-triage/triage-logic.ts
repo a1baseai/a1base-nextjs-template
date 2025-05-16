@@ -47,9 +47,12 @@ async function analyzeProjectIntent(
     content.includes("new project called") ||
     content.includes("create project called") ||
     content.includes("track project called") ||
-    // Also check for phrases with colons that often indicate project creation
-    (content.includes("project:") && content.length < 100) ||
-    (content.includes("project name:") && content.length < 100)
+    // More specific check for project creation with colons
+    // Must start with the phrase and be explicit about creation
+    content.startsWith("create project:") ||
+    content.startsWith("new project:") ||
+    content.startsWith("track project:") ||
+    content.startsWith("project name:")
   ) {
     intent.type = "START_NEW_PROJECT";
     return intent;
@@ -202,19 +205,8 @@ export async function projectTriage(
         break;
 
       case "START_NEW_PROJECT":
-        // If there's a live project, mark it as complete first
-        if (liveProject) {
-          const updated = await adapter.updateProject(liveProject.id, {
-            is_live: false,
-          });
-          if (updated) {
-            await adapter.logProjectEvent(
-              liveProject.id,
-              "project_completed",
-              `Project completed due to new project start`
-            );
-          }
-        }
+        // Allow multiple live projects - don't automatically complete existing ones
+        // This change allows users to have multiple active projects simultaneously
 
         // Create a new project
         return await createNewProject(
