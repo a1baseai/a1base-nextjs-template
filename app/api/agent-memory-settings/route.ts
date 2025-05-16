@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { loadAgentMemorySettings, saveAgentMemorySettings } from '@/lib/storage/file-storage';
 import { AgentMemorySettingsData } from '@/lib/agent-memory/types';
 
-// Reuse the shared route configuration pattern from other API routes
-import { routeConfig } from '../../../lib/route-config';
-export const { dynamic, runtime } = routeConfig;
+// Define route configuration directly in this file
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+export const maxDuration = 30;
 
 // GET handler to retrieve agent memory settings
 export async function GET(request: NextRequest) {
