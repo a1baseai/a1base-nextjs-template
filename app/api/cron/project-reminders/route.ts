@@ -74,8 +74,19 @@ export const POST = async (request: Request) => {
     let remindersSent = 0;
     let chatsWithProjects = 0;
     
-    // Process each chat
-    for (const chat of chats) {
+    // Helper function to wait a random amount of time between 1-4 seconds
+    const randomDelay = () => {
+      const delayMs = Math.floor(Math.random() * 3000) + 1000; // Random delay between 1000-4000ms
+      console.log(`[Project Reminders] Adding random delay of ${delayMs}ms before next message`);
+      return new Promise(resolve => setTimeout(resolve, delayMs));
+    };
+    
+    // Track if we've sent at least one message to add delay before subsequent messages
+    let isFirstMessage = true;
+    
+    // Process each chat sequentially with delays
+    for (let i = 0; i < chats.length; i++) {
+      const chat = chats[i];
       console.log(`[Project Reminders] Processing chat ${chat.id} (${chat.type}) with external_id ${chat.external_id}`);
       
       // Get projects for this chat
@@ -133,6 +144,13 @@ export const POST = async (request: Request) => {
           
           // Create a context with active projects information
           const messages = [systemMessage];
+          
+          // Add a random delay before sending a message (except for the very first message)
+          if (!isFirstMessage) {
+            await randomDelay();
+          } else {
+            isFirstMessage = false;
+          }
           
           // Generate a reminder message using the AI
           const reminderMessage = await DefaultReplyToMessage(
