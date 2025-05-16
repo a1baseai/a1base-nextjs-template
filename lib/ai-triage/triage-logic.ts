@@ -74,16 +74,21 @@ async function analyzeProjectIntent(
  * Create default project name and description from a message
  */
 function createProjectDefaults(latestMessage: MessageRecord) {
-  // Default project name is based on first few words of the latest message
-  const defaultName =
-    latestMessage.content
-      .split(" ")
-      .slice(0, 3)
-      .join(" ")
-      .trim()
-      .substring(0, 30) + "...";
+  let content = latestMessage.content.trim();
+  
+  // Extract a clean project name
+  let projectName = content;
+  
+  // If the message starts with "Project:" extract the actual name
+  if (content.toLowerCase().startsWith("project:")) {
+    // Remove the "Project:" prefix and trim
+    projectName = content.substring(8).trim();
+  }
+  
+  // Use the full project name without length limitation
+  const defaultName = projectName;
 
-  // Default description includes the sender and a snippet of the message
+  // Default description includes the sender and the full original message
   const defaultDescription = `Project started by ${
     latestMessage.sender_name
   }. Initial message: ${latestMessage.content.substring(0, 100)}${
