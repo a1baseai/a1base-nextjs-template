@@ -139,12 +139,40 @@ export const POST = async (request: Request) => {
             isFirstMessage = false;
           }
           
+          // For individual chats, we need to get the user's phone number to use as sender_number
+          let recipientNumber = "";
+          if (chat.type === "individual") {
+            // Get the participants for this chat
+            const { data: participants, error: participantsError } = await adapter.supabase
+              .from("chat_participants")
+              .select("user_id")
+              .eq("chat_id", chat.id);
+              
+            if (participantsError) {
+              console.error(`[Project Reminders] Error fetching participants for chat ${chat.id}:`, participantsError);
+            } else if (participants && participants.length > 0) {
+              // Get the user's phone number
+              const { data: user, error: userError } = await adapter.supabase
+                .from("conversation_users")
+                .select("phone_number")
+                .eq("id", participants[0].user_id)
+                .single();
+                
+              if (userError) {
+                console.error(`[Project Reminders] Error fetching user for chat ${chat.id}:`, userError);
+              } else if (user && user.phone_number) {
+                recipientNumber = user.phone_number;
+                console.log(`[Project Reminders] Found recipient number ${recipientNumber} for individual chat ${chat.id}`);
+              }
+            }
+          }
+          
           // Generate a reminder message using the AI
           const reminderMessage = await DefaultReplyToMessage(
             messages,
             chat.type as "individual" | "group",
             chat.external_id,
-            "", // Empty string for sender_number for reminders
+            chat.type === "individual" ? recipientNumber : "", // Use the recipient's number for individual chats
             chat.service,
             [], // No participants needed for this context
             activeProjects // Pass the active projects
