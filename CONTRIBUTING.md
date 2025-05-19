@@ -4,7 +4,7 @@ Thank you for your interest in contributing to the A1Base AI Chat Agent! We welc
 
 ## 🤝 Code of Conduct
 
-By participating in this project, you agree to abide by our Code of Conduct:
+This project adheres to the [Contributor Covenant](CODE_OF_CONDUCT.md). By participating, you agree to abide by our Code of Conduct:
 
 - Be respectful and inclusive
 - Exercise consideration and empathy
