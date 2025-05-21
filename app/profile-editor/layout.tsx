@@ -84,6 +84,12 @@ export default function ProfileEditorLayout({
       variant: pathname.includes("/profile-settings") ? "default" : "ghost",
     },
     {
+      title: "Group Chat Settings",
+      icon: <MessageSquare className="h-5 w-5" />,
+      href: "/profile-editor/group-chat-settings",
+      variant: pathname.includes("/group-chat-settings") ? "default" : "ghost",
+    },
+    {
       title: "Safety Settings",
       icon: <Shield className="h-5 w-5" />,
       href: "/profile-editor/safety-editor",

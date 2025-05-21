@@ -44,6 +44,8 @@ export interface AgentSettings {
   agent: string;
   /** URL to the animated profile GIF */
   profileGifUrl?: string;
+  /** When enabled, the agent will only respond in group chats when @mentioned */
+  requireMentionInGroupChats?: boolean;
 }
 
 /**

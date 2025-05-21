@@ -24,6 +24,7 @@ import {
 import { getSplitMessageSetting } from "../settings/message-settings";
 import { saveMessage, userCheck } from "../data/message-storage"; // userCheck is imported but not used in the original, keeping it.
 import { processMessageForMemoryUpdates } from "../agent-memory/memory-processor"; // Added import
+import agentProfileSettings from "../agent-profile/agent-profile-settings";
 
 // --- CONSTANTS ---
 export const MAX_CONTEXT_MESSAGES = 10;
@@ -48,6 +49,42 @@ const openaiClient = new OpenAI({
 });
 
 // --- HELPER FUNCTIONS ---
+
+/**
+ * Checks if the agent should respond to a message in a group chat
+ * Returns true if:
+ * - It's not a group chat, OR
+ * - The 'only reply when tagged' setting is disabled, OR
+ * - The message contains the agent's number
+ */
+function shouldRespondInGroupChat(
+  threadType: string,
+  messageContent: string
+): boolean {
+  // Always respond in individual chats
+  if (threadType !== 'group') return true;
+  
+  // Check if the setting is enabled in agent profile
+  const requireMention = agentProfileSettings?.agentSettings?.requireMentionInGroupChats;
+  if (!requireMention) return true;
+  
+  // Check if the message contains the agent's number
+  const agentNumber = process.env.A1BASE_AGENT_NUMBER;
+  if (!agentNumber) {
+    console.warn('[MentionCheck] A1BASE_AGENT_NUMBER is not set');
+    return true; // Default to responding if agent number is not set
+  }
+  
+  // Check for @mention or just the number
+  const hasMention = messageContent.includes(`@${agentNumber}`) || 
+                    messageContent.includes(agentNumber);
+  
+  if (!hasMention) {
+    console.log(`[MentionCheck] Ignoring message in group chat without @mention of ${agentNumber}`);
+  }
+  
+  return hasMention;
+}
 
 /**
  * Normalizes a phone number by removing '+' and spaces.
@@ -827,13 +864,22 @@ export async function handleWhatsAppIncoming(
     }
   }
 
-  // 7. Determine if onboarding is needed for this user/thread
+  // 7. Check if we should respond in group chats (only if @mentioned)
+  if (thread_type === 'group') {
+    const shouldRespond = shouldRespondInGroupChat(thread_type, content);
+    if (!shouldRespond) {
+      console.log(`[GroupChat] Ignoring message in group chat ${thread_id} - no @mention`);
+      return { success: true, message: 'Ignoring message in group chat (no @mention)' };
+    }
+  }
+
+  // 8. Determine if onboarding is needed for this user/thread
   const shouldTriggerOnboarding = await checkIfOnboardingNeeded(
     thread_id,
     adapter
   );
 
-  // 8. Handle Onboarding Flow OR Standard Triage
+  // 9. Handle Onboarding Flow OR Standard Triage
   let triageResponseMessageText: string | null = null;
   let onboardingHandled = false;
 
@@ -885,7 +931,7 @@ export async function handleWhatsAppIncoming(
     }
   }
 
-  // 9. Send Response (if any was generated and not sent by onboarding)
+  // 10. Send Response (if any was generated and not sent by onboarding)
   if (triageResponseMessageText) {
     // Determine recipient ID based on thread type
     const recipient = thread_type === "group" ? thread_id : sender_number;

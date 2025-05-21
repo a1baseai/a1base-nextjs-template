@@ -162,6 +162,15 @@ export async function POST(request: NextRequest) {
 
     // Write settings to file
     try {
+      // Validate and ensure agentSettings structure
+      if (!settings.agentSettings) {
+        settings.agentSettings = defaultAgentProfileSettings.agentSettings;
+      }
+      
+      // Log group chat settings
+      console.log("[PROFILE-API] Group chat require mention setting:", 
+        settings.agentSettings.requireMentionInGroupChats ? 'enabled' : 'disabled');
+      
       console.log("[PROFILE-API] Writing settings to file for", settings.name);
       fs.writeFileSync(
         PROFILE_SETTINGS_FILE,

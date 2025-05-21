@@ -55,6 +55,7 @@ export const defaultAgentProfileSettings: AgentProfileSettingsWithSource = {
   },
   agentSettings: {
     agent: "Product Guide",
+    requireMentionInGroupChats: false,
   },
 };
 
