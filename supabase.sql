@@ -89,6 +89,7 @@ CREATE TABLE public.projects (
   CONSTRAINT projects_chat_id_fkey FOREIGN KEY (chat_id) REFERENCES public.chats(id)
 ) WITH (OIDS=FALSE);
 CREATE INDEX IF NOT EXISTS idx_projects_chat_id ON public.projects USING btree (chat_id);
+CREATE INDEX IF NOT EXISTS idx_projects_chat_live_created ON public.projects (chat_id, is_live, created_at);
 
 CREATE TABLE public.project_history (
   id uuid NOT NULL DEFAULT gen_random_uuid(),

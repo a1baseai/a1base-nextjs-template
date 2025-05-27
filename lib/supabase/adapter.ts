@@ -835,20 +835,28 @@ export class SupabaseAdapter {
    * Project Operations
    */
 
-  // Get projects for a chat
+  // Get projects for a chat, filtered by is_live and age
   async getProjectsByChat(chatId: string): Promise<any[]> {
     this.ensureInitialized();
 
     try {
+      const fortyEightHoursAgo = new Date();
+      fortyEightHoursAgo.setHours(fortyEightHoursAgo.getHours() - 48);
+      const fortyEightHoursAgoISO = fortyEightHoursAgo.toISOString();
+
       const { data, error } = await this.supabase
         .from("projects")
         .select("*")
-        .eq("chat_id", chatId);
+        .eq("chat_id", chatId)
+        .or(`is_live.eq.true,and(is_live.eq.false,created_at.gte.${fortyEightHoursAgoISO})`);
 
-      if (error) throw error;
+      if (error) {
+        // console.error("Error fetching projects by chat:", error); // Kept for reference
+        throw error;
+      }
       return data || [];
     } catch (error) {
-      // Console error removed
+      // console.error('SupabaseAdapter.getProjectsByChat failed:', error); // Kept for reference
       return [];
     }
   }
@@ -870,7 +878,7 @@ export class SupabaseAdapter {
           description,
           chat_id: chatId,
           created_at: new Date().toISOString(),
-          is_live: true,
+          is_live: true, // Default to true on creation
           attributes: attributes || {},
         })
         .select("id")
