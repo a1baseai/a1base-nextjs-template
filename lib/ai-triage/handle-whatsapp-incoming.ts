@@ -10,8 +10,7 @@ import {
 import { WebhookPayload } from "@/app/api/messaging/incoming/route";
 import {
   StartOnboarding,
-  OnboardingResponse,
-} from "../workflows/onboarding-workflow"; // Added OnboardingResponse type
+} from "../workflows/onboarding-workflow"; // Removed OnboardingResponse type
 import { A1BaseAPI } from "a1base-node";
 import OpenAI from "openai";
 import { loadOnboardingFlow } from "../onboarding-flow/onboarding-storage";
@@ -471,7 +470,7 @@ async function sendResponseMessage(
     const messageData = {
       content: line,
       from: process.env.A1BASE_AGENT_NUMBER!,
-      service: WHATSAPP_SERVICE_NAME as const, // Assuming A1Base only sends via WhatsApp for now
+      service: WHATSAPP_SERVICE_NAME,
     };
 
     try {
@@ -623,7 +622,7 @@ async function manageIndividualOnboardingProcess(
             : "unsupported_message_type",
       })) as ThreadMessage[];
 
-      const onboardingResponse: OnboardingResponse | undefined =
+      const onboardingResponse: { messages: { text: string; waitForResponse: boolean }[] } | undefined =
         await StartOnboarding(
           threadMessagesForOnboarding, // Pass the converted threadMessages
           thread_type as "individual" | "group",
@@ -695,6 +694,26 @@ export async function handleWhatsAppIncoming(
     service,
   });
 
+  // 1. Skip processing for agent's own messages
+  if (sender_number === process.env.A1BASE_AGENT_NUMBER) {
+    console.log("[AgentMsg] Processing agent's own message for storage.");
+    if (adapter) {
+      await adapter.processWebhookPayload(webhookData);
+      console.log("[AgentMsg] Agent's own message processed by adapter.");
+    } else {
+      console.warn(
+        "[AgentMsg] Supabase adapter not initialized. Agent message not stored in DB."
+      );
+      // Optionally, save agent's message to memory if that's desired behavior, though original didn't explicitly for agent.
+      // await saveMessageToMemory(thread_id, { message_id, content, message_type, message_content, sender_number, sender_name: process.env.A1BASE_AGENT_NAME || sender_name, timestamp });
+    }
+    return {
+      success: true,
+      message:
+        "Agent message processed for storage and skipped for further logic.",
+    };
+  }
+
   // --- Start Memory Update Processing (non-blocking) ---
   // Launch memory processing in parallel without awaiting the result
   let memoryProcessingPromise: Promise<void> | null = null;
@@ -746,26 +765,6 @@ export async function handleWhatsAppIncoming(
     // We do NOT await the promise here, allowing it to run in parallel
   }
   // --- End Memory Update Processing Initiation ---
-
-  // 1. Skip processing for agent's own messages
-  if (sender_number === process.env.A1BASE_AGENT_NUMBER) {
-    console.log("[AgentMsg] Processing agent's own message for storage.");
-    if (adapter) {
-      await adapter.processWebhookPayload(webhookData);
-      console.log("[AgentMsg] Agent's own message processed by adapter.");
-    } else {
-      console.warn(
-        "[AgentMsg] Supabase adapter not initialized. Agent message not stored in DB."
-      );
-      // Optionally, save agent's message to memory if that's desired behavior, though original didn't explicitly for agent.
-      // await saveMessageToMemory(thread_id, { message_id, content, message_type, message_content, sender_number, sender_name: process.env.A1BASE_AGENT_NAME || sender_name, timestamp });
-    }
-    return {
-      success: true,
-      message:
-        "Agent message processed for storage and skipped for further logic.",
-    };
-  }
 
   // 2. Handle active group onboarding (early exit if message is part of it)
   if (thread_type === "group") {
