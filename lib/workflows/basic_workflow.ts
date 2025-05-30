@@ -24,6 +24,7 @@ import fs from "fs";
 import path from "path";
 import { SupabaseAdapter } from "../supabase/adapter";
 import { getInitializedAdapter } from "../supabase/config";
+import { sendMultimediaMessage, MediaType } from "../messaging/multimedia-handler";
 
 // Import StartOnboarding from dedicated onboarding workflow file
 // The re-export allows this module to act as a central point for these workflows.
@@ -112,6 +113,42 @@ async function _sendWhatsAppMessage(
   } catch (error) {
     console.error(`[_sendWhatsAppMessage] Error sending message to ${threadType} recipient ${recipientId}:`, error);
     // Potentially re-throw or handle more gracefully depending on requirements
+  }
+}
+
+/**
+ * Sends a WhatsApp multimedia message via A1Base API.
+ * @param threadType - Type of thread ("individual" or "group").
+ * @param recipientId - Thread ID for group, sender number for individual.
+ * @param mediaUrl - URL of the media to send.
+ * @param mediaType - Type of media (image, video, audio, document).
+ * @param caption - Optional caption for the media.
+ */
+async function _sendWhatsAppMediaMessage(
+  threadType: "individual" | "group",
+  recipientId: string,
+  mediaUrl: string,
+  mediaType: MediaType,
+  caption?: string
+): Promise<void> {
+  if (!A1BASE_ACCOUNT_ID || !A1BASE_AGENT_NUMBER) {
+    console.error("[_sendWhatsAppMediaMessage] Missing A1Base Account ID or Agent Number in environment variables.");
+    return;
+  }
+
+  try {
+    await sendMultimediaMessage(
+      a1BaseClient,
+      A1BASE_ACCOUNT_ID,
+      threadType,
+      recipientId,
+      mediaUrl,
+      mediaType,
+      caption
+    );
+    console.log(`[_sendWhatsAppMediaMessage] Media message sent to ${threadType} recipient: ${recipientId}`);
+  } catch (error) {
+    console.error(`[_sendWhatsAppMediaMessage] Error sending media message to ${threadType} recipient ${recipientId}:`, error);
   }
 }
 
