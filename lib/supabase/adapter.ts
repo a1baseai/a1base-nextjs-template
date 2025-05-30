@@ -337,7 +337,7 @@ export class SupabaseAdapter {
         .from("messages")
         .select(
           `
-          id, chat_id, sender_id, content, created_at, message_type, external_id, rich_content, service,
+          id, chat_id, sender_id, content, created_at, message_type, external_id, rich_content, service, media_type, media_caption,
           conversation_users:sender_id(id, created_at, name, phone_number, service, metadata)
         `
         )
@@ -414,10 +414,22 @@ export class SupabaseAdapter {
           conversation_users: msg.conversation_users,
         };
 
+        // Create safe content for AI context - avoid large base64 data
+        let safeContent = msg.content;
+        if (msg.message_type && ['image', 'video', 'audio', 'document'].includes(msg.message_type)) {
+          if (msg.media_caption) {
+            safeContent = `[${msg.message_type.charAt(0).toUpperCase() + msg.message_type.slice(1)} received: ${msg.media_caption}]`;
+          } else {
+            safeContent = `[${msg.message_type.charAt(0).toUpperCase() + msg.message_type.slice(1)} received]`;
+          }
+        } else if (msg.message_type === 'location') {
+          safeContent = '[Location shared]';
+        }
+
         const formattedMsg = {
           message_id: msg.id,
           external_id: msg.external_id,
-          content: msg.content,
+          content: safeContent, // Use the safe content here
           message_type: msg.message_type,
           message_content: msg.rich_content,
           service: msg.service,
@@ -779,22 +791,39 @@ export class SupabaseAdapter {
 
       // Extract text content from the content object for the content field
       let textContent = content.text || "";
-      if (typeof content === "object" && Object.keys(content).length > 0) {
+      
+      // For multimedia messages, don't store base64 data in content field
+      if (messageType && ['image', 'video', 'audio', 'document'].includes(messageType)) {
+        // Create a descriptive text instead of storing base64 data
+        if (content.caption) {
+          textContent = `[${messageType.charAt(0).toUpperCase() + messageType.slice(1)} received: ${content.caption}]`;
+        } else {
+          textContent = `[${messageType.charAt(0).toUpperCase() + messageType.slice(1)} received]`;
+        }
+      } else if (messageType === 'location') {
+        // Handle location messages
+        if (content.name) {
+          textContent = `[Location shared: ${content.name}]`;
+        } else {
+          textContent = `[Location shared]`;
+        }
+      } else if (typeof content === "object" && Object.keys(content).length > 0) {
         // If it's an object with no text property, take first non-empty value or stringify
         if (!textContent) {
           for (const key in content) {
-            if (content[key] && typeof content[key] === "string") {
+            if (content[key] && typeof content[key] === "string" && key !== 'data') {
+              // Skip 'data' field as it likely contains base64
               textContent = content[key];
               console.log(`Using content from key '${key}':`, textContent);
               break;
             }
           }
 
-          // If still no text found, stringify the whole object
+          // If still no text found, create a placeholder instead of stringifying
           if (!textContent) {
-            textContent = JSON.stringify(content);
+            textContent = `[${messageType || 'Message'} received]`;
             console.log(
-              "No text content found, stringifying object:",
+              "No text content found, using placeholder:",
               textContent
             );
           }
