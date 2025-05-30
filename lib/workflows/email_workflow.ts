@@ -175,13 +175,63 @@ export async function SendEmailFromAgent(
     const trimmedSenderEmail = A1BASE_AGENT_EMAIL.trim();
     const trimmedRecipientEmail = emailDetails.recipient_address.trim();
     
+    // Format the body for maximum compatibility with email clients
+    // Some email clients strip formatting, so we use visual separators
+    let formattedBody = emailDetails.body;
+    
+    // First, normalize all line endings
+    formattedBody = formattedBody.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    
+    // Split into paragraphs
+    const paragraphs = formattedBody.split('\n\n');
+    
+    // Process each paragraph
+    formattedBody = paragraphs.map((paragraph, index) => {
+      const lines = paragraph.split('\n');
+      
+      // Check if this paragraph contains list items
+      if (lines.some(line => line.trim().match(/^[-*•]|\d+\./))) {
+        // This is a list, format it nicely
+        return lines.map(line => {
+          if (line.trim().match(/^[-*•]|\d+\./)) {
+            // Convert dashes to bullets and indent
+            return '  ' + line.replace(/^-/, '•');
+          }
+          return line;
+        }).join('\n');
+      } else {
+        // Regular paragraph
+        return paragraph.replace(/\n/g, ' ');
+      }
+    }).filter(p => p.trim()).join('\n\n'); // Remove empty paragraphs
+    
+    // Add visual spacing between major sections
+    // This helps ensure separation even if email clients strip whitespace
+    formattedBody = formattedBody
+      .replace(/\n\n/g, '\n\n\n') // Triple line breaks
+      .replace(/:\n\n\n/g, ':\n\n'); // But not after colons before lists
+    
+    // Convert to CRLF format (standard for emails)
+    formattedBody = formattedBody.replace(/\n/g, '\r\n');
+    
+    // Add a note at the bottom if the email seems to have formatting issues
+    // This helps users understand if their email client is stripping formatting
+    if (formattedBody.includes('\r\n\r\n')) {
+      formattedBody += '\r\n\r\n--\r\n(If this email appears as one paragraph, your email client may be converting plain text to HTML. Try viewing the email source for proper formatting.)';
+    }
+    
+    // Log the formatted body for debugging
+    console.log('[SendEmailFromAgent] Final formatted email body:');
+    console.log(JSON.stringify(formattedBody));
+    console.log('[SendEmailFromAgent] Body length:', formattedBody.length);
+    
     // According to A1Mail documentation, the email data structure should include headers
     const emailData = {
       sender_address: trimmedSenderEmail,
       recipient_address: trimmedRecipientEmail,
       subject: emailDetails.subject,
-      body: emailDetails.body,
-      headers: {} // Add empty headers object as the API seems to expect this
+      body: formattedBody,
+      headers: {} // Keep empty as A1Base only accepts specific header fields
     };
 
     console.log(`[SendEmailFromAgent] Full email payload being sent to A1Base:`, JSON.stringify(emailData, null, 2));
