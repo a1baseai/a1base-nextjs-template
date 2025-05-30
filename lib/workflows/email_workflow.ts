@@ -257,16 +257,30 @@ ${formattedBody}
     
     // According to A1Mail documentation, the email data structure should include headers
     // We need to set Content-Type to text/html for proper HTML rendering
-    // Using 'as any' to bypass TypeScript types that may be outdated
-    const emailData = {
+    // Let's try multiple approaches to ensure HTML rendering works
+    
+    // First, let's try with html field instead of body
+    const emailData: any = {
       sender_address: trimmedSenderEmail,
       recipient_address: trimmedRecipientEmail,
       subject: emailDetails.subject,
-      body: formattedBody,
+      html: formattedBody,  // Try using 'html' field
+      body: formattedBody,  // Keep body as fallback
       headers: {
         'Content-Type': 'text/html; charset=utf-8'
-      } as any // Type assertion to bypass TypeScript restriction
+      }
     };
+    
+    // Log all possible variations for debugging
+    console.log('[SendEmailFromAgent] Trying with html field and headers');
+    console.log('[SendEmailFromAgent] Email data structure:', {
+      sender_address: trimmedSenderEmail,
+      recipient_address: trimmedRecipientEmail,
+      subject: emailDetails.subject,
+      has_html_field: 'html' in emailData,
+      has_body_field: 'body' in emailData,
+      headers: emailData.headers
+    });
 
     console.log(`[SendEmailFromAgent] Full email payload being sent to A1Base:`, JSON.stringify(emailData, null, 2));
     console.log(`[SendEmailFromAgent] Using A1Base Account ID: ${A1BASE_ACCOUNT_ID}`);
