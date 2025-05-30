@@ -175,13 +175,13 @@ export async function SendEmailFromAgent(
     const trimmedSenderEmail = A1BASE_AGENT_EMAIL.trim();
     const trimmedRecipientEmail = emailDetails.recipient_address.trim();
     
-    // Format the body as HTML since A1Base sends emails as HTML by default
-    let formattedBody = emailDetails.body;
+    // --- Simplified HTML Generation ---
+    let textContent = emailDetails.body; // Input text from GenerateEmailResponse
     
-    // First, normalize all line endings
-    formattedBody = formattedBody.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    // Normalize line endings
+    textContent = textContent.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
     
-    // Helper function to escape HTML special characters
+    // Helper function to escape HTML special characters (remains the same)
     const escapeHtml = (text: string): string => {
       return text
         .replace(/&/g, '&amp;')
@@ -190,72 +190,51 @@ export async function SendEmailFromAgent(
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
     };
+
+    // Split text into paragraphs based on double newlines
+    const paragraphs = textContent.split('\n\n');
     
-    // Split into paragraphs
-    const paragraphs = formattedBody.split('\n\n');
-    
-    // Process each paragraph
-    const htmlParagraphs = paragraphs.map((paragraph) => {
-      const lines = paragraph.split('\n');
-      
-      // Check if this paragraph contains list items
-      if (lines.some(line => line.trim().match(/^[-*•]|\d+\./))) {
-        // This is a list
-        const listItems = lines
-          .filter(line => line.trim()) // Remove empty lines
-          .map(line => {
-            if (line.trim().match(/^[-*•]|\d+\./)) {
-              // This is a list item, remove the bullet/dash and wrap in <li>
-              const content = line.trim().replace(/^[-*•]\s*/, '').replace(/^\d+\.\s*/, '');
-              return `<li>${escapeHtml(content)}</li>`;
-            } else {
-              // This is the list intro text
-              return `<p>${escapeHtml(line)}</p>`;
-            }
-          });
-        
-        // Find where the actual list starts
-        const firstListItemIndex = listItems.findIndex(item => item.startsWith('<li>'));
-        if (firstListItemIndex > 0) {
-          // There's intro text before the list
-          const introText = listItems.slice(0, firstListItemIndex).join('');
-          const listHtml = '<ul>' + listItems.slice(firstListItemIndex).join('') + '</ul>';
-          return introText + listHtml;
-        } else {
-          // No intro text, just the list
-          return '<ul>' + listItems.join('') + '</ul>';
-        }
-      } else {
-        // Regular paragraph - escape content and wrap in <p> tags
-        const processedParagraph = paragraph.replace(/\n/g, ' ');
-        return `<p>${escapeHtml(processedParagraph)}</p>`;
+    // Process each paragraph: escape, convert single newlines to <br />, wrap in <p>
+    const htmlParagraphs = paragraphs.map(paragraphStr => {
+      const lines = paragraphStr.split('\n');
+      const escapedLines = lines.map(line => escapeHtml(line));
+      const paragraphWithBrs = escapedLines.join('<br />');
+      // Avoid creating empty paragraphs like <p></p> or <p><br /></p>
+      if (paragraphWithBrs.trim() === '' || paragraphWithBrs.trim().toLowerCase() === '<br />') {
+        return ''; 
       }
-    }).filter(p => p && p !== '<p></p>'); // Remove empty paragraphs
+      return `<p>${paragraphWithBrs}</p>`;
+    }).filter(p => p !== ''); // Remove any empty strings resulting from empty paragraphs
     
-    // Combine into final HTML body
-    formattedBody = htmlParagraphs.join('\n');
+    // Combine into final HTML content for the body
+    let finalHtmlContent = htmlParagraphs.join('\n'); // Join <p> tags with a newline for readability in source
+
+    // Ensure there's some content, otherwise provide a default non-empty paragraph
+    if (finalHtmlContent.trim() === '') {
+      finalHtmlContent = '<p>&nbsp;</p>'; // Default to a non-breaking space if body is empty
+    }
+    // --- End of Simplified HTML Generation ---
     
     // Wrap in complete HTML document with DOCTYPE for A1Mail to recognize it as HTML
     // Based on A1Mail documentation, HTML emails should start with DOCTYPE declaration
-    formattedBody = `<!DOCTYPE html>
+    let formattedBody = `<!DOCTYPE html>
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-<title>${emailDetails.subject}</title>
+<title>${escapeHtml(emailDetails.subject)}</title>
 <style>
 body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
 p { margin: 0 0 1em 0; }
-ul { margin: 0 0 1em 0; padding-left: 20px; }
-li { margin: 0 0 0.5em 0; }
+/* ul, li styles removed as we are not generating them with this simplified approach */
 </style>
 </head>
 <body>
-${formattedBody}
+${finalHtmlContent}
 </body>
 </html>`;
     
     // Log the formatted body for debugging
-    console.log('[SendEmailFromAgent] Final HTML email body:');
+    console.log('[SendEmailFromAgent] Final HTML email body (simplified generation):');
     console.log(formattedBody);
     console.log('[SendEmailFromAgent] Body length:', formattedBody.length);
     

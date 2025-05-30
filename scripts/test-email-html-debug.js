@@ -5,7 +5,7 @@
  * Tests different approaches to ensure HTML rendering works
  */
 
-require('dotenv').config();
+require('dotenv').config({ path: '.env.local' });
 const { A1BaseAPI } = require('a1base-node');
 
 const a1BaseClient = new A1BaseAPI({
