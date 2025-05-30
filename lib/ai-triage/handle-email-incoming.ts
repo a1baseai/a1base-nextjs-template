@@ -1,0 +1,330 @@
+/**
+ * Email Incoming Message Handler
+ * 
+ * Processes incoming emails from A1Mail webhook and generates AI responses
+ */
+import { EmailWebhookPayload } from "@/app/api/webhook/a1mail/route";
+import { ThreadMessage } from "@/types/chat";
+import { generateAgentResponse } from "../services/openai";
+import { SendEmailFromAgent } from "../workflows/basic_workflow";
+import { getInitializedAdapter } from "../supabase/config";
+import { basicWorkflowsPrompt } from "../workflows/basic_workflows_prompt";
+
+// Constants
+const MAX_EMAIL_CONTEXT_MESSAGES = 5;
+
+/**
+ * Extract the actual email body from raw email data
+ * This is a simple implementation that extracts text content
+ */
+function extractEmailBody(rawEmailData: string): string {
+  try {
+    // Look for common email body patterns
+    // First try to find plain text body
+    const plainTextMatch = rawEmailData.match(/Content-Type: text\/plain[\s\S]*?\r\n\r\n([\s\S]*?)(\r\n--|\r\n\r\n--)/);
+    if (plainTextMatch && plainTextMatch[1]) {
+      return plainTextMatch[1].trim();
+    }
+
+    // If no plain text, try to extract from HTML (simple extraction)
+    const htmlMatch = rawEmailData.match(/Content-Type: text\/html[\s\S]*?\r\n\r\n([\s\S]*?)(\r\n--|\r\n\r\n--)/);
+    if (htmlMatch && htmlMatch[1]) {
+      // Very basic HTML stripping - in production you'd want a proper HTML parser
+      return htmlMatch[1]
+        .replace(/<[^>]*>/g, '') // Remove HTML tags
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&amp;/g, '&')
+        .trim();
+    }
+
+    // Fallback: look for any text after double newline (common in simple emails)
+    const parts = rawEmailData.split(/\r\n\r\n|\n\n/);
+    for (const part of parts) {
+      // Skip headers (contain colons)
+      if (!part.includes(':') || part.split('\n').length > 5) {
+        return part.trim();
+      }
+    }
+
+    // Last resort: return the whole thing after removing obvious headers
+    const lines = rawEmailData.split(/\r\n|\n/);
+    const bodyStart = lines.findIndex(line => line.trim() === '');
+    if (bodyStart !== -1) {
+      return lines.slice(bodyStart + 1).join('\n').trim();
+    }
+
+    return rawEmailData;
+  } catch (error) {
+    console.error('[ExtractEmailBody] Error extracting email body:', error);
+    return rawEmailData; // Return raw data as fallback
+  }
+}
+
+/**
+ * Get or create an email thread using the new email_threads table
+ */
+async function getOrCreateEmailThread(
+  senderAddress: string,
+  recipientAddress: string,
+  subject: string,
+  adapter: any
+): Promise<string | null> {
+  if (!adapter || !adapter.supabase) return null;
+
+  try {
+    // Use the PostgreSQL function to get or create thread
+    const { data, error } = await adapter.supabase
+      .rpc('get_or_create_email_thread', {
+        p_sender_email: senderAddress,
+        p_recipient_email: recipientAddress,
+        p_subject: subject
+      });
+
+    if (error) {
+      console.error('[GetOrCreateEmailThread] Error:', error);
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('[GetOrCreateEmailThread] Error:', error);
+    return null;
+  }
+}
+
+/**
+ * Store email message in the new email_messages table
+ */
+async function storeEmailMessage(
+  adapter: any,
+  threadId: string,
+  emailPayload: EmailWebhookPayload,
+  emailBody: string,
+  direction: 'inbound' | 'outbound' = 'inbound'
+): Promise<string | null> {
+  if (!adapter || !adapter.supabase || !threadId) return null;
+
+  try {
+    // Use the PostgreSQL function to store the email
+    const { data, error } = await adapter.supabase
+      .rpc('store_email_message', {
+        p_thread_id: threadId,
+        p_email_id: emailPayload.email_id,
+        p_direction: direction,
+        p_from_address: emailPayload.sender_address,
+        p_to_address: emailPayload.recipient_address,
+        p_subject: emailPayload.subject,
+        p_body_text: emailBody,
+        p_raw_email: emailPayload.raw_email_data,
+        p_metadata: {
+          timestamp: emailPayload.timestamp,
+          service: emailPayload.service
+        }
+      });
+
+    if (error) {
+      console.error('[StoreEmailMessage] Error:', error);
+      return null;
+    }
+
+    console.log(`[StoreEmailMessage] Stored ${direction} email ${emailPayload.email_id} in thread ${threadId}`);
+    return data;
+  } catch (error) {
+    console.error('[StoreEmailMessage] Error storing email:', error);
+    return null;
+  }
+}
+
+/**
+ * Get recent email messages from thread for context
+ */
+async function getEmailThreadContext(
+  adapter: any,
+  threadId: string | null,
+  currentEmailBody: string,
+  currentSubject: string,
+  currentSender: string
+): Promise<ThreadMessage[]> {
+  const messages: ThreadMessage[] = [];
+
+  if (adapter && adapter.supabase && threadId) {
+    try {
+      // Get recent messages from the thread
+      const { data: emailMessages, error } = await adapter.supabase
+        .from('email_messages')
+        .select('*')
+        .eq('thread_id', threadId)
+        .order('created_at', { ascending: true })
+        .limit(MAX_EMAIL_CONTEXT_MESSAGES);
+
+      if (error) {
+        console.error('[GetEmailThreadContext] Error fetching messages:', error);
+      } else if (emailMessages && emailMessages.length > 0) {
+        // Convert email messages to ThreadMessage format
+        for (const email of emailMessages) {
+          // Skip the current email if it's already stored
+          if (email.email_id === currentSender) continue;
+          
+          const isAgent = email.from_address === process.env.A1BASE_AGENT_EMAIL;
+          
+          messages.push({
+            role: isAgent ? 'assistant' : 'user',
+            content: `Subject: ${email.subject}\n\n${email.body_text || ''}`,
+            timestamp: email.created_at,
+            sender_number: email.from_address,
+            sender_name: email.from_address.split('@')[0], // Simple name extraction
+            message_id: email.id,
+            message_type: 'text',
+            message_content: { 
+              text: email.body_text
+            }
+          });
+        }
+      }
+    } catch (error) {
+      console.error('[GetEmailThreadContext] Error fetching thread context:', error);
+    }
+  }
+
+  // Add current email to context
+  messages.push({
+    role: 'user',
+    content: `Subject: ${currentSubject}\n\n${currentEmailBody}`,
+    timestamp: new Date().toISOString(),
+    sender_number: currentSender,
+    sender_name: currentSender.split('@')[0],
+    message_id: Date.now().toString(),
+    message_type: 'text',
+    message_content: { text: currentEmailBody }
+  });
+
+  return messages;
+}
+
+/**
+ * Store AI response email in the database
+ */
+async function storeAIResponseEmail(
+  adapter: any,
+  threadId: string,
+  fromAddress: string,
+  toAddress: string,
+  subject: string,
+  body: string
+): Promise<void> {
+  if (!adapter || !threadId) return;
+
+  const responsePayload: EmailWebhookPayload = {
+    email_id: `ai-response-${Date.now()}`,
+    subject,
+    sender_address: fromAddress,
+    recipient_address: toAddress,
+    timestamp: new Date().toISOString(),
+    service: 'email',
+    raw_email_data: `From: ${fromAddress}\nTo: ${toAddress}\nSubject: ${subject}\n\n${body}`
+  };
+
+  await storeEmailMessage(adapter, threadId, responsePayload, body, 'outbound');
+}
+
+/**
+ * Main handler for incoming emails
+ */
+export async function handleEmailIncoming(
+  emailPayload: EmailWebhookPayload
+): Promise<void> {
+  console.log(`[EmailHandler] Processing email from ${emailPayload.sender_address} with subject: ${emailPayload.subject}`);
+
+  try {
+    // 1. Extract email body from raw email data
+    const emailBody = extractEmailBody(emailPayload.raw_email_data);
+    console.log(`[EmailHandler] Extracted email body: ${emailBody.substring(0, 100)}...`);
+
+    // 2. Get database adapter
+    const adapter = await getInitializedAdapter();
+
+    // 3. Get or create email thread
+    const threadId = await getOrCreateEmailThread(
+      emailPayload.sender_address,
+      emailPayload.recipient_address,
+      emailPayload.subject,
+      adapter
+    );
+
+    if (!threadId) {
+      throw new Error('Failed to create or retrieve email thread');
+    }
+
+    // 4. Store incoming email
+    await storeEmailMessage(adapter, threadId, emailPayload, emailBody, 'inbound');
+
+    // 5. Get thread context for AI
+    const threadMessages = await getEmailThreadContext(
+      adapter,
+      threadId,
+      emailBody,
+      emailPayload.subject,
+      emailPayload.sender_address
+    );
+
+    // 6. Generate AI response using the existing system
+    const aiResponse = await generateAgentResponse(
+      threadMessages,
+      basicWorkflowsPrompt.simple_response.user,
+      'individual', // Email is always individual
+      [], // No participants needed for email
+      [], // No projects
+      'email'
+    );
+
+    console.log(`[EmailHandler] Generated AI response: ${aiResponse.substring(0, 100)}...`);
+
+    // 7. Prepare email reply
+    const replySubject = emailPayload.subject.startsWith('Re:') 
+      ? emailPayload.subject 
+      : `Re: ${emailPayload.subject}`;
+
+    // 8. Send email response
+    const emailDetails = {
+      subject: replySubject,
+      body: aiResponse,
+      recipient_address: emailPayload.sender_address
+    };
+
+    const sendResult = await SendEmailFromAgent(emailDetails);
+    console.log(`[EmailHandler] Email send result: ${sendResult}`);
+
+    // 9. Store AI response in database
+    if (adapter && process.env.A1BASE_AGENT_EMAIL) {
+      await storeAIResponseEmail(
+        adapter,
+        threadId,
+        process.env.A1BASE_AGENT_EMAIL,
+        emailPayload.sender_address,
+        replySubject,
+        aiResponse
+      );
+      
+      console.log(`[EmailHandler] Stored AI response in thread ${threadId}`);
+    }
+
+    console.log(`[EmailHandler] Successfully processed and responded to email ${emailPayload.email_id}`);
+  } catch (error) {
+    console.error(`[EmailHandler] Error processing email ${emailPayload.email_id}:`, error);
+    
+    // Attempt to send an error notification email
+    try {
+      const errorEmailDetails = {
+        subject: `Re: ${emailPayload.subject}`,
+        body: "I apologize, but I encountered an error while processing your email. Please try again later or contact support if the issue persists.",
+        recipient_address: emailPayload.sender_address
+      };
+      
+      await SendEmailFromAgent(errorEmailDetails);
+    } catch (sendError) {
+      console.error('[EmailHandler] Failed to send error notification email:', sendError);
+    }
+  }
+} 

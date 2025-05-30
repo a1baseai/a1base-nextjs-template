@@ -35,6 +35,7 @@ Whether you're creating customer support bots, virtual assistants, or interactiv
 ### Core Capabilities
 - **🧠 Advanced AI Integration**: Powered by OpenAI's GPT-4 for natural, intelligent responses.
 - **📱 Multi-Channel Support**: Engage users on WhatsApp, Email, Slack, Teams, and SMS.
+- **📧 Email Webhook Integration**: Receive and automatically respond to emails via A1Mail.
 - **💾 Persistent Chat History**: Store messages for continuity across sessions.
 
 ### Technical Features
@@ -165,6 +166,30 @@ Incoming media is automatically processed and converted to text representations 
 - Location: `[Location shared: name at coordinates]`
 
 For detailed multimedia documentation, see [docs/MULTIMEDIA_GUIDE.md](docs/MULTIMEDIA_GUIDE.md).
+
+### 📧 Email Integration
+
+The framework now supports automated email reception and response through A1Mail webhooks:
+
+#### Features
+- **Automatic Email Reception**: Receive emails via webhook integration
+- **AI-Powered Responses**: Generate contextual email replies using GPT-4
+- **Conversation Threading**: Maintain email conversation history
+- **Error Handling**: Graceful error notifications
+
+#### Setting Up Email Webhook
+1. Configure your webhook URL in A1Mail dashboard: `https://your-domain.com/api/webhook/a1mail`
+2. Ensure `A1BASE_AGENT_EMAIL` is set in your environment variables
+3. Test by sending an email to your A1Base email address
+
+#### How It Works
+When an email is received:
+- A1Mail sends the email data to your webhook endpoint
+- The system extracts the email content and maintains conversation context
+- AI generates an appropriate response
+- The reply is automatically sent back to the sender
+
+For detailed email webhook documentation, see [docs/EMAIL_WEBHOOK_GUIDE.md](docs/EMAIL_WEBHOOK_GUIDE.md).
 
 ### 📬 Message Flow
 
