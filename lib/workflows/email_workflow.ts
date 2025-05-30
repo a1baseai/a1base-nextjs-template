@@ -235,9 +235,13 @@ export async function SendEmailFromAgent(
     // Combine into final HTML body
     formattedBody = htmlParagraphs.join('\n');
     
-    // Wrap in basic HTML structure for better email client compatibility
-    formattedBody = `<html>
+    // Wrap in complete HTML document with DOCTYPE for A1Mail to recognize it as HTML
+    // Based on A1Mail documentation, HTML emails should start with DOCTYPE declaration
+    formattedBody = `<!DOCTYPE html>
+<html>
 <head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<title>${emailDetails.subject}</title>
 <style>
 body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
 p { margin: 0 0 1em 0; }
@@ -255,33 +259,16 @@ ${formattedBody}
     console.log(formattedBody);
     console.log('[SendEmailFromAgent] Body length:', formattedBody.length);
     
-    // According to A1Mail documentation, the email data structure should include headers
-    // We need to set Content-Type to text/html for proper HTML rendering
-    // Let's try multiple approaches to ensure HTML rendering works
-    
-    // First, let's try with html field instead of body
+    // According to A1Mail documentation, HTML is sent directly in the body field
+    // Headers object is only for cc, bcc, etc. - not Content-Type
     const emailData: any = {
       sender_address: trimmedSenderEmail,
       recipient_address: trimmedRecipientEmail,
       subject: emailDetails.subject,
-      html: formattedBody,  // Try using 'html' field
-      body: formattedBody,  // Keep body as fallback
-      headers: {
-        'Content-Type': 'text/html; charset=utf-8'
-      }
+      body: formattedBody,  // HTML content goes directly in body field
+      headers: {}  // Empty headers object (can be used for cc/bcc if needed)
     };
     
-    // Log all possible variations for debugging
-    console.log('[SendEmailFromAgent] Trying with html field and headers');
-    console.log('[SendEmailFromAgent] Email data structure:', {
-      sender_address: trimmedSenderEmail,
-      recipient_address: trimmedRecipientEmail,
-      subject: emailDetails.subject,
-      has_html_field: 'html' in emailData,
-      has_body_field: 'body' in emailData,
-      headers: emailData.headers
-    });
-
     console.log(`[SendEmailFromAgent] Full email payload being sent to A1Base:`, JSON.stringify(emailData, null, 2));
     console.log(`[SendEmailFromAgent] Using A1Base Account ID: ${A1BASE_ACCOUNT_ID}`);
 
