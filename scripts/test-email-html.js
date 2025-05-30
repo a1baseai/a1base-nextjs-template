@@ -135,4 +135,16 @@ console.log("• Well-formatted lists with bullets");
 console.log("• Professional appearance");
 console.log("• No formatting issues or collapsed text");
 
+console.log("\n📤 Email Payload Example:");
+console.log("========================");
+console.log(JSON.stringify({
+  sender_address: "felicie@a1send.com",
+  recipient_address: "user@example.com",
+  subject: "Re: Your Request",
+  body: htmlBody,
+  headers: {
+    'Content-Type': 'text/html; charset=utf-8'
+  }
+}, null, 2).substring(0, 500) + "...");
+
 console.log("\n✨ HTML email formatting test complete!"); 

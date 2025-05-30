@@ -254,12 +254,16 @@ ${formattedBody}
     console.log('[SendEmailFromAgent] Body length:', formattedBody.length);
     
     // According to A1Mail documentation, the email data structure should include headers
+    // We need to set Content-Type to text/html for proper HTML rendering
+    // Using 'as any' to bypass TypeScript types that may be outdated
     const emailData = {
       sender_address: trimmedSenderEmail,
       recipient_address: trimmedRecipientEmail,
       subject: emailDetails.subject,
       body: formattedBody,
-      headers: {} // Keep empty as A1Base only accepts specific header fields
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8'
+      } as any // Type assertion to bypass TypeScript restriction
     };
 
     console.log(`[SendEmailFromAgent] Full email payload being sent to A1Base:`, JSON.stringify(emailData, null, 2));
