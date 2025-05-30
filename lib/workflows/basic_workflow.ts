@@ -445,11 +445,13 @@ export async function SendEmailFromAgent(
   }
 
   try {
+    // According to A1Mail documentation, the email data structure should include headers
     const emailData = {
       sender_address: A1BASE_AGENT_EMAIL,
       recipient_address: emailDetails.recipient_address,
       subject: emailDetails.subject,
       body: emailDetails.body,
+      headers: {} // Add empty headers object as the API seems to expect this
     };
 
     console.log(`[SendEmailFromAgent] Full email payload being sent to A1Base:`, JSON.stringify(emailData, null, 2));
@@ -458,6 +460,22 @@ export async function SendEmailFromAgent(
     const response = await a1BaseClient.sendEmailMessage(A1BASE_ACCOUNT_ID, emailData);
     
     console.log(`[SendEmailFromAgent] A1Base API Response:`, response);
+    
+    // Check if the response indicates an error
+    if (response && typeof response === 'object' && 'status' in response) {
+      if ((response as any).status === 'error') {
+        const errorMessage = (response as any).message || 'Unknown error from A1Base API';
+        console.error(`[SendEmailFromAgent] A1Base API returned error: ${errorMessage}`);
+        throw new Error(`Failed to send email: ${errorMessage}`);
+      }
+    }
+    
+    // Check for other potential error indicators
+    if (response && typeof response === 'object' && 'success' in response && !(response as any).success) {
+      const errorMessage = (response as any).message || (response as any).error || 'Email send failed';
+      console.error(`[SendEmailFromAgent] A1Base API returned failure: ${errorMessage}`);
+      throw new Error(`Failed to send email: ${errorMessage}`);
+    }
     
     const successMessage = "Email sent successfully.";
     console.log(`[SendEmailFromAgent] ${successMessage}`);
