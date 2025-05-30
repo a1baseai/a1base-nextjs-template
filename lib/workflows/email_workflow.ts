@@ -62,16 +62,46 @@ export async function GenerateEmailResponse(
     }
 
     // Format the email body for proper display
-    // Convert single line breaks to double line breaks for paragraph separation
-    // But preserve existing double line breaks
+    // Handle lists and paragraphs differently
     responseBody = responseBody
-      .split('\n\n')  // Split by existing double line breaks
-      .map(paragraph => paragraph.replace(/\n/g, ' '))  // Replace single line breaks with spaces within paragraphs
+      .split('\n\n')  // Split by double line breaks (paragraphs)
+      .map(paragraph => {
+        // Check if this paragraph contains a list
+        if (paragraph.includes('\n-') || paragraph.includes('\n*') || paragraph.match(/\n\d+\./)) {
+          // This is a paragraph with a list, preserve the list formatting
+          // Split into intro and list items
+          const lines = paragraph.split('\n');
+          const processedLines = [];
+          
+          for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            // Check if this line is a list item
+            if (line.trim().startsWith('-') || line.trim().startsWith('*') || line.trim().match(/^\d+\./)) {
+              processedLines.push(line); // Keep list items as-is
+            } else if (i === 0 || !lines[i-1].trim().match(/^[-*]|\d+\./)) {
+              // This is regular text, not following a list item
+              processedLines.push(line);
+            } else {
+              // This is continuation of a list item, append to previous line
+              if (processedLines.length > 0) {
+                processedLines[processedLines.length - 1] += ' ' + line.trim();
+              }
+            }
+          }
+          
+          return processedLines.join('\n');
+        } else {
+          // Regular paragraph, replace single line breaks with spaces
+          return paragraph.replace(/\n/g, ' ');
+        }
+      })
       .join('\n\n');  // Join paragraphs back with double line breaks
 
-    // Ensure there are double line breaks before lists
-    responseBody = responseBody.replace(/:\n(-|\*|\d\.)/g, ':\n\n$1');
-    
+    // Ensure proper spacing around lists
+    responseBody = responseBody
+      .replace(/:\n(-|\*|\d\.)/g, ':\n\n$1')  // Add blank line before lists after colons
+      .replace(/\n\n\n+/g, '\n\n');  // Remove excessive blank lines
+
     // Log the formatted response for debugging
     console.log("[GenerateEmailResponse] Formatted email body:");
     console.log(responseBody);
