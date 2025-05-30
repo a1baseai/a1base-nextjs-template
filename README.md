@@ -173,23 +173,20 @@ The framework now supports automated email reception and response through A1Mail
 
 #### Features
 - **Automatic Email Reception**: Receive emails via webhook integration
-- **AI-Powered Responses**: Generate contextual email replies using GPT-4
-- **Conversation Threading**: Maintain email conversation history
-- **Error Handling**: Graceful error notifications
+- **Professional Email Formatting**: AI generates properly formatted business emails with appropriate greetings, structure, and closings
+- **Smart Thread Management**: Groups related emails into conversations
+- **Conversation Threading**: Maintains context across email exchanges
+- **Database Storage**: Stores email history for context (if Supabase is configured)
 
-#### Setting Up Email Webhook
-1. Configure your webhook URL in A1Mail dashboard: `https://your-domain.com/api/webhook/a1mail`
-2. Ensure `A1BASE_AGENT_EMAIL` is set in your environment variables
-3. Test by sending an email to your A1Base email address
+#### File Structure
+- `lib/workflows/email_workflow.ts` - Core email functions
+- `lib/workflows/email_workflow_prompt.js` - Professional email templates
+- `lib/ai-triage/handle-email-incoming.ts` - Email processing logic
+- `app/api/webhook/a1mail/route.ts` - Webhook endpoint
 
-#### How It Works
-When an email is received:
-- A1Mail sends the email data to your webhook endpoint
-- The system extracts the email content and maintains conversation context
-- AI generates an appropriate response
-- The reply is automatically sent back to the sender
-
-For detailed email webhook documentation, see [docs/EMAIL_WEBHOOK_GUIDE.md](docs/EMAIL_WEBHOOK_GUIDE.md).
+For detailed documentation, see:
+- [Email Webhook Guide](docs/EMAIL_WEBHOOK_GUIDE.md)
+- [Email Workflow Architecture](docs/EMAIL_WORKFLOW_ARCHITECTURE.md)
 
 ### 📬 Message Flow
 
