@@ -11,6 +11,66 @@
  *
  * Uses OpenAI for generating contextual responses.
  * Handles both individual and group message threads.
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
  */
 
 import { A1BaseAPI } from "a1base-node";
@@ -374,8 +434,13 @@ export async function SendEmailFromAgent(
   }
 ): Promise<string> {
   console.log(`[SendEmailFromAgent] Attempting to send email to: ${emailDetails.recipient_address}`);
+  console.log(`[SendEmailFromAgent] Email subject: ${emailDetails.subject}`);
+  console.log(`[SendEmailFromAgent] Email body preview: ${emailDetails.body.substring(0, 100)}...`);
+  
   if (!A1BASE_ACCOUNT_ID || !A1BASE_AGENT_EMAIL) {
     console.error("[SendEmailFromAgent] Missing A1Base Account ID or Agent Email in environment variables.");
+    console.error(`[SendEmailFromAgent] A1BASE_ACCOUNT_ID: ${A1BASE_ACCOUNT_ID ? 'SET' : 'MISSING'}`);
+    console.error(`[SendEmailFromAgent] A1BASE_AGENT_EMAIL: ${A1BASE_AGENT_EMAIL ? A1BASE_AGENT_EMAIL : 'MISSING'}`);
     throw new Error("Email sending service is not properly configured.");
   }
 
@@ -387,12 +452,31 @@ export async function SendEmailFromAgent(
       body: emailDetails.body,
     };
 
-    await a1BaseClient.sendEmailMessage(A1BASE_ACCOUNT_ID, emailData);
+    console.log(`[SendEmailFromAgent] Full email payload being sent to A1Base:`, JSON.stringify(emailData, null, 2));
+    console.log(`[SendEmailFromAgent] Using A1Base Account ID: ${A1BASE_ACCOUNT_ID}`);
+
+    const response = await a1BaseClient.sendEmailMessage(A1BASE_ACCOUNT_ID, emailData);
+    
+    console.log(`[SendEmailFromAgent] A1Base API Response:`, response);
+    
     const successMessage = "Email sent successfully.";
     console.log(`[SendEmailFromAgent] ${successMessage}`);
+    console.log(`[SendEmailFromAgent] Email details - From: ${A1BASE_AGENT_EMAIL}, To: ${emailDetails.recipient_address}`);
+    
     return successMessage;
-  } catch (error) {
+  } catch (error: any) {
     console.error("[SendEmailFromAgent] Error sending email:", error);
+    console.error(`[SendEmailFromAgent] Error details:`, {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      stack: error.stack
+    });
+    
+    // Log the full error object
+    console.error(`[SendEmailFromAgent] Full error object:`, JSON.stringify(error, null, 2));
+    
     throw error; // Re-throw to be handled by the caller
   }
 }
