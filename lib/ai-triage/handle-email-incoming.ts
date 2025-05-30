@@ -19,46 +19,93 @@ const MAX_EMAIL_CONTEXT_MESSAGES = 5;
  */
 function extractEmailBody(rawEmailData: string): string {
   try {
-    // Look for common email body patterns
-    // First try to find plain text body
-    const plainTextMatch = rawEmailData.match(/Content-Type: text\/plain[\s\S]*?\r\n\r\n([\s\S]*?)(\r\n--|\r\n\r\n--)/);
-    if (plainTextMatch && plainTextMatch[1]) {
-      return plainTextMatch[1].trim();
-    }
+    // First, try to find where headers end and body begins
+    // Email format typically has headers, then a blank line, then the body
+    const doubleNewlineIndex = rawEmailData.search(/\r?\n\r?\n/);
+    if (doubleNewlineIndex !== -1) {
+      // Get everything after the first double newline
+      const afterHeaders = rawEmailData.substring(doubleNewlineIndex).trim();
+      
+      // Check if this looks like multipart content
+      if (afterHeaders.includes('Content-Type:') || afterHeaders.startsWith('--')) {
+        // This is a multipart message, use the original parsing logic
+        
+        // Look for plain text part
+        const plainTextMatch = rawEmailData.match(/Content-Type: text\/plain[\s\S]*?\r?\n\r?\n([\s\S]*?)(\r?\n--|\r?\n\r?\n--|\n--|\r\n\.\r\n|$)/);
+        if (plainTextMatch && plainTextMatch[1]) {
+          return plainTextMatch[1].trim();
+        }
 
-    // If no plain text, try to extract from HTML (simple extraction)
-    const htmlMatch = rawEmailData.match(/Content-Type: text\/html[\s\S]*?\r\n\r\n([\s\S]*?)(\r\n--|\r\n\r\n--)/);
-    if (htmlMatch && htmlMatch[1]) {
-      // Very basic HTML stripping - in production you'd want a proper HTML parser
-      return htmlMatch[1]
-        .replace(/<[^>]*>/g, '') // Remove HTML tags
-        .replace(/&nbsp;/g, ' ')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&amp;/g, '&')
-        .trim();
-    }
-
-    // Fallback: look for any text after double newline (common in simple emails)
-    const parts = rawEmailData.split(/\r\n\r\n|\n\n/);
-    for (const part of parts) {
-      // Skip headers (contain colons)
-      if (!part.includes(':') || part.split('\n').length > 5) {
-        return part.trim();
+        // If no plain text, try to extract from HTML
+        const htmlMatch = rawEmailData.match(/Content-Type: text\/html[\s\S]*?\r?\n\r?\n([\s\S]*?)(\r?\n--|\r?\n\r?\n--|\n--|$)/);
+        if (htmlMatch && htmlMatch[1]) {
+          // Very basic HTML stripping
+          return htmlMatch[1]
+            .replace(/<[^>]*>/g, '') // Remove HTML tags
+            .replace(/&nbsp;/g, ' ')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&amp;/g, '&')
+            .replace(/&#39;/g, "'")
+            .replace(/&quot;/g, '"')
+            .trim();
+        }
+      } else {
+        // Simple email - the body is everything after the headers
+        // Remove any trailing dots (SMTP end-of-message indicator)
+        const cleanBody = afterHeaders.replace(/\r?\n\.\r?\n$/, '').trim();
+        if (cleanBody && !cleanBody.startsWith('Received:') && !cleanBody.startsWith('From:')) {
+          return cleanBody;
+        }
       }
     }
 
-    // Last resort: return the whole thing after removing obvious headers
-    const lines = rawEmailData.split(/\r\n|\n/);
-    const bodyStart = lines.findIndex(line => line.trim() === '');
-    if (bodyStart !== -1) {
-      return lines.slice(bodyStart + 1).join('\n').trim();
+    // Fallback: Try to find common email body patterns
+    const lines = rawEmailData.split(/\r?\n/);
+    let bodyStartIndex = -1;
+    
+    // Find the first empty line after headers
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].trim() === '' && i > 0) {
+        // Check if the next line doesn't look like a header
+        if (i + 1 < lines.length && !lines[i + 1].includes(':')) {
+          bodyStartIndex = i + 1;
+          break;
+        }
+      }
+    }
+    
+    if (bodyStartIndex !== -1) {
+      const bodyLines = lines.slice(bodyStartIndex);
+      // Remove SMTP terminator if present
+      const body = bodyLines.join('\n').replace(/\r?\n\.\r?\n$/, '').trim();
+      if (body) {
+        return body;
+      }
     }
 
+    // Last resort: return everything after the last header-looking line
+    let lastHeaderIndex = -1;
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].includes(':') && !lines[i].startsWith(' ') && !lines[i].startsWith('\t')) {
+        lastHeaderIndex = i;
+      }
+    }
+    
+    if (lastHeaderIndex !== -1 && lastHeaderIndex < lines.length - 1) {
+      const remainingLines = lines.slice(lastHeaderIndex + 1);
+      const body = remainingLines.join('\n').trim();
+      if (body) {
+        return body;
+      }
+    }
+
+    // If all else fails, return the original
+    console.warn('[ExtractEmailBody] Could not extract body, returning original');
     return rawEmailData;
   } catch (error) {
     console.error('[ExtractEmailBody] Error extracting email body:', error);
-    return rawEmailData; // Return raw data as fallback
+    return rawEmailData;
   }
 }
 
