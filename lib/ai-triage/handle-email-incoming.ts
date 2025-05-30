@@ -5,10 +5,8 @@
  */
 import { EmailWebhookPayload } from "@/app/api/webhook/a1mail/route";
 import { ThreadMessage } from "@/types/chat";
-import { generateAgentResponse } from "../services/openai";
-import { SendEmailFromAgent } from "../workflows/basic_workflow";
+import { GenerateEmailResponse, SendEmailFromAgent } from "../workflows/email_workflow";
 import { getInitializedAdapter } from "../supabase/config";
-import { basicWorkflowsPrompt } from "../workflows/basic_workflows_prompt";
 
 // Constants
 const MAX_EMAIL_CONTEXT_MESSAGES = 5;
@@ -317,26 +315,21 @@ export async function handleEmailIncoming(
     );
 
     // 6. Generate AI response using the existing system
-    const aiResponse = await generateAgentResponse(
+    const aiResponse = await GenerateEmailResponse(
       threadMessages,
-      basicWorkflowsPrompt.simple_response.user,
-      'individual', // Email is always individual
-      [], // No participants needed for email
-      [], // No projects
-      'email'
+      emailPayload.sender_address,
+      emailPayload.subject
     );
 
-    console.log(`[EmailHandler] Generated AI response: ${aiResponse.substring(0, 100)}...`);
+    console.log(`[EmailHandler] Generated AI response: ${aiResponse.body.substring(0, 100)}...`);
 
     // 7. Prepare email reply
-    const replySubject = emailPayload.subject.startsWith('Re:') 
-      ? emailPayload.subject 
-      : `Re: ${emailPayload.subject}`;
+    const replySubject = aiResponse.subject;
 
     // 8. Send email response
     const emailDetails = {
       subject: replySubject,
-      body: aiResponse,
+      body: aiResponse.body,
       recipient_address: emailPayload.sender_address
     };
 
@@ -351,7 +344,7 @@ export async function handleEmailIncoming(
         process.env.A1BASE_AGENT_EMAIL,
         emailPayload.sender_address,
         replySubject,
-        aiResponse
+        aiResponse.body
       );
       
       console.log(`[EmailHandler] Stored AI response in thread ${threadId}`);

@@ -4,73 +4,9 @@
  *
  * Key workflow functions:
  * - DefaultReplyToMessage: Generates and sends simple response.
- * - ConstructEmail: Creates email draft from thread messages.
- * - SendEmailFromAgent: Sends composed email via agent.
- * - CreateEmailAddress: Creates a new email address for the agent.
- * - ConfirmTaskCompletion: Confirms task completion with user (Note: This function was mentioned in docs but not provided in original code).
- *
+ * 
  * Uses OpenAI for generating contextual responses.
  * Handles both individual and group message threads.
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
  */
 
 import { A1BaseAPI } from "a1base-node";
@@ -91,10 +27,12 @@ import { sendMultimediaMessage, MediaType } from "../messaging/multimedia-handle
 import { StartOnboarding } from "./onboarding-workflow";
 export { StartOnboarding };
 
+// Re-export email workflows from the dedicated email workflow file
+export { ConstructEmail, SendEmailFromAgent, CreateEmailAddress } from "./email_workflow";
+
 // --- Constants ---
 const SERVICE_WEB_UI = "web-ui";
 const SERVICE_SKIP_SEND = "__skip_send";
-const DEFAULT_EMAIL_DOMAIN = "a1send.com";
 
 // --- Configuration & Initialization ---
 
@@ -128,8 +66,6 @@ const a1BaseClient = new A1BaseAPI({
 
 const A1BASE_ACCOUNT_ID = process.env.A1BASE_ACCOUNT_ID!;
 const A1BASE_AGENT_NUMBER = process.env.A1BASE_AGENT_NUMBER!;
-const A1BASE_AGENT_EMAIL = process.env.A1BASE_AGENT_EMAIL?.trim() || "";
-
 
 // --- Helper Functions ---
 
@@ -387,165 +323,6 @@ export async function DefaultReplyToMessage(
       }
     }
     return errorMessage;
-  }
-}
-
-/**
- * Constructs an email draft from the conversation thread using an AI model.
- * The AI is expected to return a string with "subject---body".
- * @param threadMessages - Array of messages in the thread.
- * @returns A promise that resolves to an object with email subject and body.
- * @throws Throws an error if email generation fails.
- */
-export async function ConstructEmail(
-  threadMessages: ThreadMessage[]
-): Promise<{ subject: string; body: string }> {
-  console.log("[ConstructEmail] Generating email draft from thread messages.");
-  try {
-    const aiResponse = await generateAgentResponse(
-      threadMessages,
-      basicWorkflowsPrompt.email_draft.user
-    );
-
-    // Expected format: "Subject of the email---Body of the email"
-    const emailParts = aiResponse.split("---");
-    const subject = emailParts[0]?.trim() || "Email from A1Base Agent"; // Default subject
-    const body = emailParts[1]?.trim() || aiResponse; // Default body if split fails
-
-    console.log("[ConstructEmail] Email draft constructed successfully.");
-    return { subject, body };
-  } catch (error) {
-    console.error("[ConstructEmail] Error generating email draft:", error);
-    throw error; // Re-throw to be handled by the caller
-  }
-}
-
-/**
- * Sends an email from the agent using A1Base API.
- * @param emailDetails - Object containing subject, body, and recipient_address.
- * @returns A promise that resolves to a confirmation message.
- * @throws Throws an error if sending email fails.
- */
-export async function SendEmailFromAgent(
-  emailDetails: {
-    subject: string;
-    body: string;
-    recipient_address: string;
-  }
-): Promise<string> {
-  console.log(`[SendEmailFromAgent] Attempting to send email to: ${emailDetails.recipient_address}`);
-  console.log(`[SendEmailFromAgent] Email subject: ${emailDetails.subject}`);
-  console.log(`[SendEmailFromAgent] Email body preview: ${emailDetails.body.substring(0, 100)}...`);
-  
-  if (!A1BASE_ACCOUNT_ID || !A1BASE_AGENT_EMAIL) {
-    console.error("[SendEmailFromAgent] Missing A1Base Account ID or Agent Email in environment variables.");
-    console.error(`[SendEmailFromAgent] A1BASE_ACCOUNT_ID: ${A1BASE_ACCOUNT_ID ? 'SET' : 'MISSING'}`);
-    console.error(`[SendEmailFromAgent] A1BASE_AGENT_EMAIL: ${A1BASE_AGENT_EMAIL ? A1BASE_AGENT_EMAIL : 'MISSING'}`);
-    throw new Error("Email sending service is not properly configured.");
-  }
-
-  try {
-    // Trim whitespace from email addresses to avoid issues
-    const trimmedSenderEmail = A1BASE_AGENT_EMAIL.trim();
-    const trimmedRecipientEmail = emailDetails.recipient_address.trim();
-    
-    // According to A1Mail documentation, the email data structure should include headers
-    const emailData = {
-      sender_address: trimmedSenderEmail,
-      recipient_address: trimmedRecipientEmail,
-      subject: emailDetails.subject,
-      body: emailDetails.body,
-      headers: {} // Add empty headers object as the API seems to expect this
-    };
-
-    console.log(`[SendEmailFromAgent] Full email payload being sent to A1Base:`, JSON.stringify(emailData, null, 2));
-    console.log(`[SendEmailFromAgent] Using A1Base Account ID: ${A1BASE_ACCOUNT_ID}`);
-
-    const response = await a1BaseClient.sendEmailMessage(A1BASE_ACCOUNT_ID, emailData);
-    
-    console.log(`[SendEmailFromAgent] A1Base API Response:`, response);
-    
-    // Check if the response indicates an error (handle both nested and direct status)
-    if (response && typeof response === 'object') {
-      // Check for direct status field
-      if ('status' in response && (response as any).status === 'error') {
-        const errorMessage = (response as any).message || 'Unknown error from A1Base API';
-        console.error(`[SendEmailFromAgent] A1Base API returned error: ${errorMessage}`);
-        throw new Error(`Failed to send email: ${errorMessage}`);
-      }
-      
-      // Check for nested data.status field (the actual response structure)
-      if ('data' in response && typeof (response as any).data === 'object') {
-        const data = (response as any).data;
-        if (data.status === 'error') {
-          const errorMessage = data.message || 'Unknown error from A1Base API';
-          console.error(`[SendEmailFromAgent] A1Base API returned error: ${errorMessage}`);
-          throw new Error(`Failed to send email: ${errorMessage}`);
-        }
-      }
-      
-      // Check for success: false pattern
-      if ('success' in response && !(response as any).success) {
-        const errorMessage = (response as any).message || (response as any).error || 'Email send failed';
-        console.error(`[SendEmailFromAgent] A1Base API returned failure: ${errorMessage}`);
-        throw new Error(`Failed to send email: ${errorMessage}`);
-      }
-    }
-    
-    const successMessage = "Email sent successfully.";
-    console.log(`[SendEmailFromAgent] ${successMessage}`);
-    console.log(`[SendEmailFromAgent] Email details - From: ${trimmedSenderEmail}, To: ${trimmedRecipientEmail}`);
-    
-    return successMessage;
-  } catch (error: any) {
-    console.error("[SendEmailFromAgent] Error sending email:", error);
-    console.error(`[SendEmailFromAgent] Error details:`, {
-      message: error.message,
-      response: error.response?.data,
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-      stack: error.stack
-    });
-    
-    // Log the full error object
-    console.error(`[SendEmailFromAgent] Full error object:`, JSON.stringify(error, null, 2));
-    
-    throw error; // Re-throw to be handled by the caller
-  }
-}
-
-/**
- * Creates a new email address for the agent via A1Base API.
- * @param emailAddress - The local part of the email address (e.g., "support").
- * @param domain - The domain for the email address (defaults to "a1send.com").
- * @returns A promise that resolves to a confirmation message.
- * @throws Throws an error if email address creation fails.
- */
-export async function CreateEmailAddress(
-  emailAddress: string,
-  domain: string = DEFAULT_EMAIL_DOMAIN
-): Promise<string> {
-  const fullEmail = `${emailAddress}@${domain}`;
-  console.log(`[CreateEmailAddress] Attempting to create email address: ${fullEmail}`);
-
-  if (!A1BASE_ACCOUNT_ID) {
-    console.error("[CreateEmailAddress] Missing A1Base Account ID in environment variables.");
-    throw new Error("Email address creation service is not properly configured.");
-  }
-
-  try {
-    const emailData = {
-      address: emailAddress, // API might expect just the local part
-      domain_name: domain,
-    };
-
-    await a1BaseClient.createEmailAddress(A1BASE_ACCOUNT_ID, emailData);
-    const successMessage = `Email address ${fullEmail} created successfully.`;
-    console.log(`[CreateEmailAddress] ${successMessage}`);
-    return successMessage;
-  } catch (error) {
-    console.error(`[CreateEmailAddress] Error creating email address ${fullEmail}:`, error);
-    throw error; // Re-throw to be handled by the caller
   }
 }
 
