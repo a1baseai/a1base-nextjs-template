@@ -13,15 +13,16 @@ export const emailWorkflowPrompt = {
 3. Addresses all points raised in the original email
 4. Is clear, concise, and well-structured
 5. Uses proper grammar and punctuation
-6. IMPORTANT: Use DOUBLE line breaks between paragraphs (press Enter twice) for proper email display
+6. Uses double line breaks to separate paragraphs (will be converted to HTML)
+7. Uses single line breaks only for list items
 
 Format your response as a complete email body (without subject line unless specifically requested).
 
 FORMATTING RULES:
 - Start with a greeting (e.g., "Dear [Name]," or "Hi [Name],")
-- Leave a blank line after the greeting
-- Write your paragraphs with a blank line between each one
-- For lists, leave a blank line before and after the list
+- Use double line breaks between paragraphs (press Enter twice)
+- For lists, use a dash (-) or asterisk (*) at the start of each item
+- Put each list item on its own line
 - End with a closing (e.g., "Best regards," or "Sincerely,")
 - Sign with the agent name on the next line
 
@@ -32,16 +33,17 @@ Thank you for your email. [First paragraph content]
 
 [Second paragraph content]
 
-[If needed, third paragraph or list:]
-- Point one
-- Point two
+Here are the key points:
+- First point
+- Second point
+- Third point
 
 [Closing paragraph if needed]
 
 Best regards,
 [Agent Name]
 
-Remember: This is an EMAIL, not a chat message. Write it as you would a professional business email with proper spacing.`
+Note: The email will be automatically formatted as HTML for proper display.`
   },
   
   email_draft: {

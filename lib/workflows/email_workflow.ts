@@ -175,54 +175,82 @@ export async function SendEmailFromAgent(
     const trimmedSenderEmail = A1BASE_AGENT_EMAIL.trim();
     const trimmedRecipientEmail = emailDetails.recipient_address.trim();
     
-    // Format the body for maximum compatibility with email clients
-    // Some email clients strip formatting, so we use visual separators
+    // Format the body as HTML since A1Base sends emails as HTML by default
     let formattedBody = emailDetails.body;
     
     // First, normalize all line endings
     formattedBody = formattedBody.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
     
+    // Escape HTML special characters
+    formattedBody = formattedBody
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+    
     // Split into paragraphs
     const paragraphs = formattedBody.split('\n\n');
     
     // Process each paragraph
-    formattedBody = paragraphs.map((paragraph, index) => {
+    const htmlParagraphs = paragraphs.map((paragraph) => {
       const lines = paragraph.split('\n');
       
       // Check if this paragraph contains list items
       if (lines.some(line => line.trim().match(/^[-*•]|\d+\./))) {
-        // This is a list, format it nicely
-        return lines.map(line => {
-          if (line.trim().match(/^[-*•]|\d+\./)) {
-            // Convert dashes to bullets and indent
-            return '  ' + line.replace(/^-/, '•');
-          }
-          return line;
-        }).join('\n');
+        // This is a list
+        const listItems = lines
+          .filter(line => line.trim()) // Remove empty lines
+          .map(line => {
+            if (line.trim().match(/^[-*•]|\d+\./)) {
+              // This is a list item, remove the bullet/dash and wrap in <li>
+              const content = line.trim().replace(/^[-*•]\s*/, '').replace(/^\d+\.\s*/, '');
+              return `<li>${content}</li>`;
+            } else {
+              // This is the list intro text
+              return `<p>${line}</p>`;
+            }
+          });
+        
+        // Find where the actual list starts
+        const firstListItemIndex = listItems.findIndex(item => item.startsWith('<li>'));
+        if (firstListItemIndex > 0) {
+          // There's intro text before the list
+          const introText = listItems.slice(0, firstListItemIndex).join('');
+          const listHtml = '<ul>' + listItems.slice(firstListItemIndex).join('') + '</ul>';
+          return introText + listHtml;
+        } else {
+          // No intro text, just the list
+          return '<ul>' + listItems.join('') + '</ul>';
+        }
       } else {
-        // Regular paragraph
-        return paragraph.replace(/\n/g, ' ');
+        // Regular paragraph - replace single line breaks with <br> if needed
+        const processedParagraph = paragraph.replace(/\n/g, ' ');
+        return `<p>${processedParagraph}</p>`;
       }
-    }).filter(p => p.trim()).join('\n\n'); // Remove empty paragraphs
+    }).filter(p => p && p !== '<p></p>'); // Remove empty paragraphs
     
-    // Add visual spacing between major sections
-    // This helps ensure separation even if email clients strip whitespace
-    formattedBody = formattedBody
-      .replace(/\n\n/g, '\n\n\n') // Triple line breaks
-      .replace(/:\n\n\n/g, ':\n\n'); // But not after colons before lists
+    // Combine into final HTML body
+    formattedBody = htmlParagraphs.join('\n');
     
-    // Convert to CRLF format (standard for emails)
-    formattedBody = formattedBody.replace(/\n/g, '\r\n');
-    
-    // Add a note at the bottom if the email seems to have formatting issues
-    // This helps users understand if their email client is stripping formatting
-    if (formattedBody.includes('\r\n\r\n')) {
-      formattedBody += '\r\n\r\n--\r\n(If this email appears as one paragraph, your email client may be converting plain text to HTML. Try viewing the email source for proper formatting.)';
-    }
+    // Wrap in basic HTML structure for better email client compatibility
+    formattedBody = `<html>
+<head>
+<style>
+body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+p { margin: 0 0 1em 0; }
+ul { margin: 0 0 1em 0; padding-left: 20px; }
+li { margin: 0 0 0.5em 0; }
+</style>
+</head>
+<body>
+${formattedBody}
+</body>
+</html>`;
     
     // Log the formatted body for debugging
-    console.log('[SendEmailFromAgent] Final formatted email body:');
-    console.log(JSON.stringify(formattedBody));
+    console.log('[SendEmailFromAgent] Final HTML email body:');
+    console.log(formattedBody);
     console.log('[SendEmailFromAgent] Body length:', formattedBody.length);
     
     // According to A1Mail documentation, the email data structure should include headers
