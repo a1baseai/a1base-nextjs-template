@@ -175,77 +175,57 @@ export async function SendEmailFromAgent(
     const trimmedSenderEmail = A1BASE_AGENT_EMAIL.trim();
     const trimmedRecipientEmail = emailDetails.recipient_address.trim();
     
-    // --- Simplified HTML Generation ---
-    let textContent = emailDetails.body; // Input text from GenerateEmailResponse
+    let rawTextContent = emailDetails.body; 
     
-    // Normalize line endings
-    textContent = textContent.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    // Normalize line endings from AI response
+    rawTextContent = rawTextContent.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
     
-    // Helper function to escape HTML special characters (remains the same)
-    const escapeHtml = (text: string): string => {
-      return text
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-    };
-
-    // Split text into paragraphs based on double newlines
-    const paragraphs = textContent.split('\n\n');
-    
-    // Process each paragraph: escape, convert single newlines to <br />, wrap in <p>
-    const htmlParagraphs = paragraphs.map(paragraphStr => {
-      const lines = paragraphStr.split('\n');
-      const escapedLines = lines.map(line => escapeHtml(line));
-      const paragraphWithBrs = escapedLines.join('<br />');
-      // Avoid creating empty paragraphs like <p></p> or <p><br /></p>
-      if (paragraphWithBrs.trim() === '' || paragraphWithBrs.trim().toLowerCase() === '<br />') {
-        return ''; 
-      }
-      return `<p>${paragraphWithBrs}</p>`;
-    }).filter(p => p !== ''); // Remove any empty strings resulting from empty paragraphs
-    
-    // Combine into final HTML content for the body
-    let finalHtmlContent = htmlParagraphs.join('\n'); // Join <p> tags with a newline for readability in source
-
-    // Ensure there's some content, otherwise provide a default non-empty paragraph
-    if (finalHtmlContent.trim() === '') {
-      finalHtmlContent = '<p>&nbsp;</p>'; // Default to a non-breaking space if body is empty
+    // --- Minimal HTML Conversion (NO CONTENT ESCAPING) ---
+    // Convert double newlines to paragraph breaks
+    let htmlBodyContent = rawTextContent.replace(/\n\n/g, '</p><p>');
+    // Convert single newlines to line breaks
+    htmlBodyContent = htmlBodyContent.replace(/\n/g, '<br />');
+    // Wrap the whole content in a starting and ending <p> tag if not already present
+    // and ensure it's not just whitespace or <br /> tags.
+    if (htmlBodyContent.trim() && !htmlBodyContent.trim().toLowerCase().startsWith('<p>')) {
+      htmlBodyContent = '<p>' + htmlBodyContent;
     }
-    // --- End of Simplified HTML Generation ---
-    
-    // Wrap in complete HTML document with DOCTYPE for A1Mail to recognize it as HTML
-    // Based on A1Mail documentation, HTML emails should start with DOCTYPE declaration
-    let formattedBody = `<!DOCTYPE html>
+    if (htmlBodyContent.trim() && !htmlBodyContent.trim().toLowerCase().endsWith('</p>')) {
+      htmlBodyContent = htmlBodyContent + '</p>';
+    }
+    // Cleanup: Remove empty paragraphs that might result from multiple newlines
+    htmlBodyContent = htmlBodyContent.replace(/<p>\s*(<br\s*\/>\s*)*<\/p>/g, '');
+    htmlBodyContent = htmlBodyContent.replace(/<p><\/p>/g, '');
+
+    const finalHtmlBody = htmlBodyContent.trim() || '<p>&nbsp;</p>'; // Ensure body is not empty
+    // --- End of Minimal HTML Conversion ---
+
+    // Construct the full HTML document as per A1Mail documentation
+    const emailHtmlDocument = `<!DOCTYPE html>
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-<title>${escapeHtml(emailDetails.subject)}</title>
+<title>${emailDetails.subject.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</title> <!-- Escape title only -->
 <style>
 body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
 p { margin: 0 0 1em 0; }
-/* ul, li styles removed as we are not generating them with this simplified approach */
 </style>
 </head>
 <body>
-${finalHtmlContent}
+${finalHtmlBody}
 </body>
 </html>`;
     
-    // Log the formatted body for debugging
-    console.log('[SendEmailFromAgent] Final HTML email body (simplified generation):');
-    console.log(formattedBody);
-    console.log('[SendEmailFromAgent] Body length:', formattedBody.length);
+    console.log('[SendEmailFromAgent] Final HTML email body (minimal processing, no content escape):');
+    console.log(emailHtmlDocument);
+    console.log('[SendEmailFromAgent] Body length:', emailHtmlDocument.length);
     
-    // According to A1Mail documentation, HTML is sent directly in the body field
-    // Headers object is only for cc, bcc, etc. - not Content-Type
-    const emailData: any = {
+    const emailData = {
       sender_address: trimmedSenderEmail,
       recipient_address: trimmedRecipientEmail,
       subject: emailDetails.subject,
-      body: formattedBody,  // HTML content goes directly in body field
-      headers: {}  // Empty headers object (can be used for cc/bcc if needed)
+      body: emailHtmlDocument, 
+      headers: {} 
     };
     
     console.log(`[SendEmailFromAgent] Full email payload being sent to A1Base:`, JSON.stringify(emailData, null, 2));
@@ -337,4 +317,4 @@ export async function CreateEmailAddress(
     console.error(`[CreateEmailAddress] Error creating email address ${fullEmail}:`, error);
     throw error; // Re-throw to be handled by the caller
   }
-} 
+}
