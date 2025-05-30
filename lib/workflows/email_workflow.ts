@@ -61,6 +61,21 @@ export async function GenerateEmailResponse(
       responseBody = lines.slice(1).join('\n').trim();
     }
 
+    // Format the email body for proper display
+    // Convert single line breaks to double line breaks for paragraph separation
+    // But preserve existing double line breaks
+    responseBody = responseBody
+      .split('\n\n')  // Split by existing double line breaks
+      .map(paragraph => paragraph.replace(/\n/g, ' '))  // Replace single line breaks with spaces within paragraphs
+      .join('\n\n');  // Join paragraphs back with double line breaks
+
+    // Ensure there are double line breaks before lists
+    responseBody = responseBody.replace(/:\n(-|\*|\d\.)/g, ':\n\n$1');
+    
+    // Log the formatted response for debugging
+    console.log("[GenerateEmailResponse] Formatted email body:");
+    console.log(responseBody);
+
     return { 
       subject: responseSubject, 
       body: responseBody 

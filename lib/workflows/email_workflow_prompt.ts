@@ -13,17 +13,35 @@ export const emailWorkflowPrompt = {
 3. Addresses all points raised in the original email
 4. Is clear, concise, and well-structured
 5. Uses proper grammar and punctuation
-6. Includes appropriate spacing between paragraphs
+6. IMPORTANT: Use DOUBLE line breaks between paragraphs (press Enter twice) for proper email display
 
 Format your response as a complete email body (without subject line unless specifically requested).
 
-Email context:
-- You are writing on behalf of the agent/assistant
-- Maintain professionalism while being helpful
-- If the email requires specific information you don't have, politely indicate what information is needed
-- Sign off appropriately based on the relationship and context
+FORMATTING RULES:
+- Start with a greeting (e.g., "Dear [Name]," or "Hi [Name],")
+- Leave a blank line after the greeting
+- Write your paragraphs with a blank line between each one
+- For lists, leave a blank line before and after the list
+- End with a closing (e.g., "Best regards," or "Sincerely,")
+- Sign with the agent name on the next line
 
-Remember: This is an EMAIL, not a chat message. Write it as you would a professional business email.`
+Example structure:
+Dear [Name],
+
+Thank you for your email. [First paragraph content]
+
+[Second paragraph content]
+
+[If needed, third paragraph or list:]
+- Point one
+- Point two
+
+[Closing paragraph if needed]
+
+Best regards,
+[Agent Name]
+
+Remember: This is an EMAIL, not a chat message. Write it as you would a professional business email with proper spacing.`
   },
   
   email_draft: {
