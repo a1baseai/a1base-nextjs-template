@@ -129,6 +129,43 @@ Your agent will be available at `http://localhost:3000`
 - **Workflows**: Enhance `lib/workflows/basic_workflow.ts`
 - **Interface**: Modify `app/page.tsx`
 
+### 📸 Multimedia Messaging
+
+The framework now supports sending and receiving multimedia content through WhatsApp:
+
+#### Supported Media Types
+- **Images** (JPG, PNG, GIF, WEBP) - up to 5MB
+- **Videos** (MP4, 3GP) - up to 16MB  
+- **Audio** (MP3, OGG, AMR, AAC) - up to 16MB
+- **Documents** (PDF, DOC, DOCX, etc.) - up to 100MB
+- **Location** sharing
+
+#### Sending Media Messages
+```typescript
+// Using the API endpoint
+POST /api/messaging/send-media
+{
+  "threadType": "individual",
+  "recipientId": "+1234567890",
+  "mediaUrl": "https://example.com/image.jpg",
+  "mediaType": "image",
+  "caption": "Check out this product!"
+}
+
+// Using workflow functions
+import { SendProductImage } from "@/lib/workflows/multimedia-workflow";
+await SendProductImage(threadMessages, imageUrl, productName, description, ...);
+```
+
+#### Receiving Media Messages
+Incoming media is automatically processed and converted to text representations for the AI:
+- Images: `[Image received: caption]`
+- Videos: `[Video received: caption]`
+- Documents: `[Document received: filename]`
+- Location: `[Location shared: name at coordinates]`
+
+For detailed multimedia documentation, see [docs/MULTIMEDIA_GUIDE.md](docs/MULTIMEDIA_GUIDE.md).
+
 ### 📬 Message Flow
 
 When a message arrives through the webhook, here's the complete flow through the codebase:

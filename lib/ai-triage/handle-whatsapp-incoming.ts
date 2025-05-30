@@ -23,6 +23,7 @@ import {
 import { getSplitMessageSetting } from "../settings/message-settings";
 import { saveMessage, userCheck } from "../data/message-storage"; // userCheck is imported but not used in the original, keeping it.
 import { processMessageForMemoryUpdates } from "../agent-memory/memory-processor"; // Added import
+import { processIncomingMediaMessage, sendMultimediaMessage, MediaType } from "../messaging/multimedia-handler";
 
 // --- CONSTANTS ---
 export const MAX_CONTEXT_MESSAGES = 10;
@@ -505,6 +506,70 @@ async function sendResponseMessage(
   }
 }
 
+/**
+ * Sends a multimedia response message.
+ */
+async function sendMultimediaResponseMessage(
+  mediaUrl: string,
+  mediaType: MediaType,
+  caption: string | undefined,
+  threadType: "individual" | "group",
+  recipientId: string, // thread_id for group, sender_number for individual
+  service: string, // Original service from webhook, e.g., "whatsapp"
+  chatId: string | null, // Database chat ID for storing AI message
+  adapter: SupabaseAdapter | null
+): Promise<void> {
+  if (service === SERVICE_WEB_UI || service === SERVICE_SKIP_SEND) {
+    console.log(`[Send] Skipping multimedia send for service: ${service}`);
+    return;
+  }
+
+  try {
+    await sendMultimediaMessage(
+      a1BaseClient,
+      process.env.A1BASE_ACCOUNT_ID!,
+      threadType,
+      recipientId,
+      mediaUrl,
+      mediaType,
+      caption
+    );
+    console.log(
+      `[Send] Multimedia message sent to ${recipientId} (Type: ${threadType}, Media: ${mediaType})`
+    );
+
+    // Store the multimedia message in the database if adapter is available
+    if (adapter && chatId && process.env.A1BASE_AGENT_NUMBER) {
+      const messageContent = {
+        media_url: mediaUrl,
+        media_type: mediaType,
+        caption: caption
+      };
+      const aiMessageId = `ai-media-${chatId}-${Date.now()}`;
+      
+      try {
+        await adapter.storeMessage(
+          chatId,
+          process.env.A1BASE_AGENT_NUMBER,
+          aiMessageId,
+          messageContent,
+          'media',
+          service,
+          messageContent
+        );
+        console.log(`[Send] Multimedia message stored in database`);
+      } catch (storeError) {
+        console.error(`[Send] Error storing multimedia message:`, storeError);
+      }
+    }
+  } catch (error) {
+    console.error(
+      `[Send] Error sending multimedia message to ${recipientId}:`,
+      error
+    );
+  }
+}
+
 // --- ONBOARDING STATUS & WORKFLOW ---
 
 /**
@@ -714,10 +779,31 @@ export async function handleWhatsAppIncoming(
     };
   }
 
+  // Process multimedia messages
+  let processedContent = content;
+  let mediaInfo: any = null;
+  
+  if (message_type !== 'text' && message_type !== 'rich_text') {
+    const mediaData = processIncomingMediaMessage(message_content, message_type);
+    
+    if (message_type === 'location' && mediaData.location) {
+      processedContent = `[Location shared: ${mediaData.location.name || 'Unnamed location'} at ${mediaData.location.latitude}, ${mediaData.location.longitude}${mediaData.location.address ? ` - ${mediaData.location.address}` : ''}]`;
+    } else if (message_type === 'reaction' && message_content.reaction) {
+      processedContent = `[Reacted with: ${message_content.reaction}]`;
+    } else if (message_type === 'group_invite' && message_content.groupName) {
+      processedContent = `[Group invite to: ${message_content.groupName}]`;
+    } else if (mediaData.mediaType) {
+      processedContent = `[${mediaData.mediaType.charAt(0).toUpperCase() + mediaData.mediaType.slice(1)} received${mediaData.caption ? `: ${mediaData.caption}` : ''}]`;
+      mediaInfo = mediaData;
+    } else if (message_type === 'unsupported_message_type') {
+      processedContent = '[Unsupported message type received]';
+    }
+  }
+
   // --- Start Memory Update Processing (non-blocking) ---
   // Launch memory processing in parallel without awaiting the result
   let memoryProcessingPromise: Promise<void> | null = null;
-  if (content && content.trim() !== "") {
+  if (processedContent && processedContent.trim() !== "") {
     console.log(
       `[MemoryProcessor] Starting parallel memory processing for ${sender_number} in chat ${thread_id}`
     );
@@ -726,7 +812,7 @@ export async function handleWhatsAppIncoming(
     memoryProcessingPromise = (async () => {
       try {
         const memorySuggestions = await processMessageForMemoryUpdates(
-          content,
+          processedContent,
           sender_number, // Using sender_number as userId
           thread_id, // Using thread_id as chatId
           openaiClient,
@@ -750,7 +836,7 @@ export async function handleWhatsAppIncoming(
           memorySuggestions.chatMemoryUpdates.length === 0
         ) {
           console.log(
-            `[MemoryProcessor] No memory updates suggested for message: "${content}"`
+            `[MemoryProcessor] No memory updates suggested for message: "${processedContent}"`
           );
         }
         console.log(`[MemoryProcessor] Memory processing completed for ${thread_id}`);
@@ -857,7 +943,7 @@ export async function handleWhatsAppIncoming(
       const triageResult = await triageMessage({
         thread_id,
         message_id,
-        content,
+        content: processedContent,
         message_type,
         message_content,
         sender_name,

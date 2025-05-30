@@ -804,6 +804,39 @@ export class SupabaseAdapter {
       console.log("Prepared text content:", textContent);
       console.log("Rich content:", richContent || content);
 
+      // Extract multimedia-specific fields
+      let mediaUrl = null;
+      let mediaType = null;
+      let mediaCaption = null;
+      let mediaMetadata: Record<string, any> = {};
+
+      // Check if this is a multimedia message
+      if (messageType && ['image', 'video', 'audio', 'document', 'location', 'media'].includes(messageType)) {
+        // Extract media URL if present
+        if (content.media_url) {
+          mediaUrl = content.media_url;
+          mediaType = content.media_type || messageType;
+          mediaCaption = content.caption;
+        }
+        
+        // Handle location messages
+        if (messageType === 'location' && (content.latitude || content.longitude)) {
+          mediaType = 'location';
+          mediaMetadata = {
+            latitude: content.latitude,
+            longitude: content.longitude,
+            name: content.name,
+            address: content.address
+          };
+        }
+        
+        // Store any additional media metadata
+        if (content.file_size) mediaMetadata.file_size = content.file_size;
+        if (content.mime_type) mediaMetadata.mime_type = content.mime_type;
+        if (content.duration) mediaMetadata.duration = content.duration;
+        if (content.dimensions) mediaMetadata.dimensions = content.dimensions;
+      }
+
       const { data, error } = await this.supabase
         .from("messages")
         .insert({
@@ -814,6 +847,10 @@ export class SupabaseAdapter {
           message_type: messageType,
           service: service,
           rich_content: richContent || content, // Store JSON in rich_content
+          media_url: mediaUrl,
+          media_type: mediaType,
+          media_caption: mediaCaption,
+          media_metadata: Object.keys(mediaMetadata).length > 0 ? mediaMetadata : null,
           created_at: new Date().toISOString(),
         })
         .select("id")
