@@ -181,13 +181,15 @@ export async function SendEmailFromAgent(
     // First, normalize all line endings
     formattedBody = formattedBody.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
     
-    // Escape HTML special characters
-    formattedBody = formattedBody
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
+    // Helper function to escape HTML special characters
+    const escapeHtml = (text: string): string => {
+      return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    };
     
     // Split into paragraphs
     const paragraphs = formattedBody.split('\n\n');
@@ -205,10 +207,10 @@ export async function SendEmailFromAgent(
             if (line.trim().match(/^[-*•]|\d+\./)) {
               // This is a list item, remove the bullet/dash and wrap in <li>
               const content = line.trim().replace(/^[-*•]\s*/, '').replace(/^\d+\.\s*/, '');
-              return `<li>${content}</li>`;
+              return `<li>${escapeHtml(content)}</li>`;
             } else {
               // This is the list intro text
-              return `<p>${line}</p>`;
+              return `<p>${escapeHtml(line)}</p>`;
             }
           });
         
@@ -224,9 +226,9 @@ export async function SendEmailFromAgent(
           return '<ul>' + listItems.join('') + '</ul>';
         }
       } else {
-        // Regular paragraph - replace single line breaks with <br> if needed
+        // Regular paragraph - escape content and wrap in <p> tags
         const processedParagraph = paragraph.replace(/\n/g, ' ');
-        return `<p>${processedParagraph}</p>`;
+        return `<p>${escapeHtml(processedParagraph)}</p>`;
       }
     }).filter(p => p && p !== '<p></p>'); // Remove empty paragraphs
     
