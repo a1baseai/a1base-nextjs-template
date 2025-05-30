@@ -128,7 +128,7 @@ const a1BaseClient = new A1BaseAPI({
 
 const A1BASE_ACCOUNT_ID = process.env.A1BASE_ACCOUNT_ID!;
 const A1BASE_AGENT_NUMBER = process.env.A1BASE_AGENT_NUMBER!;
-const A1BASE_AGENT_EMAIL = process.env.A1BASE_AGENT_EMAIL!;
+const A1BASE_AGENT_EMAIL = process.env.A1BASE_AGENT_EMAIL?.trim() || "";
 
 
 // --- Helper Functions ---
@@ -445,10 +445,14 @@ export async function SendEmailFromAgent(
   }
 
   try {
+    // Trim whitespace from email addresses to avoid issues
+    const trimmedSenderEmail = A1BASE_AGENT_EMAIL.trim();
+    const trimmedRecipientEmail = emailDetails.recipient_address.trim();
+    
     // According to A1Mail documentation, the email data structure should include headers
     const emailData = {
-      sender_address: A1BASE_AGENT_EMAIL,
-      recipient_address: emailDetails.recipient_address,
+      sender_address: trimmedSenderEmail,
+      recipient_address: trimmedRecipientEmail,
       subject: emailDetails.subject,
       body: emailDetails.body,
       headers: {} // Add empty headers object as the API seems to expect this
@@ -461,25 +465,36 @@ export async function SendEmailFromAgent(
     
     console.log(`[SendEmailFromAgent] A1Base API Response:`, response);
     
-    // Check if the response indicates an error
-    if (response && typeof response === 'object' && 'status' in response) {
-      if ((response as any).status === 'error') {
+    // Check if the response indicates an error (handle both nested and direct status)
+    if (response && typeof response === 'object') {
+      // Check for direct status field
+      if ('status' in response && (response as any).status === 'error') {
         const errorMessage = (response as any).message || 'Unknown error from A1Base API';
         console.error(`[SendEmailFromAgent] A1Base API returned error: ${errorMessage}`);
         throw new Error(`Failed to send email: ${errorMessage}`);
       }
-    }
-    
-    // Check for other potential error indicators
-    if (response && typeof response === 'object' && 'success' in response && !(response as any).success) {
-      const errorMessage = (response as any).message || (response as any).error || 'Email send failed';
-      console.error(`[SendEmailFromAgent] A1Base API returned failure: ${errorMessage}`);
-      throw new Error(`Failed to send email: ${errorMessage}`);
+      
+      // Check for nested data.status field (the actual response structure)
+      if ('data' in response && typeof (response as any).data === 'object') {
+        const data = (response as any).data;
+        if (data.status === 'error') {
+          const errorMessage = data.message || 'Unknown error from A1Base API';
+          console.error(`[SendEmailFromAgent] A1Base API returned error: ${errorMessage}`);
+          throw new Error(`Failed to send email: ${errorMessage}`);
+        }
+      }
+      
+      // Check for success: false pattern
+      if ('success' in response && !(response as any).success) {
+        const errorMessage = (response as any).message || (response as any).error || 'Email send failed';
+        console.error(`[SendEmailFromAgent] A1Base API returned failure: ${errorMessage}`);
+        throw new Error(`Failed to send email: ${errorMessage}`);
+      }
     }
     
     const successMessage = "Email sent successfully.";
     console.log(`[SendEmailFromAgent] ${successMessage}`);
-    console.log(`[SendEmailFromAgent] Email details - From: ${A1BASE_AGENT_EMAIL}, To: ${emailDetails.recipient_address}`);
+    console.log(`[SendEmailFromAgent] Email details - From: ${trimmedSenderEmail}, To: ${trimmedRecipientEmail}`);
     
     return successMessage;
   } catch (error: any) {
