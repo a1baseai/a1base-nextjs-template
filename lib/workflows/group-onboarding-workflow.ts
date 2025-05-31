@@ -8,7 +8,7 @@
  */
 import { A1BaseAPI } from "a1base-node";
 import { loadGroupOnboardingFlow } from "../onboarding-flow/group-onboarding-storage";
-import { WebhookPayload } from "@/app/api/messaging/incoming/route";
+import { WebhookPayload } from "@/app/api/a1base/messaging/route";
 import { getInitializedAdapter } from "../supabase/config";
 import { getOpenAI } from "../services/openai";
 import { ThreadMessage } from "../supabase/types"; // Import ThreadMessage type

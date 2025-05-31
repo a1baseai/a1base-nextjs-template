@@ -13,7 +13,7 @@ import { CONVERSATION_USERS_TABLE, CHATS_TABLE } from "./config";
  * using Supabase as the backend database.
  */
 // Import WebhookPayload type
-import { WebhookPayload } from "@/app/api/messaging/incoming/route";
+import { WebhookPayload } from "@/app/api/a1base/messaging/route";
 const MAX_CONTEXT_MESSAGES = 30;
 
 /**

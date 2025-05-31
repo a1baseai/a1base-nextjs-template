@@ -7,7 +7,7 @@ import {
   isSupabaseConfigured,
   SupabaseAdapter,
 } from "../supabase/config"; // Added SupabaseAdapter type
-import { WebhookPayload } from "@/app/api/messaging/incoming/route";
+import { WebhookPayload } from "@/app/api/a1base/messaging/route";
 import {
   StartOnboarding,
 } from "../workflows/onboarding-workflow"; // Removed OnboardingResponse type

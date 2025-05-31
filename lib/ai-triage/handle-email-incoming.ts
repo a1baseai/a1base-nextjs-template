@@ -3,7 +3,7 @@
  * 
  * Processes incoming emails from A1Mail webhook and generates AI responses
  */
-import { EmailWebhookPayload } from "@/app/api/webhook/a1mail/route";
+import { EmailWebhookPayload } from "@/app/api/a1base/email/route";
 import { ThreadMessage } from "@/types/chat";
 import { GenerateEmailResponse, SendEmailFromAgent } from "../workflows/email_workflow";
 import { getInitializedAdapter } from "../supabase/config";

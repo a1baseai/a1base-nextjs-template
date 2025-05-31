@@ -5,7 +5,7 @@
  * Usage: node scripts/test-email-webhook.js [webhook-url]
  */
 
-const webhookUrl = process.argv[2] || 'http://localhost:3006/api/webhook/a1mail';
+const webhookUrl = process.argv[2] || 'http://localhost:3006/api/a1base/email';
 
 // Sample email webhook payload based on A1Mail documentation
 const testPayload = {
