@@ -457,9 +457,31 @@ async function sendResponseMessage(
   chatId: string | null, // Database chat ID for storing AI message
   adapter: SupabaseAdapter | null
 ): Promise<void> {
+  // Log all arguments when sending a message
+  console.log("[Send] === sendResponseMessage called with arguments ===");
+  console.log("[Send] text:", text);
+  console.log("[Send] from:", process.env.A1BASE_AGENT_NUMBER);
+  console.log("[Send] threadType:", threadType);
+  console.log("[Send] recipientId:", recipientId);
+  console.log("[Send] service:", service);
+  console.log("[Send] chatId:", chatId);
+  console.log("[Send] adapter:", adapter ? "SupabaseAdapter instance" : null);
+  console.log("[Send] ================================================");
+  
   if (service === SERVICE_WEB_UI || service === SERVICE_SKIP_SEND) {
     console.log(`[Send] Skipping send for service: ${service}`);
     return;
+  }
+
+  // Validate agent configuration
+  if (!process.env.A1BASE_AGENT_NUMBER) {
+    console.error("[Send] ERROR: A1BASE_AGENT_NUMBER is not configured!");
+    throw new Error("A1BASE_AGENT_NUMBER environment variable is not set");
+  }
+  
+  if (!process.env.A1BASE_ACCOUNT_ID) {
+    console.error("[Send] ERROR: A1BASE_ACCOUNT_ID is not configured!");
+    throw new Error("A1BASE_ACCOUNT_ID environment variable is not set");
   }
 
   const splitParagraphs = await getSplitMessageSetting();
@@ -476,27 +498,91 @@ async function sendResponseMessage(
 
     try {
       if (threadType === "group") {
-        await a1BaseClient.sendGroupMessage(process.env.A1BASE_ACCOUNT_ID!, {
+        // Validate thread_id format
+        if (!recipientId || recipientId.trim() === "") {
+          console.error(`[Send] Invalid thread_id for group message: "${recipientId}"`);
+          throw new Error("Invalid thread_id for group message");
+        }
+        
+        console.log(`[Send] Sending group message with data:`, {
           ...messageData,
           thread_id: recipientId,
         });
+        console.log(`[Send] Thread ID: "${recipientId}", length: ${recipientId.length}`);
+        
+        const result = await a1BaseClient.sendGroupMessage(process.env.A1BASE_ACCOUNT_ID!, {
+          ...messageData,
+          thread_id: recipientId,
+        });
+        console.log(`[Send] Group message send result:`, result);
+        
+        // If result is undefined but no error was thrown, consider it a success
+        if (result === undefined) {
+          console.log(`[Send] Group message API returned undefined (this may be normal behavior)`);
+        }
       } else {
-        await a1BaseClient.sendIndividualMessage(
+        const result = await a1BaseClient.sendIndividualMessage(
           process.env.A1BASE_ACCOUNT_ID!,
           {
             ...messageData,
             to: recipientId,
           }
         );
+        console.log(`[Send] Individual message send result:`, result);
       }
       console.log(
         `[Send] Message part sent to ${recipientId} (Type: ${threadType})`
       );
+      
+      // Store the AI message in the database if adapter is available
+      // For group messages, we always store since webhook might not be triggered for agent's own messages
+      if (adapter && chatId && process.env.A1BASE_AGENT_NUMBER) {
+        const aiMessageId = `ai-${chatId}-${Date.now()}`;
+        
+        try {
+          console.log(`[Send] Storing AI ${threadType} message in database...`);
+          // Fetch agent user UUID
+          const agentUser = await adapter.getUserByPhone(normalizePhoneNumber(process.env.A1BASE_AGENT_NUMBER));
+          if (!agentUser || !agentUser.id) {
+            console.error(`[Send] Could not find agent user in database for phone number: ${process.env.A1BASE_AGENT_NUMBER}`);
+            throw new Error("Agent user not found for storing message.");
+          }
+
+          await adapter.storeMessage(
+            chatId,
+            agentUser.id, // Use agent's UUID
+            aiMessageId,
+            { text: line },
+            'text',
+            service,
+            { text: line }
+          );
+          console.log(`[Send] AI ${threadType} message stored in database successfully`);
+        } catch (storeError) {
+          console.error(`[Send] Error storing AI ${threadType} message:`, storeError);
+        }
+      }
     } catch (error) {
       console.error(
         `[Send] Error sending message part to ${recipientId}:`,
         error
       );
+      
+      // Enhanced error logging
+      if (error instanceof Error) {
+        console.error(`[Send] Error name: ${error.name}`);
+        console.error(`[Send] Error message: ${error.message}`);
+        console.error(`[Send] Error stack:`, error.stack);
+      }
+      
+      // Check for specific API error responses
+      if (error && typeof error === 'object' && 'response' in error) {
+        const apiError = error as any;
+        console.error(`[Send] API Response status:`, apiError.response?.status);
+        console.error(`[Send] API Response data:`, apiError.response?.data);
+      }
+      
+      console.error(`[Send] Error details:`, JSON.stringify(error, null, 2));
       // Optional: Decide if we should re-throw or try next line
     }
 
@@ -519,6 +605,18 @@ async function sendMultimediaResponseMessage(
   chatId: string | null, // Database chat ID for storing AI message
   adapter: SupabaseAdapter | null
 ): Promise<void> {
+  // Log all arguments when sending a multimedia message
+  console.log("[Send] === sendMultimediaResponseMessage called with arguments ===");
+  console.log("[Send] mediaUrl:", mediaUrl);
+  console.log("[Send] mediaType:", mediaType);
+  console.log("[Send] caption:", caption);
+  console.log("[Send] threadType:", threadType);
+  console.log("[Send] recipientId:", recipientId);
+  console.log("[Send] service:", service);
+  console.log("[Send] chatId:", chatId);
+  console.log("[Send] adapter:", adapter ? "SupabaseAdapter instance" : null);
+  console.log("[Send] ==========================================================");
+  
   if (service === SERVICE_WEB_UI || service === SERVICE_SKIP_SEND) {
     console.log(`[Send] Skipping multimedia send for service: ${service}`);
     return;
@@ -548,9 +646,16 @@ async function sendMultimediaResponseMessage(
       const aiMessageId = `ai-media-${chatId}-${Date.now()}`;
       
       try {
+        // Fetch agent user UUID
+        const agentUser = await adapter.getUserByPhone(normalizePhoneNumber(process.env.A1BASE_AGENT_NUMBER));
+        if (!agentUser || !agentUser.id) {
+          console.error(`[Send] Could not find agent user in database for phone number: ${process.env.A1BASE_AGENT_NUMBER}`);
+          throw new Error("Agent user not found for storing message.");
+        }
+
         await adapter.storeMessage(
           chatId,
-          process.env.A1BASE_AGENT_NUMBER,
+          agentUser.id, // Use agent's UUID
           aiMessageId,
           messageContent,
           'media',
@@ -992,7 +1097,7 @@ export async function handleWhatsAppIncoming(
     // Determine recipient ID based on thread type
     const recipient = thread_type === "group" ? thread_id : sender_number;
     console.log(`[DEBUG] Preparing to send response. Thread type: ${thread_type}, Recipient: ${recipient}, Service: ${service}`);
-    await sendResponseMessage(
+    const result = await sendResponseMessage(
       triageResponseMessageText,
       thread_type as "individual" | "group",
       recipient,
@@ -1000,6 +1105,7 @@ export async function handleWhatsAppIncoming(
       chatId,
       adapter
     );
+    console.log("[Send] result:", result);
     console.log(`[DEBUG] sendResponseMessage completed for ${recipient}`);
   } else if (!onboardingHandled) {
     console.log(

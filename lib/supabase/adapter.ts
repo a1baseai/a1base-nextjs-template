@@ -352,7 +352,7 @@ export class SupabaseAdapter {
           return result;
         });
 
-      console.log("messages from adapter", messages);
+      // console.log("messages from adapter", messages);
 
       if (messagesError) throw messagesError;
 
