@@ -147,9 +147,8 @@ Based on the conversation and the context of the recent messages, analyze the us
 
 Rules:
 - "projectFlow": Used for ALL project-related actions. Use this for any message related to creating, updating, completing, or referencing projects.
-- "noReply": No response required.
 - "onboardingFlow": Related to user onboarding.
-- "simpleResponse": Default for other messages that don't fit the above categories.
+- "simpleResponse": Default for all other messages including greetings, questions, statements, or any message from a human user that could benefit from a response.
 
 For "projectFlow" responses, include these additional fields:
 - "projectAction": one of ["create", "update", "complete", "reference"]

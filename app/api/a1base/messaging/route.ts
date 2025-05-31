@@ -72,6 +72,16 @@ export async function POST(request: Request) {
     // Log the raw request
     const body = (await request.json()) as WebhookPayload;
     
+    console.log(`[A1BASE-MESSAGING] ===== RAW WEBHOOK DATA =====`);
+    console.log(JSON.stringify(body, null, 2));
+    console.log(`[A1BASE-MESSAGING] ===========================`);
+    
+    console.log(`[A1BASE-MESSAGING] ENVIRONMENT CHECK:`);
+    console.log(`  - A1BASE_AGENT_NUMBER: ${process.env.A1BASE_AGENT_NUMBER}`);
+    console.log(`  - Webhook sender_number: ${body.sender_number}`);
+    console.log(`  - Are they equal? ${body.sender_number === process.env.A1BASE_AGENT_NUMBER}`);
+    console.log(`  - is_from_agent flag: ${body.is_from_agent}`);
+    
     console.log(`[A1BASE-MESSAGING] Received ${body.service} message:`, {
       message_id: body.message_id,
       thread_id: body.thread_id,
@@ -86,6 +96,7 @@ export async function POST(request: Request) {
 
     // Patch bug where group message sender number is missing if sender is a1base agent
     if (body.thread_type === 'group' && body.sender_number === "+") {
+      console.log(`[A1BASE-MESSAGING] Patching missing sender number for group message`);
       body.sender_number = process.env.A1BASE_AGENT_NUMBER!;
     }
 

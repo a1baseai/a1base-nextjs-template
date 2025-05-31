@@ -719,13 +719,13 @@ export async function triageMessage({
         };
 
 
-      case "noReply":
-        // Just return an empty success response
-        return {
-          type: "default",
-          success: true,
-          message: "",
-        };
+      // case "noReply":
+      //   // Just return an empty success response
+      //   return {
+      //     type: "default",
+      //     success: true,
+      //     message: "",
+      //   };
 
       case "simpleResponse":
       default:

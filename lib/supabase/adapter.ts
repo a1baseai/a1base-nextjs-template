@@ -710,6 +710,19 @@ export class SupabaseAdapter {
 
       if (insertError) {
         // Console error removed
+        console.error("Error creating chat:", insertError);
+        console.error("Error details:", {
+          code: insertError.code,
+          message: insertError.message,
+          details: insertError.details,
+          hint: insertError.hint,
+          attemptedData: {
+            external_id: threadId,
+            type: validatedThreadType,
+            service: service,
+            metadata: metadata
+          }
+        });
         throw insertError;
       }
 
@@ -876,10 +889,11 @@ export class SupabaseAdapter {
           message_type: messageType,
           service: service,
           rich_content: richContent || content, // Store JSON in rich_content
-          media_url: mediaUrl,
-          media_type: mediaType,
-          media_caption: mediaCaption,
-          media_metadata: Object.keys(mediaMetadata).length > 0 ? mediaMetadata : null,
+          // Temporarily commented out until database schema is updated
+          // media_url: mediaUrl,
+          // media_type: mediaType,
+          // media_caption: mediaCaption,
+          // media_metadata: Object.keys(mediaMetadata).length > 0 ? mediaMetadata : null,
           created_at: new Date().toISOString(),
         })
         .select("id")
@@ -887,6 +901,19 @@ export class SupabaseAdapter {
 
       if (error) {
         console.error("Error storing message:", error);
+        console.error("Error details:", {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          chatId,
+          senderId,
+          messageId,
+          contentLength: textContent.length,
+          contentPreview: textContent.substring(0, 50),
+          messageType,
+          service
+        });
         throw error;
       }
       console.log("Message stored successfully with ID:", data.id);

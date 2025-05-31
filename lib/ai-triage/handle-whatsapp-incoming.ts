@@ -759,6 +759,15 @@ export async function handleWhatsAppIncoming(
     service,
   });
 
+  // Add detailed logging for agent check
+  console.log("[DEBUG] Agent number check:");
+  console.log(`  - sender_number: "${sender_number}"`);
+  console.log(`  - A1BASE_AGENT_NUMBER: "${process.env.A1BASE_AGENT_NUMBER}"`);
+  console.log(`  - Normalized sender: "${sender_number.replace(/\+|\s/g, "")}"`);
+  console.log(`  - Normalized agent: "${process.env.A1BASE_AGENT_NUMBER?.replace(/\+|\s/g, "")}"`);
+  console.log(`  - Direct comparison: ${sender_number === process.env.A1BASE_AGENT_NUMBER}`);
+  console.log(`  - Normalized comparison: ${normalizePhoneNumber(sender_number) === normalizePhoneNumber(process.env.A1BASE_AGENT_NUMBER || "")}`);
+
   // 1. Skip processing for agent's own messages
   if (sender_number === process.env.A1BASE_AGENT_NUMBER) {
     console.log("[AgentMsg] Processing agent's own message for storage.");
