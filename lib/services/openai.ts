@@ -205,7 +205,7 @@ Return valid JSON.
     ];
 
     console.log("[TRIAGE DEBUG] Raw triage result:", parsed);
-    console.log("[TRIAGE DEBUG] Existing projects context provided:", existingProjects.map(p => ({ name: p.name, is_live: p.is_live })));
+    // console.log("[TRIAGE DEBUG] Existing projects context provided:", existingProjects.map(p => ({ name: p.name, is_live: p.is_live })));
 
     if (validTypes.includes(parsed.responseType)) {
       // Special handling for project flow
