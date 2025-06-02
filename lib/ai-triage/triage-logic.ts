@@ -372,6 +372,270 @@ export async function triageMessage({
           message: onboardingResponse,
         };
 
+      case "emailReportFlow":
+        // Handle email report requests
+        const reportAction = (triage as any).reportAction;
+        const reportFrequency = (triage as any).reportFrequency;
+        const reportTime = (triage as any).reportTime;
+        
+        console.log(`[TRIAGE] Email report flow detected: ${reportAction}`);
+        
+        // Dynamic import of report services to avoid circular dependencies
+        const { ReportSchedulerService } = await import('../services/report-scheduler');
+        const { ReportGeneratorService } = await import('../services/report-generator');
+        const { extractEmailFromMessage, updateUserEmail, isEmailProvisionMessage } = await import('../services/email-report-helpers');
+        const reportScheduler = new ReportSchedulerService();
+        const reportGenerator = new ReportGeneratorService();
+        
+        // Get user information
+        let userId: string | null = null;
+        let userEmail: string | null = null;
+        
+        // Initialize adapter if not already done
+        if (!adapter) {
+          adapter = await getInitializedAdapter();
+        }
+        
+        if (adapter) {
+          // Get the sender's user ID
+          const senderPhone = sender_number.replace(/\+/g, '');
+          const { data: user } = await adapter.supabase
+            .from('conversation_users')
+            .select('id, metadata')
+            .eq('phone_number', senderPhone)
+            .single();
+            
+          if (user) {
+            userId = user.id;
+            userEmail = user.metadata?.email || null;
+          }
+        }
+        
+        if (!userId) {
+          return {
+            type: "default",
+            success: true,
+            message: await DefaultReplyToMessage(
+              [...messages, {
+                content: "I need to identify you first before I can send reports. Please make sure you're registered in the system.",
+                sender_number: process.env.A1BASE_AGENT_NUMBER || "",
+                sender_name: "Agent",
+                thread_id,
+                thread_type,
+                timestamp: new Date().toISOString(),
+                message_id: "",
+                message_type: "text",
+                message_content: { text: "" },
+                role: "assistant"
+              }],
+              thread_type as "individual" | "group",
+              thread_id,
+              sender_number,
+              service,
+              participants,
+              projects
+            ),
+          };
+        }
+        
+        // Check if the latest message contains an email address
+        const latestUserMessage = messages[messages.length - 1];
+        if (!userEmail && latestUserMessage && isEmailProvisionMessage(latestUserMessage.content)) {
+          const extractedEmail = extractEmailFromMessage(latestUserMessage.content);
+          if (extractedEmail) {
+            // Save the email address
+            const saved = await updateUserEmail(sender_number, extractedEmail);
+            if (saved) {
+              userEmail = extractedEmail;
+              // Continue with the report flow using the newly saved email
+            }
+          }
+        }
+        
+        // Check if user has an email address
+        if (!userEmail) {
+          return {
+            type: "default",
+            success: true,
+            message: await DefaultReplyToMessage(
+              [...messages, {
+                content: "I'll need your email address to send you reports. Please provide your email address.",
+                sender_number: process.env.A1BASE_AGENT_NUMBER || "",
+                sender_name: "Agent",
+                thread_id,
+                thread_type,
+                timestamp: new Date().toISOString(),
+                message_id: "",
+                message_type: "text",
+                message_content: { text: "" },
+                role: "assistant"
+              }],
+              thread_type as "individual" | "group",
+              thread_id,
+              sender_number,
+              service,
+              participants,
+              projects
+            ),
+          };
+        }
+        
+        let reportMessage = "";
+        
+        switch (reportAction) {
+          case "request_on_demand":
+            try {
+              // Send on-demand report immediately
+              console.log(`[TRIAGE] Sending on-demand report to ${userEmail}`);
+              
+              // Import the email workflow function
+              const { SendEmailFromAgent } = await import('../workflows/email_workflow');
+              
+              // Generate the report data
+              const reportData = await reportGenerator.generateReport(
+                userId,
+                'project_status',
+                'weekly'
+              );
+              
+              // Set the email address
+              reportData.userEmail = userEmail;
+              
+              // Generate HTML email content
+              const htmlContent = reportGenerator.generateHTMLEmail(reportData);
+              
+              // Prepare email details
+              const emailDetails = {
+                subject: `Your Project Status Report - ${new Date().toLocaleDateString()}`,
+                body: htmlContent,
+                recipient_address: userEmail
+              };
+              
+              // Send the email
+              await SendEmailFromAgent(emailDetails);
+              
+              // Log report history
+              await reportScheduler.logReportHistory(userId, {
+                type: 'on_demand',
+                email_address: userEmail,
+                subject: emailDetails.subject,
+                status: 'sent',
+                sent_at: new Date().toISOString()
+              });
+              
+              console.log(`[TRIAGE] On-demand report sent successfully to ${userEmail}`);
+              reportMessage = `I've sent your project status report to ${userEmail}. Check your inbox!`;
+              
+            } catch (error) {
+              console.error('[TRIAGE] Error sending on-demand report:', error);
+              
+              // Log failed report
+              try {
+                await reportScheduler.logReportHistory(userId, {
+                  type: 'on_demand',
+                  email_address: userEmail,
+                  subject: 'Failed On-Demand Report',
+                  status: 'failed',
+                  error: error instanceof Error ? error.message : 'Unknown error',
+                  sent_at: new Date().toISOString()
+                });
+              } catch (logError) {
+                console.error('[TRIAGE] Error logging failed report:', logError);
+              }
+              
+              reportMessage = "Sorry, I couldn't send the report right now. Please try again later.";
+            }
+            break;
+            
+          case "request_scheduled":
+            try {
+              // Check if user already has scheduled reports
+              const existingReports = await reportScheduler.getUserScheduledReports(userId);
+              
+              if (existingReports.length > 0) {
+                const activeReport = existingReports[0];
+                reportMessage = `You already have a ${activeReport.frequency} report scheduled. Would you like to change the frequency or cancel it?`;
+              } else {
+                // Create scheduled report
+                const frequency = reportFrequency || 'weekly';
+                const time = reportTime || '09:00';
+                
+                const scheduledReport = await reportScheduler.createScheduledReport({
+                  userId,
+                  emailAddress: userEmail,
+                  frequency,
+                  scheduledTime: time,
+                  timezone: 'UTC' // TODO: Get user's actual timezone
+                });
+                
+                if (scheduledReport) {
+                  reportMessage = `Great! I've scheduled ${frequency} project status reports to be sent to ${userEmail}. You'll receive them every ${frequency === 'daily' ? 'day' : frequency === 'weekly' ? 'week' : 'month'} at ${time} UTC.`;
+                } else {
+                  reportMessage = "Sorry, I couldn't schedule the reports. Please try again later.";
+                }
+              }
+            } catch (error) {
+              console.error('[TRIAGE] Error scheduling report:', error);
+              reportMessage = "There was an error scheduling your reports. Please try again later.";
+            }
+            break;
+            
+          case "cancel_scheduled":
+            try {
+              // Get user's scheduled reports
+              const reports = await reportScheduler.getUserScheduledReports(userId);
+              
+              if (reports.length === 0) {
+                reportMessage = "You don't have any scheduled reports to cancel.";
+              } else {
+                // Cancel all active reports
+                let cancelCount = 0;
+                for (const report of reports) {
+                  const success = await reportScheduler.cancelScheduledReport(report.id, userId);
+                  if (success) cancelCount++;
+                }
+                
+                if (cancelCount > 0) {
+                  reportMessage = `I've cancelled your scheduled email reports. You won't receive any more automated reports.`;
+                } else {
+                  reportMessage = "Sorry, I couldn't cancel your reports. Please try again later.";
+                }
+              }
+            } catch (error) {
+              console.error('[TRIAGE] Error cancelling reports:', error);
+              reportMessage = "There was an error cancelling your reports. Please try again later.";
+            }
+            break;
+            
+          default:
+            reportMessage = "I can help you with project reports. You can ask me to send a report now, schedule regular reports, or cancel existing scheduled reports.";
+        }
+        
+        return {
+          type: "default",
+          success: true,
+          message: await DefaultReplyToMessage(
+            [...messages, {
+              content: reportMessage,
+              sender_number: process.env.A1BASE_AGENT_NUMBER || "",
+              sender_name: "Agent",
+              thread_id,
+              thread_type,
+              timestamp: new Date().toISOString(),
+              message_id: "",
+              message_type: "text",
+              message_content: { text: reportMessage },
+              role: "assistant"
+            }],
+            thread_type as "individual" | "group",
+            thread_id,
+            sender_number,
+            service,
+            participants,
+            projects
+          ),
+        };
+
       case "projectFlow":
         // Handle all project-related intents in a single flow
         const projectAction = (triage as any).projectAction || "create";
@@ -717,15 +981,6 @@ export async function triageMessage({
           message: projectResponse,
           data: projectData,
         };
-
-
-      // case "noReply":
-      //   // Just return an empty success response
-      //   return {
-      //     type: "default",
-      //     success: true,
-      //     message: "",
-      //   };
 
       case "simpleResponse":
       default:

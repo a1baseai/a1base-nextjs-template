@@ -107,7 +107,7 @@ export async function triageMessageIntent(
   threadMessages: ThreadMessage[],
   projects: any[] = []
 ): Promise<{
-  responseType: "simpleResponse" | "onboardingFlow" | "projectFlow" | "noReply";
+  responseType: "simpleResponse" | "onboardingFlow" | "projectFlow" | "noReply" | "emailReportFlow";
   projectAction?: "create" | "update" | "complete" | "reference";
   projectName?: string;
   projectDescription?: string;
@@ -115,6 +115,9 @@ export async function triageMessageIntent(
   attributes?: Record<string, any>;
   attributeUpdates?: Record<string, any>;
   replaceAttributes?: boolean;
+  reportAction?: "request_on_demand" | "request_scheduled" | "cancel_scheduled";
+  reportFrequency?: "daily" | "weekly" | "monthly";
+  reportTime?: string;
 }> {
   // Convert thread messages to OpenAI chat format
   const conversationContext = threadMessages.map((message) => {
@@ -142,11 +145,12 @@ export async function triageMessageIntent(
 
   const triagePrompt = `
 Based on the conversation and the context of the recent messages, analyze the user's intent and respond with a JSON object:
-- "responseType": one of ["simpleResponse", "projectFlow", "noReply", "onboardingFlow"]
+- "responseType": one of ["simpleResponse", "projectFlow", "noReply", "onboardingFlow", "emailReportFlow"]
 - Additional fields based on intent.
 
 Rules:
 - "projectFlow": Used for ALL project-related actions. Use this for any message related to creating, updating, completing, or referencing projects.
+- "emailReportFlow": Used for email report requests - both on-demand and scheduled.
 - "onboardingFlow": Related to user onboarding.
 - "simpleResponse": Default for all other messages including greetings, questions, statements, or any message from a human user that could benefit from a response.
 
@@ -154,6 +158,16 @@ For "projectFlow" responses, include these additional fields:
 - "projectAction": one of ["create", "update", "complete", "reference"]
 - "projectName": Name of the project (required for "create", optional for others if context makes it clear)
 - "projectDescription": Description of the project (for "create")
+
+For "emailReportFlow" responses, include these additional fields:
+- "reportAction": one of ["request_on_demand", "request_scheduled", "cancel_scheduled"]
+- "reportFrequency": one of ["daily", "weekly", "monthly"] (for scheduled reports)
+- "reportTime": Time in "HH:MM" format (for scheduled reports, optional)
+
+Email report patterns to recognize:
+- On-demand: "send me a report now", "email me my project status", "I want a report", "send report"
+- Scheduled: "send me daily reports", "email me weekly updates", "I want monthly reports", "schedule reports"
+- Cancel: "stop sending reports", "cancel email reports", "unsubscribe from reports"
 
 Additional context-specific fields:
 - For "create": include "attributes" (a JSON object with all project properties beyond name and description)
@@ -202,6 +216,7 @@ Return valid JSON.
       "onboardingFlow",
       "projectFlow",
       "noReply",
+      "emailReportFlow",
     ];
 
     console.log("[TRIAGE DEBUG] Raw triage result:", parsed);
@@ -224,6 +239,17 @@ Return valid JSON.
         
         console.log("[TRIAGE DEBUG] Final project flow response:", projectFlowResponse);
         return projectFlowResponse;
+      } else if (parsed.responseType === "emailReportFlow") {
+        // Handle email report flow
+        const emailReportResponse = {
+          responseType: "emailReportFlow" as const,
+          reportAction: parsed.reportAction as "request_on_demand" | "request_scheduled" | "cancel_scheduled" | undefined,
+          reportFrequency: parsed.reportFrequency as "daily" | "weekly" | "monthly" | undefined,
+          reportTime: parsed.reportTime
+        };
+        
+        console.log("[TRIAGE DEBUG] Final email report flow response:", emailReportResponse);
+        return emailReportResponse;
       } else {
         // For non-project flows, just return the response type
         console.log("[TRIAGE DEBUG] Non-project response type:", parsed.responseType);

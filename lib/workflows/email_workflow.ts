@@ -203,48 +203,60 @@ export async function SendEmailFromAgent(emailDetails: {
     const trimmedSenderEmail = A1BASE_AGENT_EMAIL.trim();
     const trimmedRecipientEmail = emailDetails.recipient_address.trim();
 
-    let rawTextContent = emailDetails.body;
+    let emailHtmlDocument: string;
 
-    // Normalize line endings from AI response
-    rawTextContent = rawTextContent.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+    // Check if the body is already a complete HTML document
+    const isCompleteHTML = emailDetails.body.trim().toLowerCase().startsWith('<!doctype html') || 
+                          emailDetails.body.trim().toLowerCase().startsWith('<html');
 
-    // --- Minimal HTML Conversion (NO CONTENT ESCAPING) ---
-    // Convert double newlines to paragraph breaks
-    let htmlBodyContent = rawTextContent.replace(/\n\n/g, "</p><p>");
-    // Convert single newlines to line breaks
-    htmlBodyContent = htmlBodyContent.replace(/\n/g, "<br />");
-    // Wrap the whole content in a starting and ending <p> tag if not already present
-    // and ensure it's not just whitespace or <br /> tags.
-    if (
-      htmlBodyContent.trim() &&
-      !htmlBodyContent.trim().toLowerCase().startsWith("<p>")
-    ) {
-      htmlBodyContent = "<p>" + htmlBodyContent;
-    }
-    if (
-      htmlBodyContent.trim() &&
-      !htmlBodyContent.trim().toLowerCase().endsWith("</p>")
-    ) {
-      htmlBodyContent = htmlBodyContent + "</p>";
-    }
-    // Cleanup: Remove empty paragraphs that might result from multiple newlines
-    htmlBodyContent = htmlBodyContent.replace(
-      /<p>\s*(<br\s*\/>\s*)*<\/p>/g,
-      ""
-    );
-    htmlBodyContent = htmlBodyContent.replace(/<p><\/p>/g, "");
+    if (isCompleteHTML) {
+      // Body is already a complete HTML document, use it as-is
+      console.log("[SendEmailFromAgent] Body is already complete HTML, using as-is");
+      emailHtmlDocument = emailDetails.body;
+    } else {
+      // Body is plain text or partial HTML, convert it
+      let rawTextContent = emailDetails.body;
 
-    const finalHtmlBody = htmlBodyContent.trim() || "<p>&nbsp;</p>"; // Ensure body is not empty
-    // --- End of Minimal HTML Conversion ---
+      // Normalize line endings from AI response
+      rawTextContent = rawTextContent.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
 
-    // Construct the full HTML document as per A1Mail documentation
-    const emailHtmlDocument = `<!DOCTYPE html>
+      // --- Minimal HTML Conversion (NO CONTENT ESCAPING) ---
+      // Convert double newlines to paragraph breaks
+      let htmlBodyContent = rawTextContent.replace(/\n\n/g, "</p><p>");
+      // Convert single newlines to line breaks
+      htmlBodyContent = htmlBodyContent.replace(/\n/g, "<br />");
+      // Wrap the whole content in a starting and ending <p> tag if not already present
+      // and ensure it's not just whitespace or <br /> tags.
+      if (
+        htmlBodyContent.trim() &&
+        !htmlBodyContent.trim().toLowerCase().startsWith("<p>")
+      ) {
+        htmlBodyContent = "<p>" + htmlBodyContent;
+      }
+      if (
+        htmlBodyContent.trim() &&
+        !htmlBodyContent.trim().toLowerCase().endsWith("</p>")
+      ) {
+        htmlBodyContent = htmlBodyContent + "</p>";
+      }
+      // Cleanup: Remove empty paragraphs that might result from multiple newlines
+      htmlBodyContent = htmlBodyContent.replace(
+        /<p>\s*(<br\s*\/>\s*)*<\/p>/g,
+        ""
+      );
+      htmlBodyContent = htmlBodyContent.replace(/<p><\/p>/g, "");
+
+      const finalHtmlBody = htmlBodyContent.trim() || "<p>&nbsp;</p>"; // Ensure body is not empty
+      // --- End of Minimal HTML Conversion ---
+
+      // Construct the full HTML document as per A1Mail documentation
+      emailHtmlDocument = `<!DOCTYPE html>
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 <title>${emailDetails.subject
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")}</title> <!-- Escape title only -->
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")}</title> <!-- Escape title only -->
 <style>
 body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
 p { margin: 0 0 1em 0; }
@@ -254,11 +266,12 @@ p { margin: 0 0 1em 0; }
 ${finalHtmlBody}
 </body>
 </html>`;
+    }
 
     console.log(
-      "[SendEmailFromAgent] Final HTML email body (minimal processing, no content escape):"
+      "[SendEmailFromAgent] Final HTML email body:"
     );
-    console.log(emailHtmlDocument);
+    console.log(emailHtmlDocument.substring(0, 500) + "...");
     console.log("[SendEmailFromAgent] Body length:", emailHtmlDocument.length);
 
     const emailData = {
@@ -268,6 +281,17 @@ ${finalHtmlBody}
       body: emailHtmlDocument,
       headers: {},
     };
+
+    console.log(
+      `[SendEmailFromAgent] Email payload summary:`,
+      {
+        sender: emailData.sender_address,
+        recipient: emailData.recipient_address,
+        subject: emailData.subject,
+        bodyLength: emailData.body.length,
+        isCompleteHTML: isCompleteHTML
+      }
+    );
 
     console.log(
       `[SendEmailFromAgent] Full email payload being sent to A1Base:`,

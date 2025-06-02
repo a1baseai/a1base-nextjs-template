@@ -321,7 +321,7 @@ export class SupabaseAdapter {
         .from("chats")
         .select("id, created_at, type, name, external_id, service, metadata")
         .eq("external_id", threadId)
-        .single();
+        .maybeSingle(); // Changed from .single() to handle duplicates gracefully
 
       // If chat not found, return null (it's a new thread)
       if (chatError) {
@@ -330,6 +330,11 @@ export class SupabaseAdapter {
           return null;
         }
         throw chatError;
+      }
+
+      // If multiple chats found (shouldn't happen after fix), use the first one
+      if (!chat) {
+        return null;
       }
 
       // Get all messages for the thread with complete user information
@@ -675,7 +680,7 @@ export class SupabaseAdapter {
         .from("chats")
         .select("id")
         .eq("external_id", threadId)
-        .single();
+        .maybeSingle(); // Changed from .single() to handle duplicates gracefully
 
       if (!findError && existingChat) {
         // Console log removed
@@ -685,7 +690,8 @@ export class SupabaseAdapter {
       if (findError && findError.code !== "PGRST116") {
         // This is an error other than "not found"
         // Console error removed
-        throw findError;
+        console.error("Error finding existing chat:", findError);
+        // Don't throw here, try to continue with creation
       }
 
       // At this point, we know the chat doesn't exist, so create a new one
@@ -709,6 +715,22 @@ export class SupabaseAdapter {
         .single();
 
       if (insertError) {
+        // Check if this is a unique constraint violation (duplicate external_id)
+        if (insertError.code === "23505" || insertError.message?.includes("duplicate key")) {
+          // Another request created the chat while we were trying, fetch it now
+          console.log("Concurrent chat creation detected, fetching existing chat");
+          
+          const { data: existingChatRetry, error: retryError } = await this.supabase
+            .from("chats")
+            .select("id")
+            .eq("external_id", threadId)
+            .maybeSingle();
+          
+          if (!retryError && existingChatRetry) {
+            return existingChatRetry.id;
+          }
+        }
+        
         // Console error removed
         console.error("Error creating chat:", insertError);
         console.error("Error details:", {
@@ -1244,22 +1266,33 @@ export class SupabaseAdapter {
       // 2. Get or create chat
       // First check if the chat already exists
       let isNewChat = false;
-      const { data: existingChat } = await this.supabase
+      const { data: existingChat, error: findError } = await this.supabase
         .from("chats")
         .select("id")
         .eq("external_id", payload.thread_id)
-        .single();
+        .maybeSingle(); // Changed from .single() to handle duplicates gracefully
+
+      if (findError && findError.code !== "PGRST116") {
+        console.error("Error checking for existing chat:", findError);
+        // Don't throw here, try to continue with getChatFromWebhook
+      }
 
       if (!existingChat) {
         isNewChat = true; // Chat doesn't exist yet, so it's new
+      } else if (existingChat) {
+        // Chat already exists, use its ID
+        chatId = existingChat.id;
       }
 
-      chatId = await this.getChatFromWebhook(
-        payload.thread_id,
-        payload.thread_type,
-        payload.service,
-        { a1_account_id: payload.a1_account_id }
-      );
+      // Only try to create if we didn't find an existing chat
+      if (!chatId) {
+        chatId = await this.getChatFromWebhook(
+          payload.thread_id,
+          payload.thread_type,
+          payload.service,
+          { a1_account_id: payload.a1_account_id }
+        );
+      }
 
       if (!chatId) {
         console.error("Failed to get or create chat");
@@ -1438,16 +1471,46 @@ export class SupabaseAdapter {
 
     console.log("upsertChatThreadMemoryValue");
 
-    // First get the current memory object
+    // Check if chatId is likely an external_id (UUID format) or internal id
+    let internalChatId = chatId;
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(chatId);
+    
+    if (isUuid) {
+      // This appears to be an external_id, look up the internal id
+      console.log(`[upsertChatThreadMemoryValue] Looking up internal ID for external_id: ${chatId}`);
+      const { data: chatLookup, error: lookupError } = await this.supabase
+        .from(CHATS_TABLE)
+        .select("id")
+        .eq("external_id", chatId)
+        .maybeSingle(); // Use maybeSingle to handle multiple rows gracefully
+
+      if (lookupError) {
+        console.error(
+          `[SupabaseAdapter] Error looking up chat by external_id ${chatId}:`,
+          lookupError
+        );
+        return { data: null, error: lookupError };
+      }
+
+      if (!chatLookup) {
+        console.error(`[SupabaseAdapter] No chat found with external_id ${chatId}`);
+        return { data: null, error: new Error(`No chat found with external_id ${chatId}`) };
+      }
+
+      internalChatId = chatLookup.id;
+      console.log(`[upsertChatThreadMemoryValue] Found internal ID: ${internalChatId} for external_id: ${chatId}`);
+    }
+
+    // First get the current memory object using internal ID
     const { data: currentChat, error: fetchError } = await this.supabase
       .from(CHATS_TABLE)
       .select("*")
-      .eq("external_id", chatId)
+      .eq("id", internalChatId)
       .single();
 
     if (fetchError) {
       console.error(
-        `[SupabaseAdapter] Error fetching chat for memory update ${chatId}:`,
+        `[SupabaseAdapter] Error fetching chat for memory update ${internalChatId}:`,
         fetchError
       );
       return { data: null, error: fetchError };
@@ -1461,7 +1524,7 @@ export class SupabaseAdapter {
     if (existingMemory && existingMemory.value && typeof existingMemory.value === 'string') {
       // If value is identical, no need to update
       if (existingMemory.value === value) {
-        console.log(`Memory value unchanged for chat ${chatId}, field ${fieldId}`);
+        console.log(`Memory value unchanged for chat ${internalChatId}, field ${fieldId}`);
         return { data: currentChat, error: null };
       }
       
@@ -1473,7 +1536,7 @@ export class SupabaseAdapter {
           fieldId.includes('topics') ||
           /\d+/.test(fieldId)) { // Numeric IDs often used for fact storage
       
-        console.log(`Integrating memory for chat ${chatId}, field ${fieldId}`);
+        console.log(`Integrating memory for chat ${internalChatId}, field ${fieldId}`);
         console.log(`Existing: "${existingMemory.value}"`);
         console.log(`New: "${value}"`);
         
@@ -1509,12 +1572,12 @@ export class SupabaseAdapter {
     const { data, error } = await this.supabase
       .from(CHATS_TABLE)
       .update({ memory })
-      .eq("external_id", chatId)
+      .eq("id", internalChatId)
       .select(); // Get the updated record
 
     if (error) {
       console.error(
-        `[SupabaseAdapter] Error upserting chat memory for chat ${chatId}, field ${fieldId}:`,
+        `[SupabaseAdapter] Error upserting chat memory for chat ${internalChatId}, field ${fieldId}:`,
         error
       );
     }
@@ -1862,10 +1925,34 @@ export class SupabaseAdapter {
    */
   async getAllChatMemoryValues(chatId: string): Promise<Record<string, any>> {
     try {
+      // Check if chatId is likely an external_id (UUID format) or internal id
+      let internalChatId = chatId;
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(chatId);
+      
+      if (isUuid) {
+        // This appears to be an external_id, look up the internal id
+        console.log(`[getAllChatMemoryValues] Looking up internal ID for external_id: ${chatId}`);
+        const { data: chatLookup, error: lookupError } = await this.supabase
+          .from(CHATS_TABLE)
+          .select("id")
+          .eq("external_id", chatId)
+          .maybeSingle(); // Use maybeSingle to handle multiple rows gracefully
+
+        if (lookupError || !chatLookup) {
+          console.error(
+            `[SupabaseAdapter] Error getting all chat memory values - could not find chat with external_id ${chatId}:`,
+            lookupError
+          );
+          return {};
+        }
+
+        internalChatId = chatLookup.id;
+      }
+
       const { data, error } = await this.supabase
         .from(CHATS_TABLE)
         .select("memory")
-        .eq("id", chatId)
+        .eq("id", internalChatId)
         .single();
 
       if (error) {
