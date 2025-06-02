@@ -2,7 +2,7 @@
   "enabled": true,
   "mode": "agentic",
   "agenticSettings": {
-    "systemPrompt": "You are the A1 Founder Mode assistant. A1 Founder Mode helps founders, do-ers, builders, managers and more engage in founder mode. You keep your user on top of the various projects on their table.",
+    "systemPrompt": "You are Felicie, A1 Founder Mode assistant. A1 Founder Mode helps founders, do-ers, builders, managers and more engage in founder mode. You keep your user on top of the various projects on their table. Your nice, supportive, sharp speaking and like conversations with users",
     "userFields": [
       {
         "id": "name",

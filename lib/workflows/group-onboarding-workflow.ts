@@ -13,6 +13,13 @@ import { getInitializedAdapter } from "../supabase/config";
 import { getOpenAI } from "../services/openai";
 import { ThreadMessage } from "../supabase/types"; // Import ThreadMessage type
 
+/**
+ * Normalizes a phone number by removing '+' and spaces.
+ */
+function normalizePhoneNumber(phoneNumber: string): string {
+  return phoneNumber.replace(/\+|\s/g, "");
+}
+
 // Use the existing database types
 interface MessageRecord {
   message_id: string;
@@ -390,7 +397,7 @@ async function sendGroupOnboardingPrompt(threadId: string, fieldDescription: str
             const recentMessages = threadData.messages.slice(-10);
             
             chatHistoryFormatted = recentMessages.map((msg: ThreadMessage) => ({
-              role: msg.sender_number === process.env.A1BASE_AGENT_NUMBER ? 'assistant' as const : 'user' as const,
+              role: normalizePhoneNumber(msg.sender_number) === normalizePhoneNumber(process.env.A1BASE_AGENT_NUMBER || "") ? 'assistant' as const : 'user' as const,
               content: msg.message_content?.text || msg.content || ""
             })); 
           }
@@ -540,7 +547,45 @@ export async function handleGroupChatOnboarding(
       return false;
     }
     
-    const welcomeMessage = groupOnboardingFlow.agenticSettings.initialGroupMessage;
+    let welcomeMessage = groupOnboardingFlow.agenticSettings.initialGroupMessage;
+    
+    // If we have the user's message content, generate a more contextual welcome
+    if (payload.message_content && typeof payload.message_content === 'object' && payload.message_content.text) {
+      const userMessage = payload.message_content.text;
+      console.log(`[GroupOnboarding] Generating contextual welcome based on user message: "${userMessage}"`);
+      
+      try {
+        // Get recent chat history if available
+        const threadData = await adapter.getThread(payload.thread_id);
+        const chatHistoryFormatted = threadData && threadData.messages ? 
+          threadData.messages.slice(-5).map(msg => ({
+            role: normalizePhoneNumber(msg.sender_number) === normalizePhoneNumber(process.env.A1BASE_AGENT_NUMBER || "") ? 'assistant' as const : 'user' as const,
+            content: msg.content || ""
+          })) : [];
+        
+        // Generate a contextual welcome message
+        const systemPrompt = groupOnboardingFlow.agenticSettings.systemPrompt;
+        const messagesForAI = [
+          { role: "system" as const, content: systemPrompt },
+          ...chatHistoryFormatted,
+          { role: "user" as const, content: userMessage },
+          { role: "system" as const, content: `Generate a welcoming message for this new group chat that acknowledges what the user just said: "${userMessage}". Keep it brief and friendly, and naturally lead into asking for the group name as part of the onboarding process.` }
+        ];
+        
+        const response = await getOpenAI().chat.completions.create({
+          model: "gpt-4",
+          messages: messagesForAI,
+          temperature: 0.7,
+          max_tokens: 200
+        });
+        
+        welcomeMessage = response.choices[0]?.message?.content || welcomeMessage;
+        console.log(`[GroupOnboarding] Generated contextual welcome: "${welcomeMessage}"`);
+      } catch (error) {
+        console.error('[GroupOnboarding] Error generating contextual welcome, using default:', error);
+        // Fall back to default welcome message
+      }
+    }
 
     await client.sendGroupMessage(process.env.A1BASE_ACCOUNT_ID!, {
       content: welcomeMessage,

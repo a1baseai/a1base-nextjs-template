@@ -11,6 +11,8 @@ import { OnboardingFlow } from "../onboarding-flow/types";
 import { SupabaseAdapter } from "../supabase/adapter";
 import { getInitializedAdapter } from "../supabase/config";
 import { generateAgentResponse } from "../services/openai";
+import OpenAI from "openai";
+import { formatMessagesForOpenAI } from "../services/openai";
 
 // Initialize A1Base client
 const client = new A1BaseAPI({
@@ -19,6 +21,96 @@ const client = new A1BaseAPI({
     apiSecret: process.env.A1BASE_API_SECRET!,
   },
 });
+
+// Initialize OpenAI client
+const openaiClient = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+/**
+ * Extract already collected onboarding field values from the conversation history
+ * @param threadMessages The conversation thread messages
+ * @param onboardingFlow The onboarding flow configuration
+ * @returns An object containing the collected field values
+ */
+export function extractCollectedFields(
+  threadMessages: ThreadMessage[],
+  onboardingFlow: OnboardingFlow
+): Record<string, any> {
+  const collectedData: Record<string, any> = {};
+  
+  if (!onboardingFlow.agenticSettings) {
+    return collectedData;
+  }
+
+  console.log('[extractCollectedFields] Starting extraction from', threadMessages.length, 'messages');
+  
+  // Debug: Log all messages to see what we're working with
+  console.log('[extractCollectedFields] All messages:');
+  threadMessages.forEach((msg, index) => {
+    console.log(`  [${index}] role: ${msg.role}, sender: ${msg.sender_number}, content: "${msg.content.substring(0, 80)}..."`);
+  });
+  
+  // Go through messages to find what fields have been collected
+  const fields = onboardingFlow.agenticSettings.userFields;
+  
+  // Look for assistant questions followed by user responses
+  for (let i = 0; i < threadMessages.length - 1; i++) {
+    const currentMsg = threadMessages[i];
+    const nextMsg = threadMessages[i + 1];
+    
+    // Log each message pair for debugging
+    if (currentMsg.role === 'assistant' && nextMsg.role === 'user') {
+      console.log(`[extractCollectedFields] Found assistant->user pair at index ${i}`);
+      console.log(`[extractCollectedFields] Assistant[${i}]: "${currentMsg.content.substring(0, 100)}..."`);
+      console.log(`[extractCollectedFields] User[${i+1}]: "${nextMsg.content}"`);
+      
+      const assistantText = currentMsg.content.toLowerCase();
+      const userResponse = nextMsg.content.trim();
+      
+      // Check if asking for name - be more flexible with patterns
+      if (!collectedData.name && 
+          (assistantText.includes('full name') || 
+           assistantText.includes('your name') ||
+           assistantText.includes('tell me your name') ||
+           assistantText.includes('share your name') ||
+           assistantText.includes('what is your name') ||
+           assistantText.includes("what's your name") ||
+           assistantText.includes('can i have your'))) {
+        collectedData.name = userResponse;
+        console.log('[extractCollectedFields] Extracted name:', userResponse);
+      }
+      // Check if asking for email - only after we have a name
+      else if (collectedData.name && !collectedData.email &&
+               (assistantText.includes('email') || 
+                assistantText.includes('e-mail') ||
+                assistantText.includes('email address') ||
+                assistantText.includes('your email'))) {
+        // Basic email validation
+        if (userResponse.includes('@')) {
+          collectedData.email = userResponse;
+          console.log('[extractCollectedFields] Extracted email:', userResponse);
+        }
+      }
+      // Check if asking for big dream - only after we have name and email
+      else if (collectedData.name && collectedData.email && !collectedData.big_dream &&
+               (assistantText.includes('dream') || 
+                assistantText.includes('goal') || 
+                assistantText.includes('vision') ||
+                assistantText.includes('aspiration') ||
+                assistantText.includes('project') ||
+                assistantText.includes('startup'))) {
+        collectedData.big_dream = userResponse;
+        console.log('[extractCollectedFields] Extracted big dream:', userResponse);
+      }
+    } else if (i < threadMessages.length - 1) {
+      console.log(`[extractCollectedFields] Skipping pair at index ${i}: ${currentMsg.role}->${nextMsg.role}`);
+    }
+  }
+  
+  console.log('[extractCollectedFields] Final collected fields:', collectedData);
+  return collectedData;
+}
 
 /**
  * Creates a system prompt for onboarding based on the onboarding settings
@@ -55,65 +147,149 @@ export function createAgenticOnboardingPrompt(
     return `${systemPrompt}\n\nAll required information has been collected. Now, respond with: ${onboardingFlow.agenticSettings.finalMessage}`;
   }
 
-  // Convert user fields to instructions for the AI
-  const fieldInstructions = fieldsToCollect
-    .map((field) => {
-      const requiredText = field.required ? "(required)" : "(optional)";
-      return `- ${field.description} ${requiredText}. Store as '${field.id}'.`;
-    })
-    .join("\n");
-
   console.log("[Onboarding] Fields to collect:", fieldsToCollect);
+  console.log("[Onboarding] Existing data:", existingData);
 
-  // Combine system prompt with field instructions
-  const aiPrompt = `${systemPrompt}\n\nCollect the following information:\n${fieldInstructions}\n\nAfter collecting all required information, respond with: ${onboardingFlow.agenticSettings.finalMessage}`;
+  // Get only the first field to collect for a more natural conversation
+  const nextField = fieldsToCollect[0];
+  const fieldInstruction = `${nextField.description}${nextField.required ? " (this is required)" : ""}`;
 
-  console.log("[Onboarding] Generated agentic follow-up prompt:", aiPrompt);
+  // Add context about what we've already collected
+  let contextInfo = "";
+  if (existingData && Object.keys(existingData).length > 0) {
+    contextInfo = "\n\nYou have already collected the following information:";
+    if (existingData.name) contextInfo += `\n- Name: ${existingData.name}`;
+    if (existingData.email) contextInfo += `\n- Email: ${existingData.email}`;
+    if (existingData.big_dream) contextInfo += `\n- Big Dream: ${existingData.big_dream}`;
+  }
 
-  // Console log removed
+  // Determine what specific question to ask based on the field
+  let specificQuestion = "";
+  if (nextField.id === "name") {
+    specificQuestion = "What is your full name?";
+  } else if (nextField.id === "email") {
+    specificQuestion = "What is your email address?";
+  } else if (nextField.id === "big_dream") {
+    specificQuestion = "What's your biggest dream for your project or startup?";
+  } else {
+    specificQuestion = `Please provide your ${nextField.label || nextField.id}.`;
+  }
+
+  // Combine system prompt with instruction to ask for just the next field
+  const aiPrompt = `${systemPrompt}
+
+You are currently onboarding a new user. ${contextInfo}
+
+Your task now is to ask for the following information in a natural, conversational way:
+${fieldInstruction}
+
+CRITICAL INSTRUCTIONS - YOU MUST FOLLOW THESE EXACTLY:
+1. You MUST ask for the ${nextField.label || nextField.id} specifically
+2. Your response MUST include a question asking for their ${nextField.label || nextField.id}
+3. Ask for ONLY this one piece of information
+4. Be friendly and acknowledge the user's previous response if applicable
+5. Do NOT skip ahead or ask about anything else
+6. Do NOT provide generic statements about "getting started" or "diving in" or "next steps"
+7. Do NOT say things like "Let's continue" or "Let's proceed" without asking the specific question
+
+REQUIRED: Your response MUST end with this exact question (you can add friendly context before it):
+"${specificQuestion}"
+
+Example good responses:
+- "Thanks for that! ${specificQuestion}"
+- "Great to hear from you! ${specificQuestion}"
+- "I appreciate you sharing that. ${specificQuestion}"
+
+${fieldsToCollect.length === 1 ? `\nAfter collecting this last piece of information, respond with: ${onboardingFlow.agenticSettings.finalMessage}` : ''}`;
+
+  console.log("[Onboarding] Generated agentic onboarding prompt for field:", nextField.id);
+  console.log("[Onboarding] Specific question to ask:", specificQuestion);
+
   return aiPrompt;
 }
 
 /**
  * Generate a conversational onboarding message using OpenAI
  * @param systemPrompt The system prompt containing onboarding instructions
+ * @param threadMessages The conversation thread messages for context
+ * @param userMessage The user's actual message
  * @param service The service being used
  * @returns A conversational, user-friendly onboarding message
  */
 async function generateOnboardingMessage(
   systemPrompt: string,
+  threadMessages: ThreadMessage[],
+  userMessage: string,
   service?: string
 ): Promise<string> {
   console.log("[generateOnboardingMessage] Function started");
-  console.log("[generateOnboardingMessage] System prompt received:", systemPrompt);
+  console.log("[generateOnboardingMessage] System prompt preview (first 500 chars):", systemPrompt.substring(0, 500) + "...");
+  console.log("[generateOnboardingMessage] User message:", userMessage);
+  console.log("[generateOnboardingMessage] Thread messages count:", threadMessages.length);
   
   try {
-    console.log("[generateOnboardingMessage] Preparing to call generateAgentResponse");
+    console.log("[generateOnboardingMessage] Preparing to call OpenAI directly for onboarding");
     
-    // Use generateAgentResponse. For an initial onboarding message, there are no prior threadMessages.
-    // The systemPrompt created by createAgenticOnboardingPrompt will be the main driver.
-    // We provide a simple initial user message like "Hello!" to kick off the AI's response generation
-    // based on the detailed system prompt.
-    const generatedMessage = await generateAgentResponse(
-      [], // No prior messages
-      "Hello!", // Initial user-like prompt to elicit response from the system prompt
-      "individual", // Assuming onboarding starts as individual, can be adjusted if needed
-      [], // No participants needed for this direct system prompt driven response
-      [], // No projects needed
-      service // Pass service through
-    );
+    // Format messages for OpenAI
+    const formattedMessages = formatMessagesForOpenAI(threadMessages, "individual");
+    
+    // Add a more explicit user message to reinforce the onboarding context
+    const messages = [
+      {
+        role: "system" as const,
+        content: systemPrompt, // This contains the onboarding instructions
+      },
+      ...formattedMessages,
+    ];
+    
+    // If this is continuing onboarding, add an assistant message to reinforce the context
+    if (formattedMessages.length > 0) {
+      // Add a system reminder about the onboarding task
+      messages.push({
+        role: "system" as const,
+        content: "REMINDER: You are in the middle of onboarding. Follow the instructions above and ask the specific question required. Do not give generic responses."
+      });
+    }
+    
+    console.log("[generateOnboardingMessage] Calling OpenAI with", messages.length, "messages");
+    
+    // Call OpenAI directly with the onboarding system prompt
+    // This ensures the onboarding instructions take priority
+    const response = await openaiClient.chat.completions.create({
+      model: "gpt-4",
+      messages: messages,
+      max_tokens: 1000,
+      temperature: 0.3, // Lower temperature for more consistent responses
+    });
 
-    console.log("[generateOnboardingMessage] Response received from generateAgentResponse");
+    const generatedMessage = response.choices[0]?.message?.content;
+    
+    console.log("[generateOnboardingMessage] Response received from OpenAI");
     console.log("[generateOnboardingMessage] Generated onboarding message:", generatedMessage);
     
     if (!generatedMessage) {
       console.log("[generateOnboardingMessage] No message generated, using fallback");
+      return "Hello! I'm your assistant. To get started, could you please tell me your name?";
     }
     
-    return (
-      generatedMessage ||
-      "Hello! I'm your assistant. To get started, could you please tell me your name?"
-    );
+    // Validate that the response contains a question if we're expecting one
+    const lowerMessage = generatedMessage.toLowerCase();
+    const containsQuestion = generatedMessage.includes('?');
+    const containsExpectedTerms = lowerMessage.includes('name') || lowerMessage.includes('email') || lowerMessage.includes('dream');
+    
+    if (!containsQuestion || !containsExpectedTerms) {
+      console.warn("[generateOnboardingMessage] Generated message may not contain expected question. Adding explicit question.");
+      // Extract what field we're asking for from the system prompt
+      if (systemPrompt.includes('"What is your full name?"')) {
+        return generatedMessage + "\n\nWhat is your full name?";
+      } else if (systemPrompt.includes('"What is your email address?"')) {
+        return generatedMessage + "\n\nWhat is your email address?";
+      } else if (systemPrompt.includes('"What\'s your biggest dream')) {
+        return generatedMessage + "\n\nWhat's your biggest dream for your project or startup?";
+      }
+    }
+    
+    return generatedMessage;
   } catch (error) {
     console.error('[generateOnboardingMessage] Error generating onboarding message:', error);
     console.log('[generateOnboardingMessage] Using fallback message due to error');
@@ -131,30 +307,42 @@ export async function StartOnboarding(
   thread_type: "individual" | "group",
   thread_id?: string,
   sender_number?: string,
-  service?: string
+  service?: string,
+  chatId?: string
 ): Promise<{ messages: { text: string; waitForResponse: boolean }[] }> {
-  // Console log removed
+  console.log(`[StartOnboarding] Called with thread_id: ${thread_id}, chat_id: ${chatId}, thread_type: ${thread_type}, messages count: ${threadMessages.length}`);
 
   try {
     // Safely load the onboarding flow
     const onboardingFlow = await loadOnboardingFlow();
+    console.log(`[StartOnboarding] Onboarding flow loaded. Enabled: ${onboardingFlow.enabled}`);
 
     // If onboarding is disabled, just skip
     if (!onboardingFlow.enabled) {
-      // Console log removed
+      console.log(`[StartOnboarding] Onboarding is disabled in configuration`);
       return { messages: [] };
     }
 
-    // Console log removed
+    console.log(`[StartOnboarding] Onboarding is enabled, proceeding...`);
 
-    // Create the system prompt for onboarding
-    const systemPrompt = createAgenticOnboardingPrompt(onboardingFlow);
+    // Extract already collected data from the conversation
+    const collectedData = extractCollectedFields(threadMessages, onboardingFlow);
+    console.log(`[StartOnboarding] Already collected data:`, collectedData);
 
-    // Console log removed
+    // Create the system prompt for onboarding with existing data
+    const systemPrompt = createAgenticOnboardingPrompt(onboardingFlow, collectedData);
+    console.log(`[StartOnboarding] System prompt created`);
 
-    // Generate a conversational message using the system prompt
+    // Extract the user's actual message if available
+    const userMessage = threadMessages.length > 0 && threadMessages[threadMessages.length - 1].role === "user"
+      ? threadMessages[threadMessages.length - 1].content
+      : "Hello!";
+
+    // Generate a conversational message using the system prompt and user's actual message
     const conversationalMessageText = await generateOnboardingMessage(
       systemPrompt,
+      threadMessages,
+      userMessage,
       service
     );
 
@@ -163,78 +351,6 @@ export async function StartOnboarding(
       text: conversationalMessageText,
       waitForResponse: true,
     };
-
-    // Store AI message before sending to user
-    if (
-      thread_id &&
-      process.env.A1BASE_AGENT_NUMBER &&
-      process.env.SUPABASE_URL &&
-      process.env.SUPABASE_KEY
-    ) {
-      const supabaseAdapter = await getInitializedAdapter();
-
-      if (!supabaseAdapter) {
-        console.error(
-          "[StartOnboarding] Supabase adapter not initialized. Cannot store AI message."
-        );
-        // Optionally handle this error, e.g., by returning or throwing
-      } else {
-        const messageContentForDb = { text: conversationalMessageText };
-        const aiMessageId = `ai-onboarding-${Date.now()}`;
-
-        console.log(
-          `[StartOnboarding] Attempting to store initial AI onboarding message. Thread ID: ${thread_id}, Service: ${service}, Type: ${thread_type}, AI Message ID: ${aiMessageId}`
-        );
-        try {
-          await supabaseAdapter.storeMessage(
-            thread_id,
-            process.env.A1BASE_AGENT_NUMBER,
-            aiMessageId,
-            messageContentForDb,
-            "text",
-            service || "whatsapp",
-            messageContentForDb
-          );
-          console.log(
-            `[StartOnboarding] Successfully stored initial AI onboarding message. AI Message ID: ${aiMessageId}`
-          );
-        } catch (storeError) {
-          console.error(
-            `[StartOnboarding] Error storing initial AI onboarding message. AI Message ID: ${aiMessageId}, Error:`,
-            storeError
-          );
-        }
-      }
-    }
-
-    // For WhatsApp or other channels, send the message through A1Base
-    // Skip sending if we're using the special skip marker
-    if (
-      (thread_type === "group" || thread_type === "individual") &&
-      service !== "web-ui" &&
-      service !== "__skip_send"
-    ) {
-      // Console log removed
-      const messageData = {
-        content: onboardingMessage.text,
-        from: process.env.A1BASE_AGENT_NUMBER!,
-        service: "whatsapp" as const,
-      };
-
-      if (thread_type === "group" && thread_id) {
-        await client.sendGroupMessage(process.env.A1BASE_ACCOUNT_ID!, {
-          ...messageData,
-          thread_id,
-        });
-      } else if (thread_type === "individual" && sender_number) {
-        await client.sendIndividualMessage(process.env.A1BASE_ACCOUNT_ID!, {
-          ...messageData,
-          to: sender_number,
-        });
-      }
-    } else if (service === "__skip_send") {
-      // Console log removed
-    }
 
     // Return the conversational message for the web UI or other channels
     return { messages: [onboardingMessage] };
