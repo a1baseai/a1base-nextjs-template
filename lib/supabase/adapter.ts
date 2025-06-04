@@ -1980,4 +1980,68 @@ export class SupabaseAdapter {
       return {};
     }
   }
+
+  /**
+   * Update the status of a message
+   * @param params Object containing messageId, status, and optional error details
+   * @returns Success status
+   */
+  async updateMessageStatus(params: {
+    messageId: string;
+    status: string;
+    updatedAt: string;
+    errorCode?: string;
+    errorMessage?: string;
+  }): Promise<boolean> {
+    this.ensureInitialized();
+
+    try {
+      console.log("[updateMessageStatus] Updating message status:", params);
+      
+      // Build the update object
+      const updates: any = {
+        status: params.status,
+        status_updated_at: params.updatedAt
+      };
+      
+      // If it's a failed message, store error details in rich_content
+      if (params.status === 'failed' && (params.errorCode || params.errorMessage)) {
+        // First get the current message to preserve existing rich_content
+        const { data: currentMessage, error: fetchError } = await this.supabase
+          .from("messages")
+          .select("rich_content")
+          .eq("external_id", params.messageId)
+          .single();
+          
+        if (!fetchError && currentMessage) {
+          // Merge error details with existing rich_content
+          updates.rich_content = {
+            ...(currentMessage.rich_content || {}),
+            error: {
+              code: params.errorCode,
+              message: params.errorMessage,
+              timestamp: params.updatedAt
+            }
+          };
+        }
+      }
+      
+      // Update the message by external_id (which is the message_id from A1Base)
+      const { error } = await this.supabase
+        .from("messages")
+        .update(updates)
+        .eq("external_id", params.messageId);
+
+      if (error) {
+        console.error("[updateMessageStatus] Error updating message status:", error);
+        return false;
+      }
+      
+      console.log(`[updateMessageStatus] Successfully updated status for message ${params.messageId} to ${params.status}`);
+      return true;
+    } catch (error) {
+      console.error("[updateMessageStatus] Exception updating message status:", error);
+      return false;
+    }
+  }
 }

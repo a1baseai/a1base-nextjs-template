@@ -7,6 +7,7 @@ import {
   getInitializedAdapter,
 } from "../supabase/config";
 import { SupabaseAdapter } from "../supabase/adapter";
+import { buildSystemPrompt, getServiceContextMessage } from './prompt-builder';
 
 /**
  * Normalizes a phone number by removing '+' and spaces.
@@ -334,6 +335,10 @@ export async function generateAgentResponse(
 
   // Get the system prompt with custom settings
   const systemPromptContent = await getSystemPrompt();
+  
+  // Build service-aware system prompt
+  const baseSystemPrompt = buildSystemPrompt(systemPromptContent, service || 'whatsapp');
+  
   const richContext = generateRichChatContext(
     threadType,
     threadMessages,
@@ -341,7 +346,7 @@ export async function generateAgentResponse(
     projects
   );
   // Combine the base system prompt with the rich context
-  let enhancedSystemPrompt = systemPromptContent + richContext;
+  let enhancedSystemPrompt = baseSystemPrompt + richContext;
 
   // If a specific user prompt is provided, add it to the system prompt
   if (userPrompt) {
@@ -456,6 +461,11 @@ export async function generateAgentResponse(
   );
 
   conversationForOpenAI.push(...formattedOpenAIMessages);
+  
+  // Add service context message if SMS
+  if (service === 'sms') {
+    conversationForOpenAI.push(getServiceContextMessage('sms'));
+  }
 
   console.log("OpenAI completion happening at generateAgentResponse function");
 

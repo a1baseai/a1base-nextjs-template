@@ -13,6 +13,7 @@ import { getInitializedAdapter } from "../supabase/config";
 import { generateAgentResponse } from "../services/openai";
 import OpenAI from "openai";
 import { formatMessagesForOpenAI } from "../services/openai";
+import { buildSystemPrompt } from "../services/prompt-builder";
 
 // Initialize A1Base client
 const client = new A1BaseAPI({
@@ -117,18 +118,22 @@ export function extractCollectedFields(
  *
  * @param onboardingFlow The complete onboarding flow configuration
  * @param existingData Optional. An object containing already collected user data.
+ * @param service Optional. The messaging service (e.g., 'sms', 'whatsapp')
  * @returns The formatted system prompt for the AI
  */
 export function createAgenticOnboardingPrompt(
   onboardingFlow: OnboardingFlow,
-  existingData?: Record<string, any>
+  existingData?: Record<string, any>,
+  service?: string
 ): string {
   if (!onboardingFlow.agenticSettings) {
     throw new Error("Agentic settings not available in the onboarding flow");
   }
 
   // Use the configured system prompt for onboarding
-  const systemPrompt = onboardingFlow.agenticSettings.systemPrompt;
+  const baseSystemPrompt = onboardingFlow.agenticSettings.systemPrompt;
+  // Make the system prompt service-aware
+  const systemPrompt = buildSystemPrompt(baseSystemPrompt, service || 'whatsapp');
 
   // Filter userFields to only include those not yet collected or empty
   const fieldsToCollect = onboardingFlow.agenticSettings.userFields.filter(
@@ -202,7 +207,7 @@ Example good responses:
 
 ${fieldsToCollect.length === 1 ? `\nAfter collecting this last piece of information, respond with: ${onboardingFlow.agenticSettings.finalMessage}` : ''}`;
 
-  console.log("[Onboarding] Generated agentic onboarding prompt for field:", nextField.id);
+  console.log("[Onboarding] Generated agentic onboarding prompt for field:", nextField.id, "Service:", service);
   console.log("[Onboarding] Specific question to ask:", specificQuestion);
 
   return aiPrompt;
@@ -226,9 +231,13 @@ async function generateOnboardingMessage(
   console.log("[generateOnboardingMessage] System prompt preview (first 500 chars):", systemPrompt.substring(0, 500) + "...");
   console.log("[generateOnboardingMessage] User message:", userMessage);
   console.log("[generateOnboardingMessage] Thread messages count:", threadMessages.length);
+  console.log("[generateOnboardingMessage] Service:", service);
   
   try {
     console.log("[generateOnboardingMessage] Preparing to call OpenAI directly for onboarding");
+    
+    // Build service-aware system prompt
+    const serviceAwarePrompt = buildSystemPrompt(systemPrompt, service || 'whatsapp');
     
     // Format messages for OpenAI
     const formattedMessages = formatMessagesForOpenAI(threadMessages, "individual");
@@ -237,7 +246,7 @@ async function generateOnboardingMessage(
     const messages = [
       {
         role: "system" as const,
-        content: systemPrompt, // This contains the onboarding instructions
+        content: serviceAwarePrompt, // This contains the onboarding instructions with SMS awareness
       },
       ...formattedMessages,
     ];
@@ -258,7 +267,7 @@ async function generateOnboardingMessage(
     const response = await openaiClient.chat.completions.create({
       model: "gpt-4",
       messages: messages,
-      max_tokens: 1000,
+      max_tokens: service === 'sms' ? 300 : 1000, // Limit tokens for SMS
       temperature: 0.3, // Lower temperature for more consistent responses
     });
 
@@ -269,6 +278,9 @@ async function generateOnboardingMessage(
     
     if (!generatedMessage) {
       console.log("[generateOnboardingMessage] No message generated, using fallback");
+      if (service === 'sms') {
+        return "Hi! I'm your assistant. What's your name?";
+      }
       return "Hello! I'm your assistant. To get started, could you please tell me your name?";
     }
     
@@ -281,10 +293,19 @@ async function generateOnboardingMessage(
       console.warn("[generateOnboardingMessage] Generated message may not contain expected question. Adding explicit question.");
       // Extract what field we're asking for from the system prompt
       if (systemPrompt.includes('"What is your full name?"')) {
+        if (service === 'sms') {
+          return generatedMessage + "\n\nWhat's your full name?";
+        }
         return generatedMessage + "\n\nWhat is your full name?";
       } else if (systemPrompt.includes('"What is your email address?"')) {
+        if (service === 'sms') {
+          return generatedMessage + "\n\nWhat's your email?";
+        }
         return generatedMessage + "\n\nWhat is your email address?";
       } else if (systemPrompt.includes('"What\'s your biggest dream')) {
+        if (service === 'sms') {
+          return generatedMessage + "\n\nWhat's your biggest dream?";
+        }
         return generatedMessage + "\n\nWhat's your biggest dream for your project or startup?";
       }
     }
@@ -293,6 +314,9 @@ async function generateOnboardingMessage(
   } catch (error) {
     console.error('[generateOnboardingMessage] Error generating onboarding message:', error);
     console.log('[generateOnboardingMessage] Using fallback message due to error');
+    if (service === 'sms') {
+      return "Hi! I'm your assistant. What's your name?";
+    }
     return "Hello! I'm your assistant. To help you get set up, could you please tell me your name?";
   }
 }
@@ -310,7 +334,7 @@ export async function StartOnboarding(
   service?: string,
   chatId?: string
 ): Promise<{ messages: { text: string; waitForResponse: boolean }[] }> {
-  console.log(`[StartOnboarding] Called with thread_id: ${thread_id}, chat_id: ${chatId}, thread_type: ${thread_type}, messages count: ${threadMessages.length}`);
+  console.log(`[StartOnboarding] Called with thread_id: ${thread_id}, chat_id: ${chatId}, thread_type: ${thread_type}, messages count: ${threadMessages.length}, service: ${service}`);
 
   try {
     // Safely load the onboarding flow
@@ -329,9 +353,9 @@ export async function StartOnboarding(
     const collectedData = extractCollectedFields(threadMessages, onboardingFlow);
     console.log(`[StartOnboarding] Already collected data:`, collectedData);
 
-    // Create the system prompt for onboarding with existing data
-    const systemPrompt = createAgenticOnboardingPrompt(onboardingFlow, collectedData);
-    console.log(`[StartOnboarding] System prompt created`);
+    // Create the system prompt for onboarding with existing data AND service context
+    const systemPrompt = createAgenticOnboardingPrompt(onboardingFlow, collectedData, service);
+    console.log(`[StartOnboarding] System prompt created (service: ${service})`);
 
     // Extract the user's actual message if available
     const userMessage = threadMessages.length > 0 && threadMessages[threadMessages.length - 1].role === "user"

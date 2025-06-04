@@ -1,3 +1,6 @@
+// TODO: Rename this file to something more general like 'handle-messaging-incoming.ts' or 'handle-unified-messaging.ts'
+// This file now handles all messaging channels (WhatsApp, SMS, RCS, iMessage) not just WhatsApp
+
 // import { WhatsAppIncomingData } from "a1base-node";
 import { MessageRecord } from "@/types/chat";
 import { triageMessage, projectTriage } from "./triage-logic";
@@ -261,9 +264,10 @@ async function saveOnboardingInfoToDatabase(
 async function handleAgenticOnboardingFollowUp(
   threadMessages: MessageRecord[],
   senderNumber?: string,
-  adapter?: SupabaseAdapter | null
+  adapter?: SupabaseAdapter | null,
+  service?: string
 ): Promise<{ text: string; waitForResponse: boolean }> {
-  console.log("[Onboarding] Handling agentic follow-up onboarding message");
+  console.log("[Onboarding] Handling agentic follow-up onboarding message. Service:", service);
   console.log("[Onboarding] Number of thread messages:", threadMessages.length);
   
   try {
@@ -288,8 +292,8 @@ async function handleAgenticOnboardingFollowUp(
 
     // Log the messages for debugging
     console.log("[Onboarding] Thread messages for onboarding:");
-    threadMessagesForOnboarding.forEach((msg, index) => {
-      console.log(`  [${index}] ${msg.role}: ${msg.content.substring(0, 50)}...`);
+    threadMessagesForOnboarding.forEach((index, msg) => {
+      console.log(`  [${index}] ${(msg as any).role}: ${(msg as any).content.substring(0, 50)}...`);
     });
 
     // Import necessary functions
@@ -336,13 +340,14 @@ async function handleAgenticOnboardingFollowUp(
       // We still have fields to collect
       console.log("[Onboarding] Generating prompt for next field:", fieldsToCollect[0].id);
       
-      // Generate the system prompt for the next field
+      // Generate the system prompt for the next field, now service-aware
       const systemPrompt = createAgenticOnboardingPrompt(
         onboardingFlow,
-        collectedData
+        collectedData,
+        service
       );
       console.log(
-        "[Onboarding] Generated dynamic system prompt for next field"
+        "[Onboarding] Generated dynamic system prompt for next field (service:", service, ")"
       );
       console.log("[Onboarding] System prompt preview:", systemPrompt.substring(0, 200) + "...");
 
@@ -365,7 +370,7 @@ async function handleAgenticOnboardingFollowUp(
           },
           ...formattedMessages,
         ],
-        max_tokens: 1000,
+        max_tokens: service === 'sms' ? 300 : 1000,
         temperature: 0.7,
       });
 
@@ -389,8 +394,12 @@ async function handleAgenticOnboardingFollowUp(
     return { text: responseContent, waitForResponse: !allFieldsCollected };
   } catch (error) {
     console.error("[Onboarding] Error in agentic follow-up handling:", error);
+    let fallbackMessage = "I'm having trouble processing your message. Let's continue with the onboarding. Could you please tell me your name?";
+    if (service === 'sms') {
+      fallbackMessage = "Sorry, error processing. What's your name?";
+    }
     return {
-      text: "I'm having trouble processing your message. Let's continue with the onboarding. Could you please tell me your name?",
+      text: fallbackMessage,
       waitForResponse: true,
     };
   }
@@ -567,10 +576,14 @@ async function sendResponseMessage(
   text: string,
   threadType: "individual" | "group",
   recipientId: string, // thread_id for group, sender_number for individual
-  service: string, // Original service from webhook, e.g., "whatsapp"
+  service: string, // Original service from webhook, e.g., "whatsapp" or "sms"
   chatId: string | null, // Database chat ID for storing AI message
   adapter: SupabaseAdapter | null
 ): Promise<void> {
+  // Import SMS dependencies at the top of the function (or file)
+  const { extendedClient } = require("@/lib/a1base/extended-client");
+  const { SMSHandler } = require("@/lib/services/sms-handler");
+  
   // Log all arguments when sending a message
   console.log("[Send] === sendResponseMessage called with arguments ===");
   console.log("[Send] text:", text);
@@ -598,6 +611,100 @@ async function sendResponseMessage(
     throw new Error("A1BASE_ACCOUNT_ID environment variable is not set");
   }
 
+  // Handle SMS-specific logic
+  if (service === 'sms') {
+    console.log("[Send] Processing SMS message");
+    
+    // Validate SMS content
+    const validation = SMSHandler.validateSMSContent(text);
+    
+    if (!validation.valid) {
+      console.error(`[Send] SMS validation failed: ${validation.error}`);
+      
+      // Store failed attempt in database
+      if (adapter && chatId) {
+        try {
+          const agentUserId = await ensureAgentUserExists(adapter);
+          await adapter.storeMessage(
+            chatId,
+            agentUserId,
+            `sms-failed-${Date.now()}`,
+            {
+              text: text.substring(0, 100) + '... [MESSAGE TOO LONG]',
+              error: validation.error,
+              originalLength: validation.length
+            },
+            'text',
+            'sms',
+            {
+              status: 'failed',
+              error: validation.error
+            }
+          );
+        } catch (storeError) {
+          console.error("[Send] Failed to store SMS error in database:", storeError);
+        }
+      }
+      
+      // Send a shortened error message to the user
+      const errorMessage = "I apologize, but my response was too long for SMS. Please ask me to be more concise, or we can continue via WhatsApp for detailed responses.";
+      
+      try {
+        const smsPayload = {
+          content: { message: errorMessage },
+          from: process.env.A1BASE_AGENT_NUMBER!,
+          to: recipientId,
+          service: 'sms' as const,
+          type: 'individual' as const,
+        };
+        
+        await extendedClient.sendSMS(process.env.A1BASE_ACCOUNT_ID!, smsPayload);
+        console.log("[Send] Sent SMS error message to user");
+      } catch (errorSendError) {
+        console.error("[Send] Failed to send SMS error message:", errorSendError);
+      }
+      
+      return;
+    }
+    
+    // Send valid SMS
+    try {
+      const smsPayload = {
+        content: { message: SMSHandler.sanitizeForSMS(text) },
+        from: process.env.A1BASE_AGENT_NUMBER!,
+        to: recipientId,
+        service: 'sms' as const,
+        type: 'individual' as const,
+      };
+      
+      const result = await extendedClient.sendSMS(process.env.A1BASE_ACCOUNT_ID!, smsPayload);
+      console.log(`[Send] SMS sent successfully to ${recipientId}`);
+      console.log(`[Send] SMS send result:`, result);
+      
+      // Store the message in database
+      if (adapter && chatId) {
+        const agentUserId = await ensureAgentUserExists(adapter);
+        if (agentUserId) {
+          await adapter.storeMessage(
+            chatId,
+            agentUserId,
+            `ai-sms-${chatId}-${Date.now()}`,
+            { text: SMSHandler.sanitizeForSMS(text) },
+            'text',
+            'sms'
+          );
+          console.log("[Send] AI SMS message stored in database successfully");
+        }
+      }
+    } catch (error) {
+      console.error(`[Send] Error sending SMS to ${recipientId}:`, error);
+      throw error;
+    }
+    
+    return;
+  }
+
+  // Original WhatsApp logic continues below
   const splitParagraphs = await getSplitMessageSetting();
   const messageLines = splitParagraphs
     ? text.split("\n").filter((line) => line.trim())
@@ -648,9 +755,21 @@ async function sendResponseMessage(
         `[Send] Message part sent to ${recipientId} (Type: ${threadType})`
       );
       
-      // Note: We don't store the AI message here because it will be stored when
-      // the webhook comes back from A1Base. This prevents duplicate messages in the database.
-      // The webhook ensures we have the actual message ID from A1Base and confirms delivery.
+      // Store AI WhatsApp message in database
+      if (adapter && chatId && service === 'whatsapp') {
+        const agentUserId = await ensureAgentUserExists(adapter);
+        if (agentUserId) {
+          await adapter.storeMessage(
+            chatId,
+            agentUserId,
+            `ai-${chatId}-${Date.now()}`,
+            { text: line },
+            'text',
+            'whatsapp'
+          );
+          console.log("[Send] AI individual message stored in database successfully");
+        }
+      }
     } catch (error) {
       console.error(
         `[Send] Error sending message part to ${recipientId}:`,
@@ -851,7 +970,7 @@ async function manageIndividualOnboardingProcess(
   chatId: string | null
 ): Promise<boolean> {
   // Returns true if onboarding message was sent
-  console.log("manageIndividualOnboardingProcess START");
+  console.log("manageIndividualOnboardingProcess START. Service:", webhookData.service);
   const { thread_id, sender_number, thread_type, service } = webhookData;
 
   // Check if we have any messages from the agent (indicating onboarding has started)
@@ -870,7 +989,8 @@ async function manageIndividualOnboardingProcess(
       const response = await handleAgenticOnboardingFollowUp(
         threadMessages,
         sender_number,
-        adapter
+        adapter,
+        service
       );
       await sendResponseMessage(
         response.text,

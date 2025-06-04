@@ -50,7 +50,9 @@ CREATE TABLE public.messages (
   message_type text NULL,
   external_id text NULL,
   rich_content jsonb NULL,
-  service text NULL,
+  service text NULL DEFAULT 'whatsapp',
+  status text NULL DEFAULT 'sent',
+  status_updated_at timestamp with time zone NULL,
   CONSTRAINT messages_pkey PRIMARY KEY (id),
   CONSTRAINT messages_chat_id_fkey FOREIGN KEY (chat_id) REFERENCES public.chats(id),
   CONSTRAINT messages_sender_id_fkey FOREIGN KEY (sender_id) REFERENCES public.conversation_users(id)
@@ -59,6 +61,7 @@ CREATE INDEX IF NOT EXISTS idx_messages_external_id ON public.messages USING btr
 CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON public.messages USING btree (chat_id);
 CREATE INDEX IF NOT EXISTS idx_messages_sender_id ON public.messages USING btree (sender_id);
 CREATE INDEX IF NOT EXISTS idx_messages_created_at ON public.messages USING btree (created_at);
+CREATE INDEX IF NOT EXISTS idx_messages_service ON public.messages USING btree (service);
 
 CREATE TABLE public.cron_jobs (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
