@@ -292,7 +292,7 @@ async function handleAgenticOnboardingFollowUp(
 
     // Log the messages for debugging
     console.log("[Onboarding] Thread messages for onboarding:");
-    threadMessagesForOnboarding.forEach((index, msg) => {
+    threadMessagesForOnboarding.forEach((msg, index) => {
       console.log(`  [${index}] ${(msg as any).role}: ${(msg as any).content.substring(0, 50)}...`);
     });
 
@@ -421,19 +421,9 @@ async function saveMessageToMemory(
     threadMessages = threadMessages.slice(-MAX_CONTEXT_MESSAGES);
   }
 
-  // Filter out messages from the agent itself from the context kept in memory.
-  // This is done because the agent's previous responses are typically already part of the AI's context
-  // or are not needed for the AI to formulate its *next* response to a *user*.
-  // The primary use of this in-memory store is to provide recent user interaction context.
-  const normalizedAgentNumber = process.env.A1BASE_AGENT_NUMBER
-    ? normalizePhoneNumber(process.env.A1BASE_AGENT_NUMBER)
-    : undefined;
-  if (normalizedAgentNumber) {
-    threadMessages = threadMessages.filter(
-      (msg: MessageRecord) =>
-        normalizePhoneNumber(msg.sender_number) !== normalizedAgentNumber
-    );
-  }
+  // Note: We now keep agent messages in memory to ensure proper conversation flow,
+  // especially for onboarding and other stateful interactions.
+  // The AI context management will handle deduplication if needed.
 
   messagesByThread.set(threadId, threadMessages);
 }
@@ -681,21 +671,8 @@ async function sendResponseMessage(
       console.log(`[Send] SMS sent successfully to ${recipientId}`);
       console.log(`[Send] SMS send result:`, result);
       
-      // Store the message in database
-      if (adapter && chatId) {
-        const agentUserId = await ensureAgentUserExists(adapter);
-        if (agentUserId) {
-          await adapter.storeMessage(
-            chatId,
-            agentUserId,
-            `ai-sms-${chatId}-${Date.now()}`,
-            { text: SMSHandler.sanitizeForSMS(text) },
-            'text',
-            'sms'
-          );
-          console.log("[Send] AI SMS message stored in database successfully");
-        }
-      }
+      // Note: We don't store the SMS message here because it will be stored when
+      // the webhook comes back from A1Base. This prevents duplicate messages in the database.
     } catch (error) {
       console.error(`[Send] Error sending SMS to ${recipientId}:`, error);
       throw error;
@@ -755,21 +732,9 @@ async function sendResponseMessage(
         `[Send] Message part sent to ${recipientId} (Type: ${threadType})`
       );
       
-      // Store AI WhatsApp message in database
-      if (adapter && chatId && service === 'whatsapp') {
-        const agentUserId = await ensureAgentUserExists(adapter);
-        if (agentUserId) {
-          await adapter.storeMessage(
-            chatId,
-            agentUserId,
-            `ai-${chatId}-${Date.now()}`,
-            { text: line },
-            'text',
-            'whatsapp'
-          );
-          console.log("[Send] AI individual message stored in database successfully");
-        }
-      }
+      // Note: We don't store the message here because it will be stored when
+      // the webhook comes back from A1Base. This prevents duplicate messages in the database.
+      // The webhook ensures we have the actual message ID from A1Base and confirms delivery.
     } catch (error) {
       console.error(
         `[Send] Error sending message part to ${recipientId}:`,
@@ -1133,6 +1098,50 @@ export async function handleWhatsAppIncoming(
       success: true,
       message:
         "Agent message processed for storage and skipped for further logic.",
+    };
+  }
+
+  // 1. Handle agent's own messages - ensure they are properly stored
+  if (sender_number === process.env.A1BASE_AGENT_NUMBER || 
+      normalizePhoneNumber(sender_number) === normalizePhoneNumber(process.env.A1BASE_AGENT_NUMBER || "")) {
+    console.log("[AgentMsg] Processing agent's own message for storage.");
+    console.log("[AgentMsg] Agent message details:", {
+      message_id,
+      content: content.substring(0, 100),
+      thread_id,
+      sender_number,
+      normalized_sender: normalizePhoneNumber(sender_number),
+      normalized_agent: normalizePhoneNumber(process.env.A1BASE_AGENT_NUMBER || "")
+    });
+    
+    // Store the agent message using the same logic as user messages
+    const { chatId, isNewChatInDb } = await persistIncomingMessage(
+      webhookData,
+      adapter
+    );
+    
+    if (chatId) {
+      console.log(`[AgentMsg] Agent message stored successfully. Chat ID: ${chatId}`);
+    } else {
+      console.warn("[AgentMsg] Failed to store agent message - no chat ID returned");
+    }
+    
+    // Also save to memory for immediate availability
+    const agentMessage: MessageRecord = {
+      message_id,
+      content,
+      message_type,
+      message_content,
+      sender_number,
+      sender_name: process.env.A1BASE_AGENT_NAME || sender_name,
+      timestamp,
+    };
+    await saveMessageToMemory(thread_id, agentMessage);
+    console.log("[AgentMsg] Agent message saved to memory");
+    
+    return {
+      success: true,
+      message: "Agent message processed and stored successfully.",
     };
   }
 
