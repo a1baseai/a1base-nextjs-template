@@ -27,6 +27,7 @@ import { getSplitMessageSetting } from "../settings/message-settings";
 import { saveMessage, userCheck } from "../data/message-storage"; // userCheck is imported but not used in the original, keeping it.
 import { processMessageForMemoryUpdates } from "../agent-memory/memory-processor"; // Added import
 import { processIncomingMediaMessage, sendMultimediaMessage, MediaType } from "../messaging/multimedia-handler";
+import { getAgentProfileSettings } from "@/lib/agent-profile/agent-profile-settings";
 
 // --- CONSTANTS ---
 export const MAX_CONTEXT_MESSAGES = 10;
@@ -1061,6 +1062,7 @@ export async function handleWhatsAppIncoming(
     timestamp,
     service,
     message_type, // Added for completeness from webhookData
+    agent_mentioned, // Extract agent_mentioned field
   } = webhookData;
   const content = message_content.text || ""; // Backward compatibility
 
@@ -1070,6 +1072,7 @@ export async function handleWhatsAppIncoming(
     thread_type,
     timestamp,
     service,
+    agent_mentioned,
   });
 
   // Add detailed logging for agent check
@@ -1143,6 +1146,40 @@ export async function handleWhatsAppIncoming(
       success: true,
       message: "Agent message processed and stored successfully.",
     };
+  }
+
+  // 2. Check agent profile preferences for "respond only when mentioned" setting (only for group chats)
+  if (service === 'whatsapp' && thread_type === 'group') {
+    try {
+      // Get agent profile settings to check group chat preferences
+      const agentProfile = await getAgentProfileSettings();
+      const respondOnlyWhenMentioned = agentProfile?.groupChatPreferences?.respond_only_when_mentioned || false;
+      
+      console.log(`[MENTION_CHECK] Agent respond_only_when_mentioned setting: ${respondOnlyWhenMentioned}`);
+      console.log(`[MENTION_CHECK] Agent mentioned in group message: ${agent_mentioned}`);
+      
+      if (respondOnlyWhenMentioned && !agent_mentioned) {
+        console.log(`[MENTION_CHECK] Skipping group message processing - agent not mentioned and respond_only_when_mentioned is enabled`);
+        
+        // Still store the message for record keeping
+        await persistIncomingMessage(webhookData, adapter);
+        
+        return {
+          success: true,
+          message: "Group message stored but skipped processing - agent not mentioned and respond_only_when_mentioned is enabled",
+        };
+      } else if (respondOnlyWhenMentioned && agent_mentioned) {
+        console.log(`[MENTION_CHECK] Processing group message - agent was mentioned and respond_only_when_mentioned is enabled`);
+      } else {
+        console.log(`[MENTION_CHECK] Processing group message - respond_only_when_mentioned is disabled`);
+      }
+    } catch (error) {
+      console.error(`[MENTION_CHECK] Error checking agent profile preferences:`, error);
+      // Continue with normal processing if there's an error checking preferences
+      console.log(`[MENTION_CHECK] Continuing with normal processing due to preference check error`);
+    }
+  } else if (thread_type === 'individual') {
+    console.log(`[MENTION_CHECK] Individual chat detected - mention preferences do not apply, processing normally`);
   }
 
   // Process multimedia messages

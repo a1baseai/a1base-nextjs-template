@@ -42,6 +42,7 @@ export interface WebhookPayload {
   service: string;
   message_type: 'text' | 'rich_text' | 'image' | 'video' | 'audio' | 'location' | 'reaction' | 'group_invite' | 'unsupported_message_type';
   is_from_agent: boolean;
+  agent_mentioned?: boolean;
   message_content: {
     text?: string; // for message_type: text
     data?: string; // base64 encoded string, for message_type: video, audio, image
@@ -81,6 +82,7 @@ export async function POST(request: Request) {
     console.log(`  - Webhook sender_number: ${body.sender_number}`);
     console.log(`  - Are they equal? ${body.sender_number === process.env.A1BASE_AGENT_NUMBER}`);
     console.log(`  - is_from_agent flag: ${body.is_from_agent}`);
+    console.log(`  - agent_mentioned flag: ${body.agent_mentioned}`);
     
     console.log(`[A1BASE-MESSAGING] Received ${body.service} message:`, {
       message_id: body.message_id,
@@ -91,7 +93,8 @@ export async function POST(request: Request) {
         name: body.sender_name,
         number: body.sender_number
       },
-      timestamp: body.timestamp
+      timestamp: body.timestamp,
+      agent_mentioned: body.agent_mentioned
     });
 
     // Patch bug where group message sender number is missing if sender is a1base agent

@@ -310,6 +310,27 @@ await CreateEmailAddress("your-agent", "a1send.com");
                     </svg>
                     <span>GitHub Repository</span>
                   </a>
+                  <Link
+                    href="/settings"
+                    className="p-3 rounded-lg border border-black/[.08] dark:border-white/[.08] hover:bg-gray-50 dark:hover:bg-black/30 transition-colors flex items-center gap-3"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="text-blue-600 dark:text-blue-400"
+                    >
+                      <circle cx="12" cy="12" r="3"></circle>
+                      <path d="M12 1v6m0 6v6m11-7h-6m-6 0H1m15.5-3.5L19 8.5m-14 7L7.5 13m11 3.5L16.5 19m-9-9L5 7.5"></path>
+                    </svg>
+                    <span>Agent Settings</span>
+                  </Link>
                   <a
                     href="https://discord.gg/a1framework"
                     target="_blank"

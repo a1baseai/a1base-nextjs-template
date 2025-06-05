@@ -23,5 +23,9 @@
   "agentSettings": {
     "agent": "Product Guide"
   },
-  "profileImageUrl": "https://a1base-public.s3.us-east-1.amazonaws.com/profile-moving/20250210_1742_Corporate+Serene+Smile_simple_compose_01jkq9gs6rea3v4n7w461rwye2.gif"
+  "profileImageUrl": "https://a1base-public.s3.us-east-1.amazonaws.com/profile-moving/20250210_1742_Corporate+Serene+Smile_simple_compose_01jkq9gs6rea3v4n7w461rwye2.gif",
+  "groupChatPreferences": {
+    "respond_only_when_mentioned": true
+  },
+  "_source": "file_storage"
 }

@@ -84,6 +84,12 @@ export default function ProfileEditorLayout({
       variant: pathname.includes("/profile-settings") ? "default" : "ghost",
     },
     {
+      title: "Group Chat Settings",
+      icon: <MessageSquare className="h-5 w-5" />,
+      href: "/profile-editor/group-chat-settings",
+      variant: pathname.includes("/group-chat-settings") ? "default" : "ghost",
+    },
+    {
       title: "Safety Settings",
       icon: <Shield className="h-5 w-5" />,
       href: "/profile-editor/safety-editor",
@@ -223,6 +229,7 @@ export default function ProfileEditorLayout({
             <h1 className="text-2xl font-bold">
               {pathname.includes("/get-started") && "Get Started"}
               {pathname.includes("/profile-settings") && "Profile Settings"}
+              {pathname.includes("/group-chat-settings") && "Group Chat Settings"}
               {pathname.includes("/memory") && "Agent Memory"}
               {pathname.includes("/base-information") && "Base Information"}
               {pathname.includes("/onboarding-flow") &&
@@ -240,6 +247,7 @@ export default function ProfileEditorLayout({
                 "Set up your AI agent with a guided flow"}
               {pathname.includes("/profile-settings") &&
                 "Configure your agent's identity and appearance"}
+              {pathname.includes("/group-chat-settings") && "Manage how your agent behaves in group chats"}
               {pathname.includes("/memory") &&
                 "Configure how your agent remembers information from conversations"}
               {pathname.includes("/base-information") &&

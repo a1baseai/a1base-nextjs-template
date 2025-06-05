@@ -56,6 +56,9 @@ export const defaultAgentProfileSettings: AgentProfileSettingsWithSource = {
   agentSettings: {
     agent: "Product Guide",
   },
+  groupChatPreferences: {
+    respond_only_when_mentioned: false,
+  },
 };
 
 /**

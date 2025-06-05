@@ -9,7 +9,30 @@ export { SupabaseAdapter }
  * These should be set in your .env.local file
  */
 const supabaseUrl = process.env.SUPABASE_URL
-const supabaseKey = process.env.SUPABASE_KEY
+let supabaseKey = process.env.SUPABASE_KEY
+let keySource = "SUPABASE_KEY";
+
+if (!supabaseKey) {
+  console.log("[SupabaseConfig] SUPABASE_KEY not found, attempting to use SUPABASE_ANON_KEY.");
+  supabaseKey = process.env.SUPABASE_ANON_KEY;
+  if (supabaseKey) {
+    keySource = "SUPABASE_ANON_KEY";
+  } else {
+    keySource = "None";
+  }
+}
+
+if (supabaseUrl && supabaseKey) {
+  console.log(`[SupabaseConfig] Using Supabase URL: ${supabaseUrl}`);
+  console.log(`[SupabaseConfig] Using Supabase Key from: ${keySource}`);
+} else {
+  if (!supabaseUrl) {
+    console.warn("[SupabaseConfig] SUPABASE_URL is not set in environment variables.");
+  }
+  if (!supabaseKey) {
+    console.warn("[SupabaseConfig] Neither SUPABASE_KEY nor SUPABASE_ANON_KEY is set in environment variables.");
+  }
+}
 
 /**
  * Export table names as constants to maintain consistency
@@ -33,6 +56,7 @@ let initializedAdapter: SupabaseAdapter | null = null
  */
 export const getInitializedAdapter = async (): Promise<SupabaseAdapter | null> => {
   if (!isSupabaseConfigured()) {
+    console.warn("[SupabaseAdapter] Initialization skipped: Supabase is not configured. Check SUPABASE_URL and SUPABASE_KEY/SUPABASE_ANON_KEY environment variables.");
     return null
   }
 

@@ -47,6 +47,15 @@ export interface AgentSettings {
 }
 
 /**
+ * Defines group chat behavior preferences for the agent
+ */
+export interface GroupChatPreferences {
+  /** Whether the agent should only respond to group messages when explicitly mentioned */
+  respond_only_when_mentioned: boolean;
+  /** Additional group chat settings can be added here in the future */
+}
+
+/**
  * Comprehensive profile settings for configuring an agent's identity and behavior
  */
 export interface AgentProfileSettings {
@@ -70,4 +79,6 @@ export interface AgentProfileSettings {
   companyDescription: string;
   /** URL of the profile image/GIF for the agent */
   profileImageUrl?: string;
+  /** Group chat behavior preferences */
+  groupChatPreferences: GroupChatPreferences;
 } 
