@@ -55,3 +55,6 @@ docker-build.sh
 fly.toml
 fly-deploy.yml
 .fly/
+
+# backup files
+data/.*.backup

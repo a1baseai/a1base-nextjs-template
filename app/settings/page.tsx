@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/components/ui/use-toast"
 import { Separator } from "@/components/ui/separator"
-import { Settings, User, Bell, ArrowLeft } from "lucide-react"
+import { Settings, User, Bell, ArrowLeft, FileJson } from "lucide-react"
 import Link from "next/link"
 import { UserPreferences } from "@/types/chat"
 
@@ -188,20 +188,29 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
 
-          <div className="flex justify-end gap-4">
-            <Button 
-              variant="outline" 
-              onClick={() => loadUserSettings(settings.phoneNumber)}
-              disabled={loading || saving}
-            >
-              Reset
-            </Button>
-            <Button 
-              onClick={saveSettings}
-              disabled={loading || saving || !settings.phoneNumber}
-            >
-              {saving ? "Saving..." : "Save General Settings"}
-            </Button>
+          <div className="flex justify-between items-center">
+            <Link href="/settings/import-export">
+              <Button variant="outline" className="flex items-center gap-2">
+                <FileJson className="h-4 w-4" />
+                Import/Export All Settings
+              </Button>
+            </Link>
+            
+            <div className="flex gap-4">
+              <Button 
+                variant="outline" 
+                onClick={() => loadUserSettings(settings.phoneNumber)}
+                disabled={loading || saving}
+              >
+                Reset
+              </Button>
+              <Button 
+                onClick={saveSettings}
+                disabled={loading || saving || !settings.phoneNumber}
+              >
+                {saving ? "Saving..." : "Save General Settings"}
+              </Button>
+            </div>
           </div>
         </div>
       </div>
