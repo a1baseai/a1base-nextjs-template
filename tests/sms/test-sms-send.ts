@@ -3,7 +3,7 @@
  * Run with: npx ts-node tests/sms/test-sms-send.ts
  */
 
-import { ExtendedA1BaseAPI } from '../../lib/a1base/extended-client';
+import { ExtendedA1BaseAPI } from '../../lib/a1base-chat-context/extended-client';
 import { SMSHandler } from '../../lib/services/sms-handler';
 
 // Initialize the extended client
