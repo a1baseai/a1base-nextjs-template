@@ -249,8 +249,8 @@ const EnvironmentCheck: FC = () => {
                 href="/setup-guide"
                 className="text-sm text-amber-800 dark:text-amber-300 font-medium flex items-center gap-1 hover:underline"
               >
-                View setup guide
                 <ChevronRight className="h-4 w-4" />
+                <span>Go to Setup Guide</span>
               </Link>
             </div>
           </div>
@@ -264,13 +264,67 @@ const EnvironmentCheck: FC = () => {
 
 // Main Chat Page Component
 export default function ChatPage() {
-  // Initialize chat runtime
+  const [threadId, setThreadId] = useState<string | undefined>(undefined);
+  
+  // Load existing thread ID from localStorage on mount
+  useEffect(() => {
+    const savedThreadId = localStorage.getItem('webui-thread-id');
+    if (savedThreadId) {
+      console.log('[CHAT-PAGE] Loading existing thread from localStorage:', savedThreadId);
+      setThreadId(savedThreadId);
+    }
+  }, []);
+
+  // Save thread ID to localStorage when it changes
+  useEffect(() => {
+    if (threadId) {
+      localStorage.setItem('webui-thread-id', threadId);
+    }
+  }, [threadId]);
+  
   const runtime = useChatRuntime({
     api: "/api/chat",
+    body: { threadId },
+    onResponse: async (response) => {
+      console.log('[CHAT-PAGE] Received response:', response.status, response.statusText);
+      
+      if (response.ok) {
+        const newThreadId = response.headers.get("X-Thread-Id");
+        if (newThreadId && newThreadId !== threadId) {
+          setThreadId(newThreadId);
+          console.log("Started new thread:", newThreadId);
+        }
+        
+        // Try to read the response to see what's being returned
+        try {
+          const responseClone = response.clone();
+          const reader = responseClone.body?.getReader();
+          if (reader) {
+            let receivedText = '';
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              const chunk = new TextDecoder().decode(value);
+              receivedText += chunk;
+              console.log('[CHAT-PAGE] Received chunk:', chunk);
+            }
+            console.log('[CHAT-PAGE] Complete response:', receivedText);
+          }
+        } catch (error) {
+          console.error('[CHAT-PAGE] Error reading response:', error);
+        }
+      } else {
+        const errorText = await response.text();
+        console.error('[CHAT-PAGE] Error response:', errorText);
+        toast.error(`Error from server: ${errorText}`);
+      }
+    },
+    onError: (error) => {
+      console.error('[CHAT-PAGE] Runtime error:', error);
+      toast.error(`Chat error: ${error.message}`);
+    },
   });
   
-  // Define content workflows for sidebar and mobile menu
-
   // Define content workflows for sidebar and mobile menu
   const contentWorkflows = [
     { text: "Write an email", url: "#" },
@@ -279,7 +333,6 @@ export default function ChatPage() {
   ];
 
   // Define the GIF URLs for profile gallery
-
   const gifUrls = [
     "https://a1base-public.s3.us-east-1.amazonaws.com/profile-moving/20250215_1417_Confident+Startup+Smile_simple_compose_01jm5v0x50f2kaarp5nd556cbw.gif",
     "https://a1base-public.s3.us-east-1.amazonaws.com/profile-moving/20250210_1742_Corporate+Serene+Smile_simple_compose_01jkq9gs6rea3v4n7w461rwye2.gif",
