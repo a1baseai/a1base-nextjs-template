@@ -4,7 +4,7 @@ interface SyncPayload {
     external_thread_id: string;
     content: string;
     service: "web-ui";
-    a1_number: string;
+    phone_number: string;
     external_message_id: string;
     from_agent: boolean;
     sender_number: string;
@@ -17,8 +17,8 @@ interface SyncPayload {
  * This is used to keep A1Base aware of conversations happening on the web UI.
  */
 export async function syncWebUiMessage(message: {
-    threadId: string,
-    messageId: string,
+    chatRecordId: string,
+    messageRecordId: string,
     content: string,
     /** The sender identifier. Use agent's number for agent, or another string for user. */
     senderIdentifier: string,
@@ -35,23 +35,26 @@ export async function syncWebUiMessage(message: {
     }
 
     const isFromAgent = message.senderIdentifier === A1BASE_AGENT_NUMBER;
+    // Convert web-ui-user to empty string for consistency with A1Base API
+    const senderNumber = message.senderIdentifier === 'web-ui-user' ? '' : message.senderIdentifier;
     
     const payload: SyncPayload = {
-        external_thread_id: message.threadId,
+        external_thread_id: message.chatRecordId,
         content: message.content,
         service: "web-ui",
-        a1_number: A1BASE_AGENT_NUMBER,
-        external_message_id: message.messageId,
+        phone_number: A1BASE_AGENT_NUMBER,
+        external_message_id: message.messageRecordId,
         from_agent: isFromAgent,
-        sender_number: message.senderIdentifier,
+        sender_number: senderNumber, // Use the processed senderNumber instead of raw senderIdentifier
         message_type: "text",
-        timestamp: message.timestamp,
+        timestamp: message.timestamp, // Remove multiplication since timestamp is already in ms
     };
     
     const url = `https://api.a1base.com/v1/messages/${A1BASE_ACCOUNT_ID}/save/web-ui`;
     
     try {
-        console.log(`[WebUI-Sync] Sending message to A1Base: ${message.messageId}`);
+        console.log(`[WebUI-Sync] Sending message to A1Base: ${message.messageRecordId}`);
+        console.log(`[WebUI-Sync] Payload:`, payload);
         const response = await fetch(url, {
             method: 'POST',
             headers: {
@@ -67,7 +70,7 @@ export async function syncWebUiMessage(message: {
             console.error(`[WebUI-Sync] Error sending message to A1Base. Status: ${response.status}. Body: ${errorBody}`);
         } else {
             const responseData = await response.json();
-            console.log(`[WebUI-Sync] Successfully sent message to A1Base: ${message.messageId}`, responseData);
+            console.log(`[WebUI-Sync] Successfully sent message to A1Base: ${message.messageRecordId}`, responseData);
         }
     } catch (error) {
         console.error("[WebUI-Sync] Exception while sending message to A1Base:", error);

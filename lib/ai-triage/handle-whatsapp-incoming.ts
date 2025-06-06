@@ -572,7 +572,7 @@ async function sendResponseMessage(
   adapter: SupabaseAdapter | null
 ): Promise<void> {
   // Import SMS dependencies at the top of the function (or file)
-  const { extendedClient } = require("@/lib/a1base/extended-client");
+  const { extendedClient } = require("@/lib/a1base-chat-context/extended-client");
   const { SMSHandler } = require("@/lib/services/sms-handler");
   
   // Log all arguments when sending a message

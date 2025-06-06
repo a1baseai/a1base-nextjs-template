@@ -24,13 +24,12 @@ const isBuildTime = () => {
 
 async function saveAndSyncAiResponseMessage(
     adapter: SupabaseAdapter,
-    internalChatId: string,
-    externalThreadId: string,
-    content: string
+    chatRecordId: string,
+    messageContent: string
 ) {
-    if (!content) return;
+    if (!messageContent) return;
 
-    const aiMessageId = uuidv4();
+    const messageRecordId = uuidv4();
     const aiMessageTimestamp = new Date().toISOString();
     const agentNumber = process.env.A1BASE_AGENT_NUMBER;
 
@@ -46,19 +45,19 @@ async function saveAndSyncAiResponseMessage(
             .eq('phone_number', agentNumber)
             .single();
 
-        console.log(`[CHAT-API] Saving AI message to DB: ${aiMessageId}`);
+        console.log(`[CHAT-API] Saving AI message to DB: ${messageRecordId}`);
         await adapter.storeMessage(
-            internalChatId,
+            chatRecordId,
             agentUser ? agentUser.id : null,
-            aiMessageId,
-            { text: content }, 'text', 'web-ui', { text: content }
+            messageRecordId, // This is now the Supabase message record ID
+            { text: messageContent }, 'text', 'web-ui', { text: messageContent }
         );
         console.log(`[CHAT-API] AI message saved.`);
 
         await syncWebUiMessage({
-            threadId: externalThreadId,
-            messageId: aiMessageId,
-            content: content,
+            chatRecordId: chatRecordId,
+            messageRecordId: messageRecordId,
+            content: messageContent,
             senderIdentifier: agentNumber,
             timestamp: Math.floor(new Date(aiMessageTimestamp).getTime() / 1000),
         });
@@ -70,11 +69,9 @@ async function saveAndSyncAiResponseMessage(
 export async function POST(req: Request) {
   console.log('\n\n[CHAT-API] Received chat request');
   try {
-    // Parse the request to get messages
     const { messages, threadId: clientThreadId }: { messages: CoreMessage[]; threadId?: string } = await req.json();
     console.log(`[CHAT-API] Request contains ${messages.length} messages. Received client threadId: ${clientThreadId}`);
 
-    // Handle build-time context without API keys
     if (isBuildTime()) {
       console.log('[CHAT-API] Build-time context detected, returning static response');
       return NextResponse.json({ 
@@ -86,11 +83,11 @@ export async function POST(req: Request) {
     const externalThreadId = clientThreadId || uuidv4();
     
     const adapter = await getInitializedAdapter();
-    let internalChatId: string | null = null;
+    let chatRecordId: string | null = null;
     if (adapter) {
         const existingChat = await adapter.getThread(externalThreadId);
         if (existingChat) {
-            internalChatId = existingChat.id;
+            chatRecordId = existingChat.id;
         } else {
             const { data: newChat, error: createError } = await adapter.supabase
                 .from("chats")
@@ -106,7 +103,7 @@ export async function POST(req: Request) {
                 console.error('[CHAT-API] Error creating chat:', createError);
                 return NextResponse.json({ error: 'Failed to create chat session' }, { status: 500 });
             }
-            internalChatId = newChat.id;
+            chatRecordId = newChat.id;
         }
     }
     
@@ -117,18 +114,18 @@ export async function POST(req: Request) {
         ? userMessage.content[0].text 
         : '';
     
-    console.log(`[CHAT-API] Pre-save check. Adapter exists: ${!!adapter}. User message content: "${userMessageContent}". Internal chat ID: ${internalChatId}`);
+    console.log(`[CHAT-API] Pre-save check. Adapter exists: ${!!adapter}. User message content: "${userMessageContent}". Internal chat ID: ${chatRecordId}`);
 
-    if (adapter && userMessageContent && internalChatId) {
-        const userMessageId = uuidv4();
+    if (adapter && userMessageContent && chatRecordId) {
+        const messageRecordId = uuidv4();
         const userMessageTimestamp = new Date().toISOString();
         
         try {
-            console.log(`[CHAT-API] Saving user message to DB: ${userMessageId}`);
+            console.log(`[CHAT-API] Saving user message to DB: ${messageRecordId}`);
             await adapter.storeMessage(
-                internalChatId,
+                chatRecordId,
                 null, // sender_id for user is null
-                userMessageId,
+                messageRecordId, // This is the Supabase message record ID
                 { text: userMessageContent },
                 'text',
                 'web-ui',
@@ -136,12 +133,11 @@ export async function POST(req: Request) {
             );
             console.log(`[CHAT-API] User message saved.`);
 
-            // Sync after saving
             await syncWebUiMessage({
-                threadId: externalThreadId,
-                messageId: userMessageId,
+                chatRecordId: chatRecordId,
+                messageRecordId: messageRecordId,
                 content: userMessageContent,
-                senderIdentifier: '', // Identifier for a non-agent user
+                senderIdentifier: 'web-ui-user', // Identifier for a non-agent user
                 timestamp: Math.floor(new Date(userMessageTimestamp).getTime() / 1000),
             });
         } catch (error) {
@@ -149,21 +145,17 @@ export async function POST(req: Request) {
         }
     }
     
-    // Get the system prompt with agent profile
     const systemPromptContent = await getSystemPrompt();
     console.log(`[CHAT-API] System prompt loaded (${systemPromptContent.length} chars)`);
     
-    // Extract info for logging
     const profileMatch = systemPromptContent.match(/Name: ([^\n]+)/);
     const companyMatch = systemPromptContent.match(/Company: ([^\n]+)/);
     if (profileMatch && profileMatch[1]) {
       console.log(`[CHAT-API] Using agent: ${profileMatch[1]}, ${companyMatch?.[1] || 'Unknown'}`);
     }
     
-    // Extract the most recent user message for triage
     const latestUserMessageContent = userMessageContent;
     
-    // Run message through triage
     const triageResponse = await triageMessage({
       thread_id: externalThreadId,
       message_id: Date.now().toString(),
@@ -190,7 +182,6 @@ export async function POST(req: Request) {
     
     let result;
 
-    // For non-default triage types, create a direct streaming response without using the AI model
     if (triageResponse.type !== 'default') {
       console.log('[CHAT-API] Creating direct stream for non-default triage response');
       const responseMessage = triageResponse.message || 'No response message available';
@@ -226,7 +217,6 @@ export async function POST(req: Request) {
 
     const [stream1, stream2] = result.textStream.tee();
 
-    // In parallel, read the stream to completion for saving
     (async () => {
         let fullResponse = "";
         const reader = stream1.getReader();
@@ -235,8 +225,8 @@ export async function POST(req: Request) {
             if (done) break;
             fullResponse += value;
         }
-        if (adapter && internalChatId) {
-            await saveAndSyncAiResponseMessage(adapter, internalChatId, externalThreadId, fullResponse);
+        if (adapter && chatRecordId) {
+            await saveAndSyncAiResponseMessage(adapter, chatRecordId, fullResponse);
         }
     })();
     
@@ -245,30 +235,27 @@ export async function POST(req: Request) {
         responseHeaders['X-Thread-Id'] = externalThreadId;
     }
     
-    // Return the other stream to the client
     const responseStream = new ReadableStream({
       async start(controller) {
         const reader = stream2.getReader();
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) {
-            controller.close();
-            break;
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            controller.enqueue(value);
           }
-          controller.enqueue(value);
+        } catch (error) {
+          controller.error(error);
+        } finally {
+          controller.close();
         }
       },
     });
 
-    return new Response(responseStream, {
-        headers: responseHeaders,
-    });
-    
+    return new Response(responseStream, { headers: responseHeaders });
   } catch (error) {
-    console.error('[CHAT-API] Error in chat API:', error);
-    return NextResponse.json({ 
-      error: 'Failed to generate response', 
-      details: error instanceof Error ? error.message : 'Unknown error' 
-    }, { status: 500 });
+    console.error('[CHAT-API] Unhandled error in chat route:', error);
+    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
+    return NextResponse.json({ error: "Failed to handle chat request", details: errorMessage }, { status: 500 });
   }
 }
