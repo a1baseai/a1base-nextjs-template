@@ -258,46 +258,41 @@ export async function triageMessage({
   try {
     let threadMessages: MessageRecord[] = [];
 
-    // Skip Supabase for web-ui service
-    if (service === "web-ui") {
-      threadMessages = messagesByThread.get(thread_id) || [];
-    } else {
-      // Try to get messages from Supabase first
-      try {
-        // Init adapter
-        const adapter = await getInitializedAdapter();
-        if (adapter) {
-          const thread = await adapter.getThread(thread_id);
-          if (thread) {
-            threadMessages = thread.messages || [];
+    // Always try to get messages from Supabase first for context, regardless of service
+    try {
+      // Init adapter
+      const adapter = await getInitializedAdapter();
+      if (adapter) {
+        const thread = await adapter.getThread(thread_id);
+        if (thread) {
+          threadMessages = thread.messages || [];
 
-            // Get participants data for context
-            participants = thread.participants || [];
+          // Get participants data for context
+          participants = thread.participants || [];
 
-            // Get projects data associated with the chat
-            if (thread.id) {
-              try {
-                projects = (await adapter.getProjectsByChat(thread.id)) || [];
-              } catch (projectError) {
-                console.error(
-                  "Error retrieving projects for chat:",
-                  projectError
-                );
-              }
+          // Get projects data associated with the chat
+          if (thread.id) {
+            try {
+              projects = (await adapter.getProjectsByChat(thread.id)) || [];
+            } catch (projectError) {
+              console.error(
+                "Error retrieving projects for chat:",
+                projectError
+              );
             }
-          } else {
-            // Thread not found, fall back to in-memory
-            threadMessages = messagesByThread.get(thread_id) || [];
           }
         } else {
-          // No adapter, fall back to in-memory
+          // Thread not found, fall back to in-memory
           threadMessages = messagesByThread.get(thread_id) || [];
         }
-      } catch (error) {
-        console.error("Error retrieving thread from Supabase:", error);
-        // Continue with in-memory as fallback
+      } else {
+        // No adapter, fall back to in-memory
         threadMessages = messagesByThread.get(thread_id) || [];
       }
+    } catch (error) {
+      console.error("Error retrieving thread from Supabase:", error);
+      // Continue with in-memory as fallback
+      threadMessages = messagesByThread.get(thread_id) || [];
     }
 
     // Convert to ThreadMessage format

@@ -53,8 +53,6 @@ export async function syncWebUiMessage(message: {
     const url = `https://api.a1base.com/v1/messages/${A1BASE_ACCOUNT_ID}/save/web-ui`;
     
     try {
-        console.log(`[WebUI-Sync] Sending message to A1Base: ${message.messageRecordId}`);
-        console.log(`[WebUI-Sync] Payload:`, payload);
         const response = await fetch(url, {
             method: 'POST',
             headers: {

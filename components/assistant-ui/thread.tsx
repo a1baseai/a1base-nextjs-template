@@ -24,10 +24,104 @@ import { Button } from "@/components/ui/button";
 import { MarkdownText } from "@/components/assistant-ui/markdown-text";
 import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button";
 import agentProfileSettings from "@/lib/agent-profile/agent-profile-settings";
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useOnboardingFlow } from "@/hooks/useOnboardingFlow";
 
+// Historical messages component
+const HistoricalMessages: FC<{ threadId?: string }> = ({ threadId }) => {
+  const [historicalMessages, setHistoricalMessages] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (threadId) {
+      loadHistoricalMessages();
+    }
+  }, [threadId]);
+
+  const loadHistoricalMessages = async () => {
+    if (!threadId) return;
+    
+    setLoading(true);
+    try {
+      console.log(`[HISTORICAL-MESSAGES] Loading messages for thread: ${threadId}`);
+      const response = await fetch(`/api/chat?threadId=${threadId}`);
+      if (response.ok) {
+        const data = await response.json();
+        const messages = data.messages || [];
+        console.log(`[HISTORICAL-MESSAGES] Loaded ${messages.length} historical messages`);
+        setHistoricalMessages(messages);
+      } else {
+        console.error('[HISTORICAL-MESSAGES] Failed to load historical messages:', response.statusText);
+      }
+    } catch (error) {
+      console.error('[HISTORICAL-MESSAGES] Error loading historical messages:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!threadId || loading) {
+    return null;
+  }
+
+  if (historicalMessages.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="w-full max-w-[var(--thread-max-width)] space-y-4 mb-6">
+      {/* Historical messages header */}
+      <div className="text-center py-2">
+        <div className="inline-flex items-center gap-2 px-3 py-1 bg-gray-100 dark:bg-gray-800 rounded-full text-xs text-gray-600 dark:text-gray-400">
+          <span>📝</span>
+          <span>Previous conversation ({historicalMessages.length} messages)</span>
+        </div>
+      </div>
+      
+      {/* Render historical messages */}
+      {historicalMessages.map((msg, index) => (
+        <div key={`historical-${index}`} className={`py-4 ${msg.role === 'user' ? 'historical-user-message' : 'historical-assistant-message'}`}>
+          {msg.role === 'assistant' ? (
+            <div className="grid grid-cols-[auto_auto_1fr] grid-rows-[auto_1fr] relative w-full max-w-[var(--thread-max-width)]">
+              <Avatar className="col-start-1 row-span-full row-start-1 mr-4">
+                <AvatarFallback>A</AvatarFallback>
+              </Avatar>
+              <div className="text-foreground max-w-[calc(var(--thread-max-width)*0.8)] break-words leading-7 col-span-2 col-start-2 row-start-1 my-1.5 opacity-75">
+                {msg.content}
+              </div>
+            </div>
+          ) : (
+            <div className="grid auto-rows-auto grid-cols-[minmax(72px,1fr)_auto] gap-y-2 [&:where(>*)]:col-start-2 w-full max-w-[var(--thread-max-width)]">
+              <div className="bg-muted text-foreground max-w-[calc(var(--thread-max-width)*0.8)] break-words rounded-3xl px-5 py-2.5 col-start-2 row-start-2 opacity-75">
+                {msg.content}
+              </div>
+            </div>
+          )}
+        </div>
+      ))}
+      
+      {/* Separator */}
+      <div className="text-center py-4">
+        <div className="inline-flex items-center gap-2 px-3 py-1 bg-green-100 dark:bg-green-900/20 rounded-full text-xs text-green-700 dark:text-green-300">
+          <span>🔄</span>
+          <span>Continue conversation below</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export const Thread: FC = () => {
+  // Get threadId from localStorage to pass to historical messages
+  const [threadId, setThreadId] = useState<string | undefined>(undefined);
+  
+  useEffect(() => {
+    const savedThreadId = localStorage.getItem('webui-thread-id');
+    if (savedThreadId) {
+      setThreadId(savedThreadId);
+    }
+  }, []);
+
   return (
     <ThreadPrimitive.Root
       className="bg-background box-border h-full"
@@ -37,6 +131,9 @@ export const Thread: FC = () => {
     >
       <ThreadPrimitive.Viewport className="flex h-full flex-col items-center overflow-y-scroll scroll-smooth bg-inherit px-2 pt-8">
         <ThreadWelcome />
+        
+        {/* Historical messages */}
+        <HistoricalMessages threadId={threadId} />
 
         <ThreadPrimitive.Messages
           components={{
@@ -78,7 +175,24 @@ const ThreadWelcome: FC = () => {
     <ThreadPrimitive.Empty>
       <div className="flex w-full max-w-[var(--thread-max-width)] flex-grow flex-col">
         <div className="flex w-full flex-grow flex-col items-center justify-center">
+          <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg max-w-lg text-center">
+            <div className="text-sm text-blue-800 dark:text-blue-200">
+              <p className="font-medium mb-1">💬 Conversation Continuity</p>
+              <p>Your conversations are saved and the agent remembers your history. This web UI shows the current session only.</p>
+            </div>
+          </div>
+          
           <p className="mt-4 font-medium">How can I help you today?</p>
+          
+          <button
+            onClick={() => {
+              localStorage.removeItem('webui-thread-id');
+              window.location.reload();
+            }}
+            className="mt-4 px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 rounded-lg transition-colors"
+          >
+            🔄 Start New Conversation
+          </button>
         </div>
         <ThreadWelcomeSuggestions />
       </div>

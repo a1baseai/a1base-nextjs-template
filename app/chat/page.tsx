@@ -266,20 +266,62 @@ const EnvironmentCheck: FC = () => {
 export default function ChatPage() {
   const [threadId, setThreadId] = useState<string | undefined>(undefined);
   
+  // Load existing thread ID from localStorage on mount
+  useEffect(() => {
+    const savedThreadId = localStorage.getItem('webui-thread-id');
+    if (savedThreadId) {
+      console.log('[CHAT-PAGE] Loading existing thread from localStorage:', savedThreadId);
+      setThreadId(savedThreadId);
+    }
+  }, []);
+
+  // Save thread ID to localStorage when it changes
+  useEffect(() => {
+    if (threadId) {
+      localStorage.setItem('webui-thread-id', threadId);
+    }
+  }, [threadId]);
+  
   const runtime = useChatRuntime({
     api: "/api/chat",
     body: { threadId },
     onResponse: async (response) => {
+      console.log('[CHAT-PAGE] Received response:', response.status, response.statusText);
+      
       if (response.ok) {
         const newThreadId = response.headers.get("X-Thread-Id");
-        if (newThreadId) {
+        if (newThreadId && newThreadId !== threadId) {
           setThreadId(newThreadId);
           console.log("Started new thread:", newThreadId);
         }
+        
+        // Try to read the response to see what's being returned
+        try {
+          const responseClone = response.clone();
+          const reader = responseClone.body?.getReader();
+          if (reader) {
+            let receivedText = '';
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              const chunk = new TextDecoder().decode(value);
+              receivedText += chunk;
+              console.log('[CHAT-PAGE] Received chunk:', chunk);
+            }
+            console.log('[CHAT-PAGE] Complete response:', receivedText);
+          }
+        } catch (error) {
+          console.error('[CHAT-PAGE] Error reading response:', error);
+        }
       } else {
         const errorText = await response.text();
+        console.error('[CHAT-PAGE] Error response:', errorText);
         toast.error(`Error from server: ${errorText}`);
       }
+    },
+    onError: (error) => {
+      console.error('[CHAT-PAGE] Runtime error:', error);
+      toast.error(`Chat error: ${error.message}`);
     },
   });
   

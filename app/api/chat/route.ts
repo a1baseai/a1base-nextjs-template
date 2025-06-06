@@ -66,6 +66,46 @@ async function saveAndSyncAiResponseMessage(
     }
 }
 
+/**
+ * GET endpoint to retrieve historical messages for a thread
+ */
+export async function GET(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const threadId = searchParams.get('threadId');
+    
+    if (!threadId) {
+      return NextResponse.json({ error: 'threadId is required' }, { status: 400 });
+    }
+
+    const adapter = await getInitializedAdapter();
+    if (!adapter) {
+      return NextResponse.json({ messages: [] });
+    }
+
+    const thread = await adapter.getThread(threadId);
+    if (!thread) {
+      return NextResponse.json({ messages: [] });
+    }
+
+    // Convert database messages to the format expected by the UI
+    const messages = thread.messages.map(msg => {
+      const isFromAgent = msg.sender_number === process.env.A1BASE_AGENT_NUMBER;
+      return {
+        role: isFromAgent ? 'assistant' : 'user',
+        content: msg.content,
+        id: msg.message_id,
+        timestamp: msg.timestamp
+      };
+    });
+
+    return NextResponse.json({ messages });
+  } catch (error) {
+    console.error('[CHAT-API-GET] Error retrieving historical messages:', error);
+    return NextResponse.json({ error: 'Failed to retrieve messages' }, { status: 500 });
+  }
+}
+
 export async function POST(req: Request) {
   console.log('\n\n[CHAT-API] Received chat request');
   try {
@@ -199,8 +239,35 @@ export async function POST(req: Request) {
         maxTokens: 1000,
       });
     } else {
+        // Get historical messages for context
+        let historicalMessages: CoreMessage[] = [];
+        
+        if (adapter && chatRecordId) {
+            try {
+                const thread = await adapter.getThread(externalThreadId);
+                if (thread && thread.messages.length > 0) {
+                    // Convert database messages to AI format, excluding the current user message
+                    // since it's already in the messages array
+                    const dbMessages = thread.messages.slice(0, -1); // Exclude the last message (current user message)
+                    
+                    historicalMessages = dbMessages.map(msg => {
+                        const isFromAgent = msg.sender_number === process.env.A1BASE_AGENT_NUMBER;
+                        return {
+                            role: isFromAgent ? 'assistant' as const : 'user' as const,
+                            content: msg.content
+                        };
+                    });
+                    
+                    console.log(`[CHAT-API] Including ${historicalMessages.length} historical messages in AI context`);
+                }
+            } catch (error) {
+                console.error('[CHAT-API] Error loading historical messages:', error);
+            }
+        }
+        
         const aiMessages: CoreMessage[] = [
           { role: 'system', content: systemPromptContent },
+          ...historicalMessages,
           ...messages
         ];
         
@@ -215,11 +282,10 @@ export async function POST(req: Request) {
         });
     }
 
-    const [stream1, stream2] = result.textStream.tee();
-
+    // Save the AI response in the background
     (async () => {
         let fullResponse = "";
-        const reader = stream1.getReader();
+        const reader = result.textStream.getReader();
         while (true) {
             const { done, value } = await reader.read();
             if (done) break;
@@ -230,29 +296,15 @@ export async function POST(req: Request) {
         }
     })();
     
-    const responseHeaders: HeadersInit = { "Content-Type": "text/plain; charset=utf-8" };
+    const responseHeaders: HeadersInit = {};
     if (isNewSession) {
         responseHeaders['X-Thread-Id'] = externalThreadId;
     }
     
-    const responseStream = new ReadableStream({
-      async start(controller) {
-        const reader = stream2.getReader();
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            controller.enqueue(value);
-          }
-        } catch (error) {
-          controller.error(error);
-        } finally {
-          controller.close();
-        }
-      },
-    });
-
-    return new Response(responseStream, { headers: responseHeaders });
+    console.log(`[CHAT-API] Returning AI SDK streaming response with headers:`, responseHeaders);
+    
+    // Return the AI SDK result directly with proper streaming format
+    return result.toDataStreamResponse({ headers: responseHeaders });
   } catch (error) {
     console.error('[CHAT-API] Unhandled error in chat route:', error);
     const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
