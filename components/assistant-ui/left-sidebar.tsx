@@ -3,11 +3,63 @@
 import React, { useState, useEffect } from 'react';
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import { PhoneIcon, MessageSquareIcon, Mail } from "lucide-react";
+import { PhoneIcon, MessageSquareIcon, Mail, Plus, Users } from "lucide-react";
+import { useRouter, usePathname } from 'next/navigation';
 import { AgentProfileSettings } from "@/lib/agent-profile/types";
 import { defaultAgentProfileSettings } from "@/lib/agent-profile/agent-profile-settings";
 import { loadProfileSettings } from "@/lib/storage/file-storage";
 import { loadFromLocalStorage, LOCAL_STORAGE_KEYS } from "@/lib/storage/local-storage";
+import { v4 as uuidv4 } from "uuid";
+
+interface Chat {
+  id: string;
+  external_id: string;
+  name: string;
+  type: string;
+  created_at: string;
+  service: string;
+}
+
+// Multi-user chat section component
+const MultiUserChatSection: React.FC = () => {
+  const router = useRouter();
+
+  const handleNewGroupChat = () => {
+    // Generate a new chat ID and open it in a new tab
+    const newChatId = uuidv4();
+    window.open(`/chat/${newChatId}`, '_blank');
+  };
+
+  return (
+    <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+      {/* Chat Section Header */}
+      <div className="mb-3">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-sm font-medium text-gray-900 dark:text-white">
+            Group Chats
+          </h3>
+        </div>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+          Create shareable conversations
+        </p>
+        
+        <Button
+          onClick={handleNewGroupChat}
+          size="sm"
+          variant="outline"
+          className="w-full flex items-center justify-center gap-2"
+        >
+          <Plus className="h-3 w-3" />
+          <span>New Group Chat</span>
+        </Button>
+        
+        <p className="text-xs text-gray-400 dark:text-gray-500 mt-2 text-center">
+          Opens in new tab
+        </p>
+      </div>
+    </div>
+  );
+};
 
 // The client-side LeftSidebar component which loads profile data on the client
 export const LeftSidebar: React.FC = () => {
@@ -51,8 +103,9 @@ export const LeftSidebar: React.FC = () => {
   }
   
   return (
-    <div className="h-full w-full p-4 space-y-6">
-      <div>
+    <div className="h-full w-full p-4 space-y-6 flex flex-col">
+      {/* Agent Profile Section */}
+      <div className="flex-shrink-0">
         <div className="w-full relative">
           <Image
             src={profileSettings.profileImageUrl || "https://a1base-public.s3.us-east-1.amazonaws.com/profile-moving/20250215_1417_Confident+Startup+Smile_simple_compose_01jm5v0x50f2kaarp5nd556cbw.gif"}
@@ -117,6 +170,11 @@ export const LeftSidebar: React.FC = () => {
             </Button>
           </div>
         </div>
+      </div>
+
+      {/* Multi-User Chat Section */}
+      <div className="flex-1 min-h-0">
+        <MultiUserChatSection />
       </div>
     </div>
   );

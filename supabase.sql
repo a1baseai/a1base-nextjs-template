@@ -11,6 +11,7 @@ CREATE TABLE public.conversation_users (
   name text NULL,
   phone_number text NULL,
   service text NULL,
+  is_agent boolean NULL DEFAULT false,
   metadata jsonb NULL,
   memory jsonb NULL DEFAULT '{}'::jsonb,
   CONSTRAINT conversation_users_pkey PRIMARY KEY (id)

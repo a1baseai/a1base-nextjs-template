@@ -2044,4 +2044,343 @@ export class SupabaseAdapter {
       return false;
     }
   }
+
+  // === Web UI Chat Methods ===
+
+  /**
+   * Create a new anonymous web user
+   * @returns User data with id and generated name
+   */
+  async createWebUser(): Promise<{ id: string; name: string } | null> {
+    this.ensureInitialized();
+    
+    try {
+      const animalNames = [
+        'Anonymous Panda', 'Clever Fox', 'Curious Cat', 'Wise Owl', 'Brave Wolf',
+        'Happy Dolphin', 'Quick Rabbit', 'Strong Bear', 'Gentle Deer', 'Bright Peacock',
+        'Swift Eagle', 'Cool Penguin', 'Smart Raven', 'Kind Elephant', 'Noble Lion'
+      ];
+      
+      const randomName = animalNames[Math.floor(Math.random() * animalNames.length)];
+      
+      const { data, error } = await this.supabase
+        .from(CONVERSATION_USERS_TABLE)
+        .insert({
+          name: randomName,
+          phone_number: null,
+          service: 'web-ui',
+          created_at: new Date().toISOString(),
+        })
+        .select('id, name')
+        .single();
+
+      if (error) {
+        console.error('[createWebUser] Error creating web user:', error);
+        return null;
+      }
+
+      return { id: data.id, name: data.name };
+    } catch (error) {
+      console.error('[createWebUser] Exception creating web user:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get all chats that a user participates in
+   * @param userId The user's ID
+   * @returns Array of chat objects
+   */
+  async getChatsForUser(userId: string): Promise<any[]> {
+    this.ensureInitialized();
+    
+    try {
+      const { data, error } = await this.supabase
+        .from('chat_participants')
+        .select(`
+          chat_id,
+          chats:chat_id (
+            id,
+            external_id,
+            name,
+            type,
+            created_at,
+            service,
+            metadata
+          )
+        `)
+        .eq('user_id', userId);
+
+      if (error) {
+        console.error('[getChatsForUser] Error fetching user chats:', error);
+        return [];
+      }
+
+      // Transform the data to return just the chat info
+      return data.map((item: any) => item.chats).filter(Boolean);
+    } catch (error) {
+      console.error('[getChatsForUser] Exception fetching user chats:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Create a new chat and add the creator as a participant
+   * @param creatorId The ID of the user creating the chat
+   * @returns Chat object with id and external_id
+   */
+  async createChat(creatorId: string): Promise<{ id: string; external_id: string } | null> {
+    this.ensureInitialized();
+    
+    try {
+      const externalId = require('crypto').randomUUID();
+      
+      // Create the chat
+      const { data: chat, error: chatError } = await this.supabase
+        .from(CHATS_TABLE)
+        .insert({
+          external_id: externalId,
+          service: 'web-ui',
+          type: 'group',
+          name: 'New Chat',
+          created_at: new Date().toISOString(),
+        })
+        .select('id, external_id')
+        .single();
+
+      if (chatError) {
+        console.error('[createChat] Error creating chat:', chatError);
+        return null;
+      }
+
+      // Add the creator as a participant
+      const { error: participantError } = await this.supabase
+        .from('chat_participants')
+        .insert({
+          chat_id: chat.id,
+          user_id: creatorId,
+        });
+
+      if (participantError) {
+        console.error('[createChat] Error adding creator as participant:', participantError);
+        // Try to clean up the created chat
+        await this.supabase.from(CHATS_TABLE).delete().eq('id', chat.id);
+        return null;
+      }
+
+      return { id: chat.id, external_id: chat.external_id };
+    } catch (error) {
+      console.error('[createChat] Exception creating chat:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get all messages for a specific chat
+   * @param chatId The external ID of the chat
+   * @param userId The ID of the user requesting messages (for permission check)
+   * @returns Array of message objects
+   */
+  async getChatMessages(chatId: string, userId: string): Promise<any[]> {
+    this.ensureInitialized();
+    
+    try {
+      // First verify the user is a participant in this chat
+      const { data: chat, error: chatError } = await this.supabase
+        .from(CHATS_TABLE)
+        .select('id')
+        .eq('external_id', chatId)
+        .single();
+
+      if (chatError || !chat) {
+        console.error('[getChatMessages] Chat not found:', chatError);
+        return [];
+      }
+
+      // Check if user is a participant
+      const { data: participant, error: participantError } = await this.supabase
+        .from('chat_participants')
+        .select('user_id')
+        .eq('chat_id', chat.id)
+        .eq('user_id', userId)
+        .single();
+
+      if (participantError) {
+        console.error('[getChatMessages] User is not a participant in this chat');
+        return [];
+      }
+
+      // Get messages with sender information
+      const { data: messages, error: messagesError } = await this.supabase
+        .from('messages')
+        .select(`
+          id,
+          content,
+          created_at,
+          message_type,
+          sender_id,
+          conversation_users:sender_id (
+            id,
+            name,
+            phone_number,
+            service
+          )
+        `)
+        .eq('chat_id', chat.id)
+        .order('created_at', { ascending: true });
+
+      if (messagesError) {
+        console.error('[getChatMessages] Error fetching messages:', messagesError);
+        return [];
+      }
+
+      return messages.map((msg: any) => ({
+        id: msg.id,
+        content: msg.content,
+        timestamp: msg.created_at,
+        messageType: msg.message_type || 'text',
+        senderId: msg.sender_id,
+        senderName: msg.conversation_users?.name || 'Unknown',
+        senderService: msg.conversation_users?.service || '',
+        isFromAgent: msg.conversation_users?.phone_number === process.env.A1BASE_AGENT_NUMBER?.replace(/\+/g, ''),
+      }));
+    } catch (error) {
+      console.error('[getChatMessages] Exception fetching messages:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Add a message to a chat
+   * @param chatId The external ID of the chat
+   * @param senderId The ID of the user sending the message
+   * @param content The message content
+   * @returns The created message object
+   */
+  async addMessageToChat(chatId: string, senderId: string, content: string): Promise<any | null> {
+    this.ensureInitialized();
+    
+    try {
+      // Get the internal chat ID
+      const { data: chat, error: chatError } = await this.supabase
+        .from(CHATS_TABLE)
+        .select('id')
+        .eq('external_id', chatId)
+        .single();
+
+      if (chatError || !chat) {
+        console.error('[addMessageToChat] Chat not found:', chatError);
+        return null;
+      }
+
+      // Verify user is a participant
+      const { data: participant, error: participantError } = await this.supabase
+        .from('chat_participants')
+        .select('user_id')
+        .eq('chat_id', chat.id)
+        .eq('user_id', senderId)
+        .single();
+
+      if (participantError) {
+        console.error('[addMessageToChat] User is not a participant in this chat');
+        return null;
+      }
+
+      // Create the message
+      const messageId = require('crypto').randomUUID();
+      const { data: message, error: messageError } = await this.supabase
+        .from('messages')
+        .insert({
+          id: messageId,
+          chat_id: chat.id,
+          sender_id: senderId,
+          content: content,
+          message_type: 'text',
+          service: 'web-ui',
+          external_id: messageId,
+          created_at: new Date().toISOString(),
+        })
+        .select('id, content, created_at, sender_id')
+        .single();
+
+      if (messageError) {
+        console.error('[addMessageToChat] Error creating message:', messageError);
+        return null;
+      }
+
+      // Get sender information separately
+      const { data: sender, error: senderError } = await this.supabase
+        .from(CONVERSATION_USERS_TABLE)
+        .select('name, service')
+        .eq('id', senderId)
+        .single();
+
+      return {
+        id: message.id,
+        content: message.content,
+        timestamp: message.created_at,
+        senderId: message.sender_id,
+        senderName: sender?.name || 'Unknown',
+        senderService: sender?.service || '',
+      };
+    } catch (error) {
+      console.error('[addMessageToChat] Exception adding message:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Add a user to a chat as a participant
+   * @param chatId The external ID of the chat
+   * @param userId The ID of the user to add
+   * @returns Success status
+   */
+  async addUserToChat(chatId: string, userId: string): Promise<boolean> {
+    this.ensureInitialized();
+    
+    try {
+      // Get the internal chat ID
+      const { data: chat, error: chatError } = await this.supabase
+        .from(CHATS_TABLE)
+        .select('id')
+        .eq('external_id', chatId)
+        .single();
+
+      if (chatError || !chat) {
+        console.error('[addUserToChat] Chat not found:', chatError);
+        return false;
+      }
+
+      // Check if user is already a participant
+      const { data: existingParticipant } = await this.supabase
+        .from('chat_participants')
+        .select('user_id')
+        .eq('chat_id', chat.id)
+        .eq('user_id', userId)
+        .single();
+
+      if (existingParticipant) {
+        // User is already a participant, no need to add again
+        return true;
+      }
+
+      // Add the user as a participant
+      const { error: participantError } = await this.supabase
+        .from('chat_participants')
+        .insert({
+          chat_id: chat.id,
+          user_id: userId,
+        });
+
+      if (participantError) {
+        console.error('[addUserToChat] Error adding participant:', participantError);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('[addUserToChat] Exception adding user to chat:', error);
+      return false;
+    }
+  }
 }

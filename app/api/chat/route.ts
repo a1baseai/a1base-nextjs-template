@@ -73,6 +73,7 @@ export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const threadId = searchParams.get('threadId');
+    const isGroupChat = searchParams.get('isGroupChat') === 'true';
     
     if (!threadId) {
       return NextResponse.json({ error: 'threadId is required' }, { status: 400 });
@@ -89,15 +90,60 @@ export async function GET(req: Request) {
     }
 
     // Convert database messages to the format expected by the UI
-    const messages = thread.messages.map(msg => {
+    const messages = await Promise.all(thread.messages.map(async (msg) => {
       const isFromAgent = msg.sender_number === process.env.A1BASE_AGENT_NUMBER;
+      const isSystemMessage = msg.message_type === 'system';
+      
+      // For group chats, get the sender's name
+      let senderName = 'User';
+      if (isGroupChat && msg.sender_id && !isSystemMessage && !isFromAgent) {
+        // Check if it's a web group user
+        if (msg.sender_number?.startsWith('web-group-')) {
+          // For web group users, parse the name from metadata or conversation_users
+          const { data: sender } = await adapter.supabase
+            .from('conversation_users')
+            .select('name')
+            .eq('id', msg.sender_id)
+            .single();
+          
+          if (sender?.name) {
+            senderName = sender.name;
+          }
+        } else {
+          const { data: sender } = await adapter.supabase
+            .from('conversation_users')
+            .select('name')
+            .eq('id', msg.sender_id)
+            .single();
+          
+          if (sender?.name) {
+            senderName = sender.name;
+          }
+        }
+      }
+      
+      // Handle different message types
+      if (isSystemMessage) {
+        return {
+          role: 'system' as const,
+          content: msg.content,
+          id: msg.message_id,
+          timestamp: msg.timestamp,
+          isSystemMessage: true
+        };
+      }
+      
+      // For group chats, don't prefix the message content with sender name
+      // Instead, include it as a separate field
       return {
         role: isFromAgent ? 'assistant' : 'user',
         content: msg.content,
         id: msg.message_id,
-        timestamp: msg.timestamp
+        timestamp: msg.timestamp,
+        senderName: isFromAgent ? 'AI Assistant' : senderName,
+        isFromAgent
       };
-    });
+    }));
 
     return NextResponse.json({ messages });
   } catch (error) {
@@ -109,8 +155,20 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   console.log('\n\n[CHAT-API] Received chat request');
   try {
-    const { messages, threadId: clientThreadId }: { messages: CoreMessage[]; threadId?: string } = await req.json();
+    const { 
+      messages, 
+      threadId: clientThreadId, 
+      isGroupChat, 
+      userInfo 
+    }: { 
+      messages: CoreMessage[]; 
+      threadId?: string; 
+      isGroupChat?: boolean;
+      userInfo?: { id: string; name: string; };
+    } = await req.json();
+    
     console.log(`[CHAT-API] Request contains ${messages.length} messages. Received client threadId: ${clientThreadId}`);
+    console.log(`[CHAT-API] Group chat: ${isGroupChat}, User: ${userInfo?.name} (${userInfo?.id})`);
 
     if (isBuildTime()) {
       console.log('[CHAT-API] Build-time context detected, returning static response');
@@ -124,17 +182,98 @@ export async function POST(req: Request) {
     
     const adapter = await getInitializedAdapter();
     let chatRecordId: string | null = null;
+    let currentUserId: string | null = null;
+
     if (adapter) {
+        // Handle user creation/lookup for group chats
+        if (isGroupChat && userInfo) {
+            // Try to find existing user by the group chat user ID stored in phone_number
+            const userPhoneNumber = `web-group-${userInfo.id}`;
+            let { data: existingUser } = await adapter.supabase
+                .from('conversation_users')
+                .select('id')
+                .eq('phone_number', userPhoneNumber)
+                .single();
+
+            if (!existingUser) {
+                console.log(`[CHAT-API] Creating new group chat user: ${userInfo.name}`);
+                // Create new user for group chat
+                const { data: newUser, error: userError } = await adapter.supabase
+                    .from('conversation_users')
+                    .insert({
+                        name: userInfo.name,
+                        phone_number: userPhoneNumber, // Store the group chat user ID here
+                        service: 'web-ui',
+                        created_at: new Date().toISOString(),
+                    })
+                    .select('id')
+                    .single();
+
+                if (userError) {
+                    console.error('[CHAT-API] Error creating group chat user:', userError);
+                } else {
+                    currentUserId = newUser.id;
+                    console.log(`[CHAT-API] Created group chat user with ID: ${currentUserId}`);
+                }
+            } else {
+                currentUserId = existingUser.id;
+                console.log(`[CHAT-API] Found existing group chat user with ID: ${currentUserId}`);
+            }
+        }
+
+        // Handle chat creation/lookup
         const existingChat = await adapter.getThread(externalThreadId);
         if (existingChat) {
             chatRecordId = existingChat.id;
+            console.log(`[CHAT-API] Found existing chat: ${chatRecordId}`);
+            
+            // For group chats, ensure the user is added as a participant
+            if (isGroupChat && currentUserId) {
+                // Check if user is already a participant
+                const { data: existingParticipant } = await adapter.supabase
+                    .from('chat_participants')
+                    .select('user_id')
+                    .eq('chat_id', chatRecordId)
+                    .eq('user_id', currentUserId)
+                    .single();
+
+                if (!existingParticipant) {
+                    console.log(`[CHAT-API] Adding user ${currentUserId} to existing group chat`);
+                    await adapter.supabase
+                        .from('chat_participants')
+                        .insert({
+                            chat_id: chatRecordId,
+                            user_id: currentUserId,
+                            joined_at: new Date().toISOString()
+                        });
+                    
+                    // Add a system message that the user joined
+                    if (userInfo) {
+                        const joinMessageId = uuidv4();
+                        await adapter.supabase
+                            .from('messages')
+                            .insert({
+                                id: joinMessageId,
+                                chat_id: chatRecordId,
+                                sender_id: null, // System message
+                                content: `${userInfo.name} joined the chat`,
+                                message_type: 'system',
+                                service: 'web-ui',
+                                external_id: joinMessageId,
+                                created_at: new Date().toISOString(),
+                            });
+                        console.log(`[CHAT-API] Added join message for ${userInfo.name}`);
+                    }
+                }
+            }
         } else {
+            const chatType = isGroupChat ? "group" : "individual";
             const { data: newChat, error: createError } = await adapter.supabase
                 .from("chats")
                 .insert({
                     external_id: externalThreadId,
                     service: "web-ui",
-                    type: "individual",
+                    type: chatType,
                 })
                 .select("id")
                 .single();
@@ -144,6 +283,19 @@ export async function POST(req: Request) {
                 return NextResponse.json({ error: 'Failed to create chat session' }, { status: 500 });
             }
             chatRecordId = newChat.id;
+            console.log(`[CHAT-API] Created new ${chatType} chat: ${chatRecordId}`);
+
+            // Add user to group chat participants if this is a group chat
+            if (isGroupChat && currentUserId) {
+                await adapter.supabase
+                    .from('chat_participants')
+                    .insert({
+                        chat_id: chatRecordId,
+                        user_id: currentUserId,
+                        joined_at: new Date().toISOString()
+                    });
+                console.log(`[CHAT-API] Added user ${currentUserId} to group chat participants`);
+            }
         }
     }
     
@@ -154,7 +306,7 @@ export async function POST(req: Request) {
         ? userMessage.content[0].text 
         : '';
     
-    console.log(`[CHAT-API] Pre-save check. Adapter exists: ${!!adapter}. User message content: "${userMessageContent}". Internal chat ID: ${chatRecordId}`);
+    console.log(`[CHAT-API] Pre-save check. Adapter exists: ${!!adapter}. User message content: "${userMessageContent}". Internal chat ID: ${chatRecordId}. User ID: ${currentUserId}`);
 
     if (adapter && userMessageContent && chatRecordId) {
         const messageRecordId = uuidv4();
@@ -164,8 +316,8 @@ export async function POST(req: Request) {
             console.log(`[CHAT-API] Saving user message to DB: ${messageRecordId}`);
             await adapter.storeMessage(
                 chatRecordId,
-                null, // sender_id for user is null
-                messageRecordId, // This is the Supabase message record ID
+                currentUserId, // Use the group chat user ID instead of null
+                messageRecordId,
                 { text: userMessageContent },
                 'text',
                 'web-ui',
@@ -173,11 +325,16 @@ export async function POST(req: Request) {
             );
             console.log(`[CHAT-API] User message saved.`);
 
+            // For group chats, sync with user name; for individual chats use default
+            const senderIdentifier = isGroupChat && userInfo 
+                ? `web-group-${userInfo.id}` 
+                : 'web-ui-user';
+
             await syncWebUiMessage({
                 chatRecordId: chatRecordId,
                 messageRecordId: messageRecordId,
                 content: userMessageContent,
-                senderIdentifier: 'web-ui-user', // Identifier for a non-agent user
+                senderIdentifier: senderIdentifier,
                 timestamp: Math.floor(new Date(userMessageTimestamp).getTime() / 1000),
             });
         } catch (error) {
@@ -196,23 +353,28 @@ export async function POST(req: Request) {
     
     const latestUserMessageContent = userMessageContent;
     
+    // Use appropriate thread type for triage
+    const threadType = isGroupChat ? 'group' : 'individual';
+    const senderName = isGroupChat && userInfo ? userInfo.name : 'WebUser';
+    const senderNumber = isGroupChat && userInfo ? `web-group-${userInfo.id}` : 'web';
+
     const triageResponse = await triageMessage({
       thread_id: externalThreadId,
       message_id: Date.now().toString(),
       content: latestUserMessageContent,
       message_type: 'text',
       message_content: { text: latestUserMessageContent },
-      sender_name: 'WebUser',
-      sender_number: 'web',
-      thread_type: 'individual',
+      sender_name: senderName,
+      sender_number: senderNumber,
+      thread_type: threadType,
       timestamp: new Date().toISOString(),
       messagesByThread: new Map([[externalThreadId, [{ 
         message_id: Date.now().toString(),
         content: latestUserMessageContent,
         message_type: 'text',
         message_content: { text: latestUserMessageContent },
-        sender_number: 'web',
-        sender_name: 'WebUser',
+        sender_number: senderNumber,
+        sender_name: senderName,
         timestamp: new Date().toISOString(),
       }]]]),
       service: 'web-ui',
@@ -247,8 +409,7 @@ export async function POST(req: Request) {
                 const thread = await adapter.getThread(externalThreadId);
                 if (thread && thread.messages.length > 0) {
                     // Convert database messages to AI format, excluding the current user message
-                    // since it's already in the messages array
-                    const dbMessages = thread.messages.slice(0, -1); // Exclude the last message (current user message)
+                    const dbMessages = thread.messages.slice(0, -1);
                     
                     historicalMessages = dbMessages.map(msg => {
                         const isFromAgent = msg.sender_number === process.env.A1BASE_AGENT_NUMBER;
@@ -276,7 +437,7 @@ export async function POST(req: Request) {
         }
         
         result = streamText({
-          model: openai('gpt-4.1'),
+          model: openai('gpt-4o'),
           messages: aiMessages,
           temperature: 0.7,
         });

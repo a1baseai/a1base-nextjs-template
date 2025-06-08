@@ -44,7 +44,8 @@ const HistoricalMessages: FC<{ threadId?: string }> = ({ threadId }) => {
     setLoading(true);
     try {
       console.log(`[HISTORICAL-MESSAGES] Loading messages for thread: ${threadId}`);
-      const response = await fetch(`/api/chat?threadId=${threadId}`);
+      const isGroupChat = threadId.includes('-'); // Simple heuristic for group chat IDs
+      const response = await fetch(`/api/chat?threadId=${threadId}${isGroupChat ? '&isGroupChat=true' : ''}`);
       if (response.ok) {
         const data = await response.json();
         const messages = data.messages || [];
@@ -79,26 +80,53 @@ const HistoricalMessages: FC<{ threadId?: string }> = ({ threadId }) => {
       </div>
       
       {/* Render historical messages */}
-      {historicalMessages.map((msg, index) => (
-        <div key={`historical-${index}`} className={`py-4 ${msg.role === 'user' ? 'historical-user-message' : 'historical-assistant-message'}`}>
-          {msg.role === 'assistant' ? (
-            <div className="grid grid-cols-[auto_auto_1fr] grid-rows-[auto_1fr] relative w-full max-w-[var(--thread-max-width)]">
-              <Avatar className="col-start-1 row-span-full row-start-1 mr-4">
-                <AvatarFallback>A</AvatarFallback>
-              </Avatar>
-              <div className="text-foreground max-w-[calc(var(--thread-max-width)*0.8)] break-words leading-7 col-span-2 col-start-2 row-start-1 my-1.5 opacity-75">
-                {msg.content}
+      {historicalMessages.map((msg, index) => {
+        const isSystemMessage = msg.isSystemMessage;
+        const isAssistant = msg.role === 'assistant';
+        
+        if (isSystemMessage) {
+          return (
+            <div key={`historical-${index}`} className="text-center py-2">
+              <div className="inline-flex items-center gap-2 px-3 py-1 bg-gray-100 dark:bg-gray-800 rounded-full text-xs text-gray-500 dark:text-gray-400">
+                <span>{msg.content}</span>
               </div>
             </div>
-          ) : (
-            <div className="grid auto-rows-auto grid-cols-[minmax(72px,1fr)_auto] gap-y-2 [&:where(>*)]:col-start-2 w-full max-w-[var(--thread-max-width)]">
-              <div className="bg-muted text-foreground max-w-[calc(var(--thread-max-width)*0.8)] break-words rounded-3xl px-5 py-2.5 col-start-2 row-start-2 opacity-75">
-                {msg.content}
+          );
+        }
+        
+        return (
+          <div key={`historical-${index}`} className={`py-4 ${msg.role === 'user' ? 'historical-user-message' : 'historical-assistant-message'}`}>
+            {isAssistant ? (
+              <div className="grid grid-cols-[auto_auto_1fr] grid-rows-[auto_1fr] relative w-full max-w-[var(--thread-max-width)]">
+                <Avatar className="col-start-1 row-span-full row-start-1 mr-4">
+                  <AvatarFallback>A</AvatarFallback>
+                </Avatar>
+                <div className="col-span-2 col-start-2">
+                  {msg.senderName && (
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                      {msg.senderName}
+                    </div>
+                  )}
+                  <div className="text-foreground max-w-[calc(var(--thread-max-width)*0.8)] break-words leading-7 opacity-75">
+                    {msg.content}
+                  </div>
+                </div>
               </div>
-            </div>
-          )}
-        </div>
-      ))}
+            ) : (
+              <div className="grid auto-rows-auto grid-cols-[minmax(72px,1fr)_auto] gap-y-2 [&:where(>*)]:col-start-2 w-full max-w-[var(--thread-max-width)]">
+                {msg.senderName && (
+                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-1 col-start-2">
+                    {msg.senderName}
+                  </div>
+                )}
+                <div className="bg-muted text-foreground max-w-[calc(var(--thread-max-width)*0.8)] break-words rounded-3xl px-5 py-2.5 col-start-2 row-start-2 opacity-75">
+                  {msg.content}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
       
       {/* Separator */}
       <div className="text-center py-4">
