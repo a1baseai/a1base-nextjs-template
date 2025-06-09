@@ -2,6 +2,7 @@ const { createServer } = require('http');
 const { parse } = require('url');
 const next = require('next');
 const { Server } = require('socket.io');
+const { generateChatSummary } = require('./lib/workflows/chat_workflow');
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = process.env.HOSTNAME || '0.0.0.0'; // Listen on all interfaces
@@ -127,27 +128,36 @@ app.prepare().then(() => {
           participants: finalParticipantsList
         });
 
-        // Automatically send a welcome message from the AI agent
+        // Automatically send a welcome summary from the AI agent
         if (userId !== 'ai-agent') {
-          setTimeout(() => {
-            const welcomeMessage = {
-              id: `welcome-${Date.now()}`,
-              content: `Hello ${userName}! 👋 Welcome to the chat. I'm Felicie, your AI assistant. To help you get the most out of our conversation, could you please share your email address? I'll send you a personalized welcome message.`,
-              role: 'assistant',
-              timestamp: new Date().toISOString()
-            };
+          console.log(`[SOCKET.IO] User ${userName} joined. Fetching summary for chat ${chatId}...`);
+          
+          generateChatSummary(chatId)
+            .then(summary => {
+              if (summary) {
+                const welcomeMessage = {
+                  id: `summary-${Date.now()}`,
+                  content: `Welcome, ${userName}! 👋 Here's a quick summary of what's happened so far:\n\n${summary}`,
+                  role: 'assistant',
+                  timestamp: new Date().toISOString()
+                };
 
-            io.to(chatId).emit('new-message', {
-              id: welcomeMessage.id,
-              content: welcomeMessage.content,
-              role: welcomeMessage.role,
-              timestamp: welcomeMessage.timestamp,
-              senderName: 'Felicie',
-              senderId: 'ai-agent'
+                // Emit the message directly to the user who just joined
+                socket.emit('new-message', {
+                  id: welcomeMessage.id,
+                  content: welcomeMessage.content,
+                  role: welcomeMessage.role,
+                  timestamp: welcomeMessage.timestamp,
+                  senderName: 'Felicie',
+                  senderId: 'ai-agent'
+                });
+                
+                console.log(`[SOCKET.IO] Sent summary to ${userName} in chat ${chatId}`);
+              }
+            })
+            .catch(error => {
+              console.error('[SOCKET.IO] Failed to fetch chat summary:', error);
             });
-            
-            console.log(`[SOCKET.IO] Sent welcome message to ${userName} in chat ${chatId}`);
-          }, 2500); // Increased delay to ensure client is ready
         }
       } catch (error) {
         console.error('[SOCKET.IO] Error in join-chat:', error);
