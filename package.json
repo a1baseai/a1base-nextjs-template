@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev > ./logs.txt",
+    "dev": "NODE_ENV=development node server.js | tee ./logs.txt",
     "dev:next": "next dev",
     "build": "next build",
     "start": "NODE_ENV=production node server.js",

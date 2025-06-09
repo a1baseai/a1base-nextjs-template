@@ -2,7 +2,13 @@ const { createServer } = require('http');
 const { parse } = require('url');
 const next = require('next');
 const { Server } = require('socket.io');
-const { generateChatSummary } = require('./lib/workflows/chat_workflow');
+// const { generateChatSummary } = require('./lib/workflows/chat_workflow');
+
+// Temporary stub function until we can properly handle TypeScript files
+async function generateChatSummary(chatId) {
+  console.log(`[SOCKET.IO] Chat summary requested for ${chatId} - using placeholder`);
+  return null; // This will skip the summary message
+}
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = process.env.HOSTNAME || '0.0.0.0'; // Listen on all interfaces
