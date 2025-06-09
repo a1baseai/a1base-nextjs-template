@@ -25,9 +25,9 @@ const MultiUserChatSection: React.FC = () => {
   const router = useRouter();
 
   const handleNewGroupChat = () => {
-    // Generate a new chat ID and open it in a new tab
+    // Generate a new chat ID and navigate to it
     const newChatId = uuidv4();
-    window.open(`/chat/${newChatId}`, '_blank');
+    router.push(`/chat/${newChatId}`);
   };
 
   return (

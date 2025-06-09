@@ -30,6 +30,7 @@ interface SocketGroupChatHook {
   typingUsers: Map<string, string>;
   connectionStatus: 'connecting' | 'connected' | 'disconnected' | 'error';
   reconnect: () => void;
+  socket: Socket | null;
 }
 
 export function useSocketGroupChat(chatId: string): SocketGroupChatHook {
@@ -71,7 +72,21 @@ export function useSocketGroupChat(chatId: string): SocketGroupChatHook {
     if (!chatId) return;
 
     // Connect socket
-    const socketUrl = `${window.location.protocol}//${window.location.host}`;
+    const getSocketUrl = () => {
+      if (typeof window === 'undefined') {
+        return 'http://localhost:3000'; // Default for server-side
+      }
+      
+      // For production (e.g., on Railway), use wss://
+      if (process.env.NODE_ENV === 'production' && window.location.protocol === 'https:') {
+        return `wss://${window.location.host}`;
+      }
+      
+      // For local development, use the current protocol and host
+      return `${window.location.protocol}//${window.location.host}`;
+    };
+
+    const socketUrl = getSocketUrl();
     console.log('[SOCKET.IO] Connecting to:', socketUrl);
     setConnectionStatus('connecting');
     setError(null);
@@ -541,6 +556,7 @@ export function useSocketGroupChat(chatId: string): SocketGroupChatHook {
     setTyping,
     typingUsers,
     connectionStatus,
-    reconnect
+    reconnect,
+    socket: socketRef.current
   };
 } 
