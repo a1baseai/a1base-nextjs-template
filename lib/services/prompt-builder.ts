@@ -12,6 +12,12 @@
 export function buildSystemPrompt(basePrompt: string, service: string): string {
   let prompt = basePrompt;
   
+  // Handle undefined service
+  if (!service) {
+    console.warn('[buildSystemPrompt] Service is undefined, defaulting to web-ui');
+    service = 'web-ui';
+  }
+  
   if (service === 'sms') {
     prompt += `
 
@@ -31,6 +37,13 @@ MESSAGE SERVICE INFO:
 - You can use rich formatting, emojis, and longer messages.
 - Media sharing is supported if needed.
 - Current message service: WhatsApp`;
+  } else if (service === 'web-ui') {
+    prompt += `
+
+MESSAGE SERVICE INFO:
+- You are responding via the web interface.
+- You can use rich formatting and longer messages.
+- Current message service: Web UI`;
   }
   
   return prompt;
@@ -58,6 +71,13 @@ export function getServiceConstraints(service: string): {
     case 'whatsapp':
       return {
         maxLength: 65536, // WhatsApp's practical limit
+        allowsUnicode: true,
+        allowsMedia: true,
+        supportsFormatting: true
+      };
+    case 'web-ui':
+      return {
+        maxLength: 65536,
         allowsUnicode: true,
         allowsMedia: true,
         supportsFormatting: true
@@ -110,6 +130,12 @@ export function validateResponseForService(
   valid: boolean;
   reason?: string;
 } {
+  // Handle undefined service
+  if (!service) {
+    console.warn('[validateResponseForService] Service is undefined, defaulting to web-ui constraints');
+    service = 'web-ui';
+  }
+  
   const constraints = getServiceConstraints(service);
   
   if (response.length > constraints.maxLength) {
