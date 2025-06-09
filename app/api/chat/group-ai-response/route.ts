@@ -42,6 +42,14 @@ export async function POST(request: Request) {
       }
     }
 
+    // Check if message contains an email address - if so, skip AI response
+    // This prevents duplicate responses when users provide their email
+    const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/;
+    if (emailRegex.test(message.content)) {
+      console.log('[GROUP-AI] Message contains email address, skipping AI response to avoid duplicate');
+      return NextResponse.json({ shouldRespond: false });
+    }
+
     // Get system prompt
     const systemPromptContent = await getSystemPrompt();
     

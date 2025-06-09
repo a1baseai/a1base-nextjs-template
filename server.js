@@ -7,6 +7,7 @@ const next = require('next');
 const { Server } = require('socket.io');
 const { loadProfileSettingsFromFile } = require('./lib/storage/server-file-storage');
 const { generateChatSummary } = require('./lib/workflows/chat_workflow');
+const { extractEmailFromMessage, sendGroupChatLinkEmail, requestEmailAfterSummary } = require('./lib/workflows/group-chat-email-workflow');
 
 // Temporary stub function until we can properly handle TypeScript files
 // Remove this stub - we now have a proper implementation
@@ -26,6 +27,7 @@ const handle = app.getRequestHandler();
 // Store active connections and rooms
 const rooms = new Map(); // chatId -> Set of participant info
 const userSockets = new Map(); // userId -> socket.id
+const userEmailRequested = new Map(); // userId -> boolean (tracks if we've asked for email)
 
 app.prepare().then(() => {
   console.log('[INFO] Next.js app prepared. Setting up server...');
@@ -208,6 +210,12 @@ app.prepare().then(() => {
                   });
                   
                   console.log(`[SOCKET.IO] Sent summary to ${userName} in chat ${chatId}`);
+                  
+                  // Request email after summary if we haven't already
+                  if (!userEmailRequested.get(userId)) {
+                    userEmailRequested.set(userId, true);
+                    requestEmailAfterSummary(io, chatId, userId, userName, agentName);
+                  }
                 }
               })
               .catch(error => {
@@ -245,6 +253,67 @@ app.prepare().then(() => {
         }
 
         console.log(`[SOCKET.IO] Message from ${userName} in chat ${chatId}: ${message.content.substring(0, 50)}...`);
+
+        // Check if this is a user message and we've requested their email
+        let emailHandled = false;
+        if (userId !== 'ai-agent' && userEmailRequested.get(userId)) {
+          const extractedEmail = await extractEmailFromMessage(message.content);
+          
+          if (extractedEmail) {
+            console.log(`[SOCKET.IO] User ${userName} provided email: ${extractedEmail}`);
+            emailHandled = true;
+            
+            // Load agent profile for the name
+            const profileSettings = await loadProfileSettingsFromFile();
+            const agentName = profileSettings?.name || 'Felicie';
+            
+            // Send acknowledgment message
+            const ackMessage = {
+              id: `email-ack-${Date.now()}`,
+              content: `Great! I'm sending the group chat link to ${extractedEmail} right now... 📧`,
+              role: 'assistant',
+              timestamp: new Date().toISOString()
+            };
+            
+            io.to(chatId).emit('new-message', {
+              id: ackMessage.id,
+              content: ackMessage.content,
+              role: ackMessage.role,
+              timestamp: ackMessage.timestamp,
+              senderName: agentName,
+              senderId: 'ai-agent'
+            });
+            
+            // Send the email
+            const emailSent = await sendGroupChatLinkEmail(extractedEmail, chatId, userName);
+            
+            // Send confirmation or error message
+            const confirmMessage = {
+              id: `email-confirm-${Date.now()}`,
+              content: emailSent 
+                ? `✅ I've sent the group chat link to ${extractedEmail}! Check your inbox for easy access to return to this conversation anytime.`
+                : `❌ I had trouble sending the email. Please make sure the email address is correct and try again.`,
+              role: 'assistant',
+              timestamp: new Date().toISOString()
+            };
+            
+            io.to(chatId).emit('new-message', {
+              id: confirmMessage.id,
+              content: confirmMessage.content,
+              role: confirmMessage.role,
+              timestamp: confirmMessage.timestamp,
+              senderName: agentName,
+              senderId: 'ai-agent'
+            });
+            
+            // Mark that we've handled this user's email
+            if (emailSent) {
+              userEmailRequested.delete(userId);
+              // Don't return early - allow the message to be broadcast normally
+              // The AI response will be prevented by the group-ai-response API
+            }
+          }
+        }
 
         // If this is an AI agent message, ensure it's in the participants list
         if (userId === 'ai-agent') {
@@ -323,6 +392,7 @@ app.prepare().then(() => {
           const parsed = JSON.parse(userParticipant);
           participants.delete(userParticipant);
           userSockets.delete(parsed.userId);
+          userEmailRequested.delete(parsed.userId); // Clean up email request tracking
 
           // Notify others in the room
           const remainingParticipants = Array.from(participants).map(p => JSON.parse(p));
