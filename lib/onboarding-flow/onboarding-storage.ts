@@ -1,7 +1,6 @@
 import { OnboardingFlow, defaultOnboardingFlow } from './types';
 import { saveToLocalStorage, loadFromLocalStorage } from '@/lib/storage/local-storage';
 import { toast } from 'sonner';
-import { loadOnboardingFlowFromFile } from '@/lib/storage/server-file-storage';
 
 const ONBOARDING_FLOW_KEY = 'onboarding_flow_settings';
 
@@ -37,39 +36,7 @@ export const loadOnboardingFlow = async (): Promise<OnboardingFlow> => {
   console.log('🔄 Attempting to load onboarding flow...');
   
   try {
-    // In server context, try to load directly from filesystem first (much faster and more reliable)
-    if (typeof window === 'undefined') {
-      console.log('🔍 DEBUG: Server context detected, loading directly from filesystem');
-      try {
-        const flowFromFile = await loadOnboardingFlowFromFile();
-        
-        if (flowFromFile) {
-          console.log('✅ Successfully loaded onboarding flow from filesystem');
-          // Return immediately to avoid any API calls or localStorage checks
-          return flowFromFile;
-        } else {
-          console.log('⚠️ No onboarding flow file found, will use defaults');
-          // Return immediately with default flow
-          return { ...defaultOnboardingFlow };
-        }
-      } catch (fsError) {
-        console.error('❌ Error loading from filesystem:', fsError);
-        // Only continue to API fallback if filesystem access fails completely
-      }
-    }
-    
-    // Skip localStorage loading
-    // if (typeof window !== 'undefined') {
-    //   console.log('🔄 Checking localStorage for onboarding flow...');
-    //   const savedSettings = loadFromLocalStorage<OnboardingFlow>(ONBOARDING_FLOW_KEY);
-    //   
-    //   if (savedSettings) {
-    //     console.log('✅ Found onboarding flow in localStorage');
-    //     return savedSettings;
-    //   }
-    // }
-    
-    // Try API as another fallback (but only as a last resort for server contexts)
+    // Try API as the primary source of truth
     console.log('🔄 Attempting to load onboarding flow via API...');
     
     // Add a shorter timeout to the fetch operation to avoid hanging
@@ -89,12 +56,6 @@ export const loadOnboardingFlow = async (): Promise<OnboardingFlow> => {
       if (response.ok) {
         const data = await response.json();
         console.log('✅ Successfully loaded onboarding flow via API');
-        
-        // No caching in localStorage
-        // if (data.flow && typeof window !== 'undefined') {
-        //   saveToLocalStorage(ONBOARDING_FLOW_KEY, data.flow);
-        // }
-        
         return data.flow;
       } else {
         console.log('❌ Failed to load onboarding flow via API. Status:', response.status);
@@ -119,10 +80,6 @@ export const loadOnboardingFlow = async (): Promise<OnboardingFlow> => {
       } catch (toastError) {
         console.error('❌ Error showing toast:', toastError);
       }
-      
-      // Skip localStorage as fallback
-      // const savedSettings = loadFromLocalStorage<OnboardingFlow>(ONBOARDING_FLOW_KEY);
-      // if (savedSettings) return savedSettings;
     }
     
     // Always fall back to defaults if everything else fails

@@ -2,6 +2,7 @@ const { createServer } = require('http');
 const { parse } = require('url');
 const next = require('next');
 const { Server } = require('socket.io');
+const { loadProfileSettingsFromFile } = require('./lib/storage/server-file-storage');
 // const { generateChatSummary } = require('./lib/workflows/chat_workflow');
 
 // Temporary stub function until we can properly handle TypeScript files
@@ -146,9 +147,19 @@ app.prepare().then(() => {
             // This is a new chat - send introductory message
             console.log(`[SOCKET.IO] First user in chat ${chatId}. Sending introduction...`);
             
+            // Load agent profile to customize the message
+            const profileSettings = await loadProfileSettingsFromFile();
+            const agentName = profileSettings?.name || 'Felicie';
+            const respondOnlyWhenMentioned = profileSettings?.groupChatPreferences?.respond_only_when_mentioned;
+            
+            let mentionInstructions = "I'll respond to every message in this chat. You can change this in my settings.";
+            if (respondOnlyWhenMentioned) {
+              mentionInstructions = `To talk to me, just mention me by name: @${agentName}. You can change this in my settings.`;
+            }
+
             const introMessage = {
               id: `intro-${Date.now()}`,
-              content: `Hello ${userName}! 👋 I'm Felicie, your AI assistant.\n\nI'm here to help you with:\n• Answering questions and providing information\n• Creative brainstorming and problem-solving\n• Learning and exploring new topics together\n• Having engaging conversations\n\nFeel free to ask me anything or just chat! You can also invite others to join our conversation using the "Share Chat Link" button above. The more perspectives, the better our discussions! 🚀\n\nWhat would you like to talk about today?`,
+              content: `Hello ${userName}! 👋 I'm ${agentName}, your A1 Zap.\n\nI'm here to help you with:\n• Answering questions and providing information\n• Creative brainstorming and problem-solving\n• Learning and exploring new topics together\n\n${mentionInstructions}\n\nYou can invite others to join us and coordinate tasks together using the "Share Chat Link" button. ! 🚀\n\nWhat can I help you with today?`,
               role: 'assistant',
               timestamp: new Date().toISOString()
             };
@@ -159,7 +170,7 @@ app.prepare().then(() => {
               content: introMessage.content,
               role: introMessage.role,
               timestamp: introMessage.timestamp,
-              senderName: 'Felicie',
+              senderName: agentName,
               senderId: 'ai-agent'
             });
             
