@@ -1,15 +1,19 @@
+// Load environment variables
+require('dotenv').config({ path: '.env.local' });
+
 const { createServer } = require('http');
 const { parse } = require('url');
 const next = require('next');
 const { Server } = require('socket.io');
 const { loadProfileSettingsFromFile } = require('./lib/storage/server-file-storage');
-// const { generateChatSummary } = require('./lib/workflows/chat_workflow');
+const { generateChatSummary } = require('./lib/workflows/chat_workflow');
 
 // Temporary stub function until we can properly handle TypeScript files
-async function generateChatSummary(chatId) {
-  console.log(`[SOCKET.IO] Chat summary requested for ${chatId} - using placeholder`);
-  return null; // This will skip the summary message
-}
+// Remove this stub - we now have a proper implementation
+// async function generateChatSummary(chatId) {
+//   console.log(`[SOCKET.IO] Chat summary requested for ${chatId} - using placeholder`);
+//   return null; // This will skip the summary message
+// }
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = process.env.HOSTNAME || '0.0.0.0'; // Listen on all interfaces
@@ -179,12 +183,16 @@ app.prepare().then(() => {
             // Existing chat - try to generate a summary
             console.log(`[SOCKET.IO] User ${userName} joined existing chat. Fetching summary for chat ${chatId}...`);
             
+            // Load agent profile for the name
+            const profileSettings = await loadProfileSettingsFromFile();
+            const agentName = profileSettings?.name || 'Felicie';
+            
             generateChatSummary(chatId)
               .then(summary => {
                 if (summary) {
                   const welcomeMessage = {
                     id: `summary-${Date.now()}`,
-                    content: `Welcome, ${userName}! 👋 Here's a quick summary of what's happened so far:\n\n${summary}`,
+                    content: `Welcome, ${userName}! 👋 Here's a quick summary of what's happened in the chat so far:\n\n${summary}`,
                     role: 'assistant',
                     timestamp: new Date().toISOString()
                   };
@@ -195,7 +203,7 @@ app.prepare().then(() => {
                     content: welcomeMessage.content,
                     role: welcomeMessage.role,
                     timestamp: welcomeMessage.timestamp,
-                    senderName: 'Felicie',
+                    senderName: agentName,
                     senderId: 'ai-agent'
                   });
                   
