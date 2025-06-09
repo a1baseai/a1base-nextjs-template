@@ -159,7 +159,7 @@ const RightSidebar: FC<{
   contentWorkflows: { text: string; url: string }[];
 }> = ({ gifUrls, contentWorkflows }) => {
   return (
-    <div className="hidden w-80 border-l border-gray-200 dark:border-gray-700 bg-gray-100 p-4 lg:p-6 md:block overflow-y-auto">
+    <div className="hidden w-80 h-full border-l border-gray-200 dark:border-gray-700 bg-gray-100 p-4 lg:p-6 md:block overflow-y-auto">
       <h2 className="text-xl font-bold">✨ Your AI Workforce</h2>
       <div className="grid grid-cols-3 gap-2 mt-4">
         {gifUrls.slice(0, 9).map((url, index) => (

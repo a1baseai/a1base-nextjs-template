@@ -3,12 +3,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Share2, Users, Check, ArrowLeft, Send, X, Loader2, ChevronLeft, ChevronRight, MessageCircle, AlertCircle, WifiOff, Wifi } from 'lucide-react';
+import { Share2, Users, Check, ArrowLeft, Send, X, Loader2, ChevronLeft, ChevronRight, MessageCircle, AlertCircle, WifiOff, Wifi, Copy, ExternalLink, Star, Sparkles, TrendingUp } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { v4 as uuidv4 } from "uuid";
 import { useSocketGroupChat } from '@/hooks/useSocketGroupChat';
 import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
 import Image from "next/image";
 import { AgentProfileSettings } from "@/lib/agent-profile/types";
 import { defaultAgentProfileSettings } from "@/lib/agent-profile/agent-profile-settings";
@@ -84,11 +85,198 @@ const AgentProfileCard: React.FC = () => {
   );
 };
 
+// Group Chat Share Section Component with Dark UI Patterns
+const GroupChatShareSection: React.FC<{ chatId: string; participantCount: number }> = ({ chatId, participantCount }) => {
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [copySuccess, setCopySuccess] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [shareStats] = useState({ 
+    views: Math.floor(Math.random() * 80) + 20, 
+    activeUsers: participantCount,
+    growthRate: Math.floor(Math.random() * 30) + 15
+  });
+
+  // Ensure component is mounted before using browser APIs
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const chatUrl = mounted && typeof window !== 'undefined' ? `${window.location.origin}/chat/${chatId}` : '';
+
+  const handleCopyLink = async () => {
+    if (!mounted || typeof window === 'undefined') return;
+    
+    try {
+      await navigator.clipboard.writeText(chatUrl);
+      setCopySuccess(true);
+      toast.success('🔥 Link copied! Share it and grow your network!');
+      setTimeout(() => setCopySuccess(false), 2000);
+    } catch (err) {
+      toast.error('Failed to copy link');
+    }
+  };
+
+  // Don't render until mounted to prevent SSR issues
+  if (!mounted) {
+    return (
+      <Button variant="outline" size="sm" disabled>
+        <Share2 className="w-4 h-4 mr-2" />
+        Share
+      </Button>
+    );
+  }
+
+  const shareOptions = [
+    {
+      name: 'WhatsApp',
+      icon: '💬',
+      url: `https://wa.me/?text=Join%20this%20amazing%20group%20chat%20discussion!%20${encodeURIComponent(chatUrl)}`,
+      description: 'Share instantly'
+    },
+    {
+      name: 'Twitter',
+      icon: '🐦',
+      url: `https://twitter.com/intent/tweet?text=Having%20incredible%20conversations%20here!%20Join%20us:%20${encodeURIComponent(chatUrl)}`,
+      description: 'Tweet it out'
+    },
+    {
+      name: 'LinkedIn',
+      icon: '💼',
+      url: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(chatUrl)}`,
+      description: 'Professional network'
+    },
+    {
+      name: 'Copy Link',
+      icon: '🔗',
+      onClick: handleCopyLink,
+      description: 'Share anywhere'
+    }
+  ];
+
+  return (
+    <>
+      <Button
+        onClick={() => setShowShareModal(true)}
+        className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
+      >
+        <Share2 className="w-4 h-4 mr-2" />
+        Invite Friends
+        <Badge variant="secondary" className="ml-2 bg-white/20 text-white">
+          {shareStats.activeUsers} online
+        </Badge>
+      </Button>
+
+      {showShareModal && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={() => setShowShareModal(false)}>
+          <div 
+            className="bg-gray-900 border border-gray-700 rounded-2xl max-w-lg w-full p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                  <Star className="w-5 h-5 text-yellow-400" />
+                  Spread the Word
+                </h3>
+                <p className="text-gray-300 text-sm">Share this conversation and build your network</p>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowShareModal(false)}
+                className="text-gray-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+
+            {/* Social proof section */}
+            <div className="bg-purple-900/30 border border-purple-700 rounded-xl p-4 mb-6">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                <span className="text-purple-200 font-medium">{shareStats.views} views today</span>
+                <TrendingUp className="w-4 h-4 text-green-400" />
+                <span className="text-green-300 text-sm">+{shareStats.growthRate}% growth</span>
+              </div>
+              <div className="text-xs text-purple-300 flex items-center gap-2">
+                <Sparkles className="w-3 h-3" />
+                <span>This chat is gaining momentum • Join the conversation! 🚀</span>
+              </div>
+            </div>
+
+            {/* Copy link section */}
+            <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 mb-6">
+              <p className="text-gray-300 text-sm font-medium mb-3">Quick Share Link</p>
+              <div className="flex items-center gap-3">
+                <div className="flex-1 bg-gray-900 border border-gray-700 rounded-lg p-3">
+                  <p className="text-gray-300 text-sm font-mono truncate">{chatUrl}</p>
+                </div>
+                <Button
+                  onClick={handleCopyLink}
+                  className={copySuccess ? 'bg-green-600' : 'bg-purple-600'}
+                >
+                  {copySuccess ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                </Button>
+              </div>
+            </div>
+
+            {/* Share buttons */}
+            <div className="space-y-3">
+              <p className="text-gray-300 text-sm font-medium flex items-center gap-2">
+                <ExternalLink className="w-4 h-4" />
+                Share on your favorite platform:
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                {shareOptions.map((option) => (
+                  option.onClick ? (
+                    <button
+                      key={option.name}
+                      onClick={option.onClick}
+                      className="bg-purple-700 hover:bg-purple-600 border border-gray-600 rounded-xl p-4 text-center transition-colors"
+                    >
+                      <div className="text-2xl mb-2">{option.icon}</div>
+                      <div className="text-white font-medium text-sm">{option.name}</div>
+                      <div className="text-gray-300 text-xs">{option.description}</div>
+                    </button>
+                  ) : (
+                    <a
+                      key={option.name}
+                      href={option.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="bg-purple-700 hover:bg-purple-600 border border-gray-600 rounded-xl p-4 text-center transition-colors"
+                    >
+                      <div className="text-2xl mb-2">{option.icon}</div>
+                      <div className="text-white font-medium text-sm">{option.name}</div>
+                      <div className="text-gray-300 text-xs">{option.description}</div>
+                    </a>
+                  )
+                ))}
+              </div>
+            </div>
+
+            {/* Growth messaging */}
+            <div className="mt-6 p-4 bg-purple-900/30 border border-purple-700 rounded-xl">
+              <div className="flex items-center gap-2 mb-2">
+                <Sparkles className="w-4 h-4 text-purple-400" />
+                <p className="text-purple-200 font-medium">Network Effect Magic</p>
+              </div>
+              <p className="text-purple-300 text-sm">
+                Every person you invite multiplies the value. More minds = better ideas = bigger opportunities. 
+                Your next breakthrough conversation is just one share away! ✨
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
+
 function GroupChatContent() {
   const params = useParams();
   const router = useRouter();
   const chatId = params.chatId as string;
-  const [copied, setCopied] = useState(false);
   const [showParticipants, setShowParticipants] = useState(true);
   const [messageInput, setMessageInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -123,18 +311,6 @@ function GroupChatContent() {
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  const handleShareChat = async () => {
-    try {
-      const url = window.location.href;
-      await navigator.clipboard.writeText(url);
-      setCopied(true);
-      toast.success('Chat link copied to clipboard!');
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      toast.error('Failed to copy link');
-    }
   };
 
   const handleSendMessage = () => {
@@ -294,15 +470,7 @@ function GroupChatContent() {
             {getConnectionStatusDisplay()}
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleShareChat}
-              className="flex items-center gap-2"
-            >
-              <Share2 className="w-4 h-4" />
-              Share
-            </Button>
+            <GroupChatShareSection chatId={chatId} participantCount={participants.length} />
             <Button
               variant="ghost"
               size="icon"
