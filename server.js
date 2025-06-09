@@ -126,6 +126,29 @@ app.prepare().then(() => {
           chatId,
           participants: finalParticipantsList
         });
+
+        // Automatically send a welcome message from the AI agent
+        if (userId !== 'ai-agent') {
+          setTimeout(() => {
+            const welcomeMessage = {
+              id: `welcome-${Date.now()}`,
+              content: `Hello ${userName}! 👋 Welcome to the chat. I'm Felicie, your AI assistant. To help you get the most out of our conversation, could you please share your email address? I'll send you a personalized welcome message.`,
+              role: 'assistant',
+              timestamp: new Date().toISOString()
+            };
+
+            io.to(chatId).emit('new-message', {
+              id: welcomeMessage.id,
+              content: welcomeMessage.content,
+              role: welcomeMessage.role,
+              timestamp: welcomeMessage.timestamp,
+              senderName: 'Felicie',
+              senderId: 'ai-agent'
+            });
+            
+            console.log(`[SOCKET.IO] Sent welcome message to ${userName} in chat ${chatId}`);
+          }, 2500); // Increased delay to ensure client is ready
+        }
       } catch (error) {
         console.error('[SOCKET.IO] Error in join-chat:', error);
         socket.emit('error', { message: 'Failed to join chat' });
