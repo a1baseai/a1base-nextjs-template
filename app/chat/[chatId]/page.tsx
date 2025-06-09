@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Share2, Users, Check, ArrowLeft, Send, X, Loader2, ChevronLeft, ChevronRight, MessageCircle, AlertCircle, WifiOff, Wifi, Copy, ExternalLink, Star, Sparkles, TrendingUp, Edit2 } from 'lucide-react';
@@ -367,13 +367,30 @@ function GroupChatContent() {
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const [profileSettings, setProfileSettings] = useState<AgentProfileSettings | null>(null);
   const [currentUserName, setCurrentUserName] = useState<string>('');
+  const [waitingForEmail, setWaitingForEmail] = useState(false);
+  const socketRef = useRef<any>(null);
   
   const { messages, participants, isLoading, error, sendMessage, setTyping, typingUsers, connectionStatus, reconnect } = useSocketGroupChat(chatId);
 
-  // Initialize current user name from localStorage
+  // Helper function to send AI agent messages
+  const sendAgentMessage = useCallback((content: string) => {
+    // Use the sendMessage function but it will appear as from the current user
+    // The server-side welcome message should handle the initial greeting
+    console.log('[CHAT] Agent message would be:', content);
+  }, []);
+
+  // Initialize current user name
   useEffect(() => {
     const userName = localStorage.getItem('group-chat-user-name') || 'Anonymous User';
     setCurrentUserName(userName);
+    
+    // Check if this is a new user who hasn't provided email yet
+    const userEmailKey = `user-${localStorage.getItem('group-chat-user-id')}-email-provided`;
+    const hasProvidedEmail = localStorage.getItem(userEmailKey);
+    
+    if (!hasProvidedEmail) {
+      setWaitingForEmail(true);
+    }
   }, []);
 
   // Load profile settings for agent info
@@ -409,10 +426,45 @@ function GroupChatContent() {
     // The UserNameEditor component will handle the page reload
   };
 
-  const handleSendMessage = () => {
-    if (messageInput.trim()) {
-      sendMessage(messageInput);
-      setMessageInput('');
+  // Handle message sending with email detection
+  const handleSendMessage = async () => {
+    if (!messageInput.trim()) return;
+
+    const trimmedMessage = messageInput.trim();
+    setMessageInput('');
+
+    // Send the user's message first
+    sendMessage(trimmedMessage);
+
+    // Check if we're waiting for email and trigger the triage
+    if (waitingForEmail) {
+      try {
+        // Call the email triage API
+        const response = await fetch('/api/chat/email-triage', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            chatId,
+            userMessage: trimmedMessage,
+            userName: currentUserName,
+            userId: localStorage.getItem('group-chat-user-id')
+          }),
+        });
+
+        const result = await response.json();
+        
+        if (result.emailSent) {
+          // Mark that this user has provided their email
+          const userEmailKey = `user-${localStorage.getItem('group-chat-user-id')}-email-provided`;
+          localStorage.setItem(userEmailKey, 'true');
+          localStorage.setItem('user-email', trimmedMessage);
+          setWaitingForEmail(false);
+        }
+      } catch (error) {
+        console.error('Failed to process email triage:', error);
+      }
     }
   };
 
