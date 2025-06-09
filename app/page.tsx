@@ -36,8 +36,28 @@ export default function Home() {
         setLoading(false);
       }
     };
+
+    // Load profile immediately
     loadProfile();
+
+    // Set up polling to refresh data every 30 seconds
+    const interval = setInterval(loadProfile, 30000);
+
+    // Cleanup interval on unmount
+    return () => clearInterval(interval);
   }, []);
+
+  // Optional: Add a visual indicator when data is being refreshed
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  
+  useEffect(() => {
+    if (!loading && agentProfile) {
+      // Show refresh indicator briefly when data updates
+      setIsRefreshing(true);
+      const timeout = setTimeout(() => setIsRefreshing(false), 500);
+      return () => clearTimeout(timeout);
+    }
+  }, [agentProfile, loading]);
 
   const features = [
     {
@@ -108,7 +128,7 @@ export default function Home() {
             </div>
           ) : agentProfile ? (
             <div className="max-w-4xl mx-auto">
-              <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl overflow-hidden transform hover:scale-[1.02] transition-transform duration-300">
+              <div className={`bg-white dark:bg-gray-800 rounded-3xl shadow-2xl overflow-hidden transform hover:scale-[1.02] transition-transform duration-300 ${isRefreshing ? 'ring-2 ring-blue-400 ring-opacity-50' : ''}`}>
                 <div className="md:flex">
                   <div className="md:w-1/3 p-8 bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
                     {agentProfile.profileImageUrl ? (
