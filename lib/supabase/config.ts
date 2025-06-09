@@ -5,36 +5,6 @@ import { SupabaseAdapter } from './adapter'
 export { SupabaseAdapter }
 
 /**
- * Environment variables for Supabase configuration
- * These should be set in your .env.local file
- */
-const supabaseUrl = process.env.SUPABASE_URL
-let supabaseKey = process.env.SUPABASE_KEY
-let keySource = "SUPABASE_KEY";
-
-if (!supabaseKey) {
-  console.log("[SupabaseConfig] SUPABASE_KEY not found, attempting to use SUPABASE_ANON_KEY.");
-  supabaseKey = process.env.SUPABASE_ANON_KEY;
-  if (supabaseKey) {
-    keySource = "SUPABASE_ANON_KEY";
-  } else {
-    keySource = "None";
-  }
-}
-
-if (supabaseUrl && supabaseKey) {
-  console.log(`[SupabaseConfig] Using Supabase URL: ${supabaseUrl}`);
-  console.log(`[SupabaseConfig] Using Supabase Key from: ${keySource}`);
-} else {
-  if (!supabaseUrl) {
-    console.warn("[SupabaseConfig] SUPABASE_URL is not set in environment variables.");
-  }
-  if (!supabaseKey) {
-    console.warn("[SupabaseConfig] Neither SUPABASE_KEY nor SUPABASE_ANON_KEY is set in environment variables.");
-  }
-}
-
-/**
  * Export table names as constants to maintain consistency
  * across the application
  */
@@ -42,9 +12,44 @@ export const CONVERSATION_USERS_TABLE = 'conversation_users' as const
 export const CHATS_TABLE = 'chats' as const
 
 /**
+ * Get Supabase configuration from environment variables
+ * This function is called lazily to ensure environment variables are loaded
+ */
+function getSupabaseConfig() {
+  const supabaseUrl = process.env.SUPABASE_URL
+  let supabaseKey = process.env.SUPABASE_KEY
+  let keySource = "SUPABASE_KEY";
+
+  if (!supabaseKey) {
+    console.log("[SupabaseConfig] SUPABASE_KEY not found, attempting to use SUPABASE_ANON_KEY.");
+    supabaseKey = process.env.SUPABASE_ANON_KEY;
+    if (supabaseKey) {
+      keySource = "SUPABASE_ANON_KEY";
+    } else {
+      keySource = "None";
+    }
+  }
+
+  if (supabaseUrl && supabaseKey) {
+    console.log(`[SupabaseConfig] Using Supabase URL: ${supabaseUrl}`);
+    console.log(`[SupabaseConfig] Using Supabase Key from: ${keySource}`);
+  } else {
+    if (!supabaseUrl) {
+      console.warn("[SupabaseConfig] SUPABASE_URL is not set in environment variables.");
+    }
+    if (!supabaseKey) {
+      console.warn("[SupabaseConfig] Neither SUPABASE_KEY nor SUPABASE_ANON_KEY is set in environment variables.");
+    }
+  }
+
+  return { supabaseUrl, supabaseKey };
+}
+
+/**
  * Check if Supabase is configured in the environment
  */
 export function isSupabaseConfigured(): boolean {
+  const { supabaseUrl, supabaseKey } = getSupabaseConfig();
   return !!supabaseUrl && !!supabaseKey
 }
 
@@ -55,7 +60,9 @@ let initializedAdapter: SupabaseAdapter | null = null
  * Ensures that the adapter is initialized only once.
  */
 export const getInitializedAdapter = async (): Promise<SupabaseAdapter | null> => {
-  if (!isSupabaseConfigured()) {
+  const { supabaseUrl, supabaseKey } = getSupabaseConfig();
+  
+  if (!supabaseUrl || !supabaseKey) {
     console.warn("[SupabaseAdapter] Initialization skipped: Supabase is not configured. Check SUPABASE_URL and SUPABASE_KEY/SUPABASE_ANON_KEY environment variables.");
     return null
   }
@@ -65,7 +72,7 @@ export const getInitializedAdapter = async (): Promise<SupabaseAdapter | null> =
   }
 
   try {
-    const adapter = new SupabaseAdapter(supabaseUrl!, supabaseKey!)
+    const adapter = new SupabaseAdapter(supabaseUrl, supabaseKey)
     await adapter.init()
     initializedAdapter = adapter
     console.log("[SupabaseAdapter] Supabase adapter class instance initialized and ready.")
@@ -90,6 +97,18 @@ export async function initializeDatabase() {
  * Export a typed Supabase client for direct database operations
  * Only available if Supabase is configured
  */
-export const supabase = isSupabaseConfigured() 
-  ? createClient<Database>(supabaseUrl!, supabaseKey!)
-  : null
+let _supabase: SupabaseClient<Database> | null = null;
+
+export function getSupabase(): SupabaseClient<Database> | null {
+  if (_supabase) return _supabase;
+  
+  const { supabaseUrl, supabaseKey } = getSupabaseConfig();
+  if (supabaseUrl && supabaseKey) {
+    _supabase = createClient<Database>(supabaseUrl, supabaseKey);
+  }
+  
+  return _supabase;
+}
+
+// For backward compatibility
+export const supabase = getSupabase();

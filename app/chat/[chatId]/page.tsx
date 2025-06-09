@@ -552,27 +552,38 @@ function GroupChatContent() {
       return (
         <div
           key={participant.userId}
-          className="flex items-center gap-2 p-2 rounded-lg bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800"
+          className="relative flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-orange-100 to-amber-100 dark:from-orange-900/30 dark:to-amber-900/30 border border-orange-300 dark:border-orange-700 shadow-sm hover:shadow-md transition-all duration-200"
         >
-          <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0">
-            <Image
-              src={settings?.agentSettings?.profileGifUrl || settings?.profileImageUrl || '/a1base-favicon.png'}
-              alt={settings.name}
-              width={40}
-              height={40}
-              unoptimized={true}
-              style={{ width: "100%", height: "100%", objectFit: "cover" }}
-            />
+          {/* AI Badge */}
+          <div className="absolute -top-2 -right-2 bg-gradient-to-r from-orange-500 to-amber-500 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow-sm">
+            AI
           </div>
+          
+          <div className="relative">
+            <div className="w-12 h-12 rounded-full overflow-hidden flex-shrink-0 ring-2 ring-orange-300 dark:ring-orange-700 shadow-md">
+              <Image
+                src={settings?.agentSettings?.profileGifUrl || settings?.profileImageUrl || '/a1base-favicon.png'}
+                alt={settings.name}
+                width={48}
+                height={48}
+                unoptimized={true}
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
+            </div>
+            {/* Online indicator */}
+            <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white dark:border-gray-900"></div>
+          </div>
+          
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate">
-              {settings.name} (AI)
+            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate flex items-center gap-1">
+              {settings.name}
+              <span className="text-orange-600 dark:text-orange-400">✨</span>
             </p>
-            <p className="text-xs text-gray-500 truncate">
-              {settings.role}
+            <p className="text-xs text-gray-600 dark:text-gray-400 truncate">
+              {settings.role} • {settings.companyName}
             </p>
             {settings.groupChatPreferences?.respond_only_when_mentioned && (
-              <p className="text-xs text-amber-600 dark:text-amber-400">
+              <p className="text-xs text-orange-600 dark:text-orange-400 font-medium mt-1">
                 @mention {settings.name} to chat
               </p>
             )}
@@ -777,9 +788,15 @@ function GroupChatContent() {
                     >
                       <div className={`max-w-[70%] ${isCurrentUser ? 'order-2' : ''}`}>
                         {message.senderName && !isCurrentUser && (
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 px-1">
-                            {message.senderName}
-                            {isAIMessage && ' 🤖'}
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 px-1 flex items-center gap-1">
+                            {isAIMessage ? (
+                              <>
+                                <span className="font-semibold text-orange-600 dark:text-orange-400">{message.senderName}</span>
+                                <span className="text-orange-500">✨</span>
+                              </>
+                            ) : (
+                              message.senderName
+                            )}
                           </p>
                         )}
                         <div
@@ -787,7 +804,7 @@ function GroupChatContent() {
                             isCurrentUser
                               ? 'bg-blue-500 text-white'
                               : isAIMessage
-                              ? 'bg-orange-100 dark:bg-orange-900/20 text-gray-900 dark:text-gray-100 border border-orange-200 dark:border-orange-800'
+                              ? 'bg-gradient-to-r from-orange-100 to-amber-100 dark:from-orange-900/20 dark:to-amber-900/20 text-gray-900 dark:text-gray-100 border border-orange-300 dark:border-orange-700 shadow-sm'
                               : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
                           }`}
                         >

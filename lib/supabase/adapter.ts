@@ -22,7 +22,7 @@ const MAX_CONTEXT_MESSAGES = 30;
  */
 export class SupabaseAdapter {
   public readonly supabase: SupabaseClient<Database>;
-  private isInitialized: boolean = false;
+  public isInitialized: boolean = false;
 
   constructor(supabaseUrl: string, supabaseKey: string) {
     this.supabase = createClient<Database>(supabaseUrl, supabaseKey);
@@ -2341,7 +2341,7 @@ export class SupabaseAdapter {
     try {
       // Get the internal chat ID
       const { data: chat, error: chatError } = await this.supabase
-        .from(CHATS_TABLE)
+        .from("chats") // Use CHATS_TABLE if defined, otherwise "chats"
         .select('id')
         .eq('external_id', chatId)
         .single();
@@ -2378,9 +2378,50 @@ export class SupabaseAdapter {
       }
 
       return true;
-    } catch (error) {
-      console.error('[addUserToChat] Exception adding user to chat:', error);
+    } catch (error: any) {
+      // It's possible for .single() to throw if no row is found, which we don't consider a critical error here
+      if (error.code !== 'PGRST116') {
+        console.error('[addUserToChat] Exception adding user to chat:', error);
+      }
+      // If we are here due to an error, we likely need to add the user
+      // This path can be complex, for now, we assume the above logic handles it.
+      // A potential improvement is to handle the "no row" error from .single() more gracefully.
       return false;
     }
   }
+}
+
+// Singleton instance of the adapter
+let adapterInstance: SupabaseAdapter | null = null;
+
+/**
+ * Returns an initialized instance of the SupabaseAdapter.
+ * It ensures that environment variables are loaded and the adapter is initialized before use.
+ *
+ * @returns {Promise<SupabaseAdapter>} A promise that resolves to the initialized adapter instance.
+ * @throws {Error} If SUPABASE_URL or SUPABASE_ANON_KEY environment variables are not set.
+ */
+export async function getAdapter(): Promise<SupabaseAdapter> {
+  if (adapterInstance && adapterInstance.isInitialized) {
+    return adapterInstance;
+  }
+
+  // Ensure environment variables are loaded
+  if (process.env.NODE_ENV !== 'production') {
+    require('dotenv').config({ path: '.env.local' });
+  }
+
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error(
+      "Supabase URL or Key is not set in environment variables."
+    );
+  }
+
+  adapterInstance = new SupabaseAdapter(supabaseUrl, supabaseKey);
+  await adapterInstance.init();
+  
+  return adapterInstance;
 }

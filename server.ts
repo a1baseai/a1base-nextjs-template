@@ -1,9 +1,12 @@
-const { createServer } = require('http');
-const { parse } = require('url');
-const next = require('next');
-const { Server } = require('socket.io');
-const { generateChatSummary } = require('./lib/workflows/chat_workflow');
-const { getAdapter } = require('./lib/supabase/adapter');
+import * as dotenv from 'dotenv';
+dotenv.config({ path: '.env.local' });
+
+import { createServer } from 'http';
+import { parse } from 'url';
+import next from 'next';
+import { Server, Socket } from 'socket.io';
+import { generateChatSummary } from './lib/workflows/chat_workflow';
+import { getAdapter } from './lib/supabase/adapter';
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = process.env.HOSTNAME || '0.0.0.0'; // Listen on all interfaces
@@ -14,14 +17,20 @@ const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
 
 // Store active connections and rooms
-const rooms = new Map(); // chatId -> Set of participant info
-const userSockets = new Map(); // userId -> socket.id
+const rooms = new Map<string, Set<string>>(); // chatId -> Set of participant info (as JSON strings)
+const userSockets = new Map<string, string>(); // userId -> socket.id
+
+interface ParticipantInfo {
+  userId: string;
+  userName: string;
+  socketId: string;
+}
 
 app.prepare().then(() => {
   console.log('[INFO] Next.js app prepared. Setting up server...');
   const server = createServer(async (req, res) => {
     try {
-      const parsedUrl = parse(req.url, true);
+      const parsedUrl = parse(req.url!, true);
       await handle(req, res, parsedUrl);
     } catch (err) {
       console.error('Error occurred handling', req.url, err);
@@ -45,7 +54,7 @@ app.prepare().then(() => {
       //     callback(new Error('Not allowed by CORS'));
       //   }
       // },
-      origin: (origin, callback) => {
+      origin: (origin: string | undefined, callback: (err: Error | null, success?: boolean) => void) => {
         callback(null, true);
       },
       methods: ["GET", "POST"],
@@ -58,12 +67,12 @@ app.prepare().then(() => {
   });
 
   // Add error handling for Socket.IO
-  io.on('connection_error', (err) => {
+  io.on('connection_error', (err: Error) => {
     console.error('[SOCKET.IO] Connection error:', err.message);
   });
 
   // Socket.IO connection handling
-  io.on('connection', (socket) => {
+  io.on('connection', (socket: Socket) => {
     console.log('[SOCKET.IO] New connection:', socket.id);
 
     // Add rate limiting for production
@@ -74,7 +83,7 @@ app.prepare().then(() => {
     }, 60000); // Reset every minute
 
     // Handle user joining a chat room
-    socket.on('join-chat', async (data) => {
+    socket.on('join-chat', async (data: { chatId: string; userId: string; userName: string }) => {
       try {
         const { chatId, userId, userName } = data;
         
@@ -107,23 +116,23 @@ app.prepare().then(() => {
         if (!rooms.has(chatId)) {
           rooms.set(chatId, new Set());
         }
-        const participants = rooms.get(chatId);
+        const participants = rooms.get(chatId)!;
         
         // Add participant info
-        const participantInfo = { userId, userName, socketId: socket.id };
+        const participantInfo: ParticipantInfo = { userId, userName, socketId: socket.id };
         participants.add(JSON.stringify(participantInfo));
 
         // Ensure AI agent is always a participant
-        const currentParticipants = Array.from(participants).map(p => JSON.parse(p));
+        const currentParticipants: ParticipantInfo[] = Array.from(participants).map(p => JSON.parse(p));
         const aiAgentExists = currentParticipants.some(p => p.userId === 'ai-agent');
         if (!aiAgentExists) {
           // The agent's name will be derived from its profile on the client-side
-          const aiParticipantInfo = { userId: 'ai-agent', userName: 'AI Assistant', socketId: 'ai-agent' };
+          const aiParticipantInfo: ParticipantInfo = { userId: 'ai-agent', userName: 'AI Assistant', socketId: 'ai-agent' };
           participants.add(JSON.stringify(aiParticipantInfo));
         }
 
         // Emit updated participants list to all users in the room
-        const finalParticipantsList = Array.from(participants).map(p => JSON.parse(p));
+        const finalParticipantsList: ParticipantInfo[] = Array.from(participants).map(p => JSON.parse(p));
         io.to(chatId).emit('participants-update', { participants: finalParticipantsList });
 
         // Emit join message to other users
@@ -145,12 +154,12 @@ app.prepare().then(() => {
           
           try {
             // First check if the chat has any message history
-            const adapter = getAdapter();
+            const adapter = await getAdapter();
             let hasHistory = false;
             
             if (adapter) {
               const thread = await adapter.getThread(chatId);
-              hasHistory = thread && thread.messages && thread.messages.length > 0;
+              hasHistory = !!(thread && thread.messages && thread.messages.length > 0);
             }
             
             if (hasHistory) {
@@ -200,7 +209,7 @@ app.prepare().then(() => {
     });
 
     // Handle sending messages
-    socket.on('send-message', async (data) => {
+    socket.on('send-message', async (data: { chatId: string; message: any; userId: string; userName: string }) => {
       try {
         // Rate limiting
         messageCount++;
@@ -229,19 +238,19 @@ app.prepare().then(() => {
           if (!rooms.has(chatId)) {
             rooms.set(chatId, new Set());
           }
-          const participants = rooms.get(chatId);
+          const participants = rooms.get(chatId)!;
           
           // Check if AI agent is already in participants
-          const participantsArray = Array.from(participants).map(p => JSON.parse(p));
+          const participantsArray: ParticipantInfo[] = Array.from(participants).map(p => JSON.parse(p));
           const aiAgentExists = participantsArray.some(p => p.userId === 'ai-agent');
           
           if (!aiAgentExists) {
             // Add AI agent to participants
-            const aiParticipantInfo = { userId: 'ai-agent', userName, socketId: 'ai-agent' };
+            const aiParticipantInfo: ParticipantInfo = { userId: 'ai-agent', userName, socketId: 'ai-agent' };
             participants.add(JSON.stringify(aiParticipantInfo));
             
             // Emit updated participants list
-            const updatedParticipantsList = Array.from(participants).map(p => JSON.parse(p));
+            const updatedParticipantsList: ParticipantInfo[] = Array.from(participants).map(p => JSON.parse(p));
             io.to(chatId).emit('participants-update', { participants: updatedParticipantsList });
           }
         }
@@ -262,7 +271,7 @@ app.prepare().then(() => {
     });
 
     // Handle typing indicators
-    socket.on('typing', (data) => {
+    socket.on('typing', (data: { chatId: string; userId: string; userName: string; isTyping: boolean }) => {
       try {
         const { chatId, userId, userName, isTyping } = data;
         
@@ -293,17 +302,17 @@ app.prepare().then(() => {
       rooms.forEach((participants, chatId) => {
         const participantsArray = Array.from(participants);
         const userParticipant = participantsArray.find(p => {
-          const parsed = JSON.parse(p);
+          const parsed: ParticipantInfo = JSON.parse(p);
           return parsed.socketId === socket.id;
         });
 
         if (userParticipant) {
-          const parsed = JSON.parse(userParticipant);
+          const parsed: ParticipantInfo = JSON.parse(userParticipant);
           participants.delete(userParticipant);
           userSockets.delete(parsed.userId);
 
           // Notify others in the room
-          const remainingParticipants = Array.from(participants).map(p => JSON.parse(p));
+          const remainingParticipants: ParticipantInfo[] = Array.from(participants).map(p => JSON.parse(p));
           io.to(chatId).emit('participants-update', { participants: remainingParticipants });
           io.to(chatId).emit('user-left', {
             userId: parsed.userId,
@@ -320,7 +329,7 @@ app.prepare().then(() => {
     });
   });
 
-  server.listen(port, hostname, (err) => {
+  server.listen(port, hostname, (err?: Error) => {
     if (err) throw err;
     const displayHost = hostname === '0.0.0.0' ? 'localhost' : hostname;
     console.log(`> Ready on http://${displayHost}:${port}`);

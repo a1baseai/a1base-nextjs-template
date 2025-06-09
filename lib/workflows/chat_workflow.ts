@@ -1,15 +1,22 @@
-const { getInitializedAdapter } = require('../supabase/config');
-const { openai } = require('@ai-sdk/openai');
-const { streamText } = require('ai');
+import { getAdapter } from '../supabase/adapter';
+import { openai } from '@ai-sdk/openai';
+import { streamText } from 'ai';
+
+// Define a type for the message object to resolve implicit 'any'
+interface ChatMessage {
+  message_type: string;
+  sender_number?: string;
+  content: string;
+}
 
 /**
  * Generates a concise summary of a chat thread.
  * @param {string} chatId The ID of the chat to summarize.
  * @returns {Promise<string>} A string containing the summary.
  */
-async function generateChatSummary(chatId) {
+export async function generateChatSummary(chatId: string): Promise<string> {
   try {
-    const adapter = await getInitializedAdapter();
+    const adapter = await getAdapter();
     if (!adapter) {
       console.log('[ChatWorkflow] No adapter found, returning default summary.');
       return 'No chat history available.';
@@ -24,7 +31,7 @@ async function generateChatSummary(chatId) {
     }
     
     // Filter out system messages to see if there's actual conversation
-    const conversationMessages = thread.messages.filter(msg => msg.message_type !== 'system');
+    const conversationMessages = thread.messages.filter((msg: ChatMessage) => msg.message_type !== 'system');
     
     // If there are only system messages or less than 2 real messages, don't summarize
     if (conversationMessages.length < 2) {
@@ -34,8 +41,8 @@ async function generateChatSummary(chatId) {
 
     // Prepare messages for the AI, excluding system messages
     const history = conversationMessages
-      .map(msg => ({
-        role: msg.sender_number === process.env.A1BASE_AGENT_NUMBER ? 'assistant' : 'user',
+      .map((msg: ChatMessage) => ({
+        role: (msg.sender_number === process.env.A1BASE_AGENT_NUMBER ? 'assistant' : 'user') as 'user' | 'assistant',
         content: msg.content,
       }));
 
@@ -53,6 +60,4 @@ async function generateChatSummary(chatId) {
     console.error('[ChatWorkflow] Error generating summary:', error);
     return "Unable to generate chat summary.";
   }
-}
-
-module.exports = { generateChatSummary }; 
+} 
