@@ -15,28 +15,8 @@ const handle = app.getRequestHandler();
 const rooms = new Map(); // chatId -> Set of participant info
 const userSockets = new Map(); // userId -> socket.id
 
-// Get allowed origins from environment variable
-function getAllowedOrigins() {
-  if (process.env.ALLOWED_ORIGINS) {
-    return process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim());
-  }
-  
-  // Default origins for development
-  if (dev) {
-    return [
-      'http://localhost:3000',
-      'http://127.0.0.1:3000',
-      /^https:\/\/.*\.ngrok\.io$/,  // Allow any ngrok domain
-      /^https:\/\/.*\.ngrok-free\.app$/  // Allow ngrok-free domains
-    ];
-  }
-  
-  // In production, you should specify allowed origins explicitly
-  console.warn('WARNING: No ALLOWED_ORIGINS specified. Using restrictive CORS policy.');
-  return [];
-}
-
 app.prepare().then(() => {
+  console.log('[INFO] Next.js app prepared. Setting up server...');
   const server = createServer(async (req, res) => {
     try {
       const parsedUrl = parse(req.url, true);
@@ -51,28 +31,10 @@ app.prepare().then(() => {
   // Initialize Socket.IO with production-ready configuration
   const io = new Server(server, {
     cors: {
+      // WARNING: This allows all origins. For a production environment, it's recommended
+      // to implement a whitelist of allowed domains.
       origin: (origin, callback) => {
-        const allowedOrigins = getAllowedOrigins();
-        
-        // Allow requests with no origin (e.g., mobile apps, Postman)
-        if (!origin) {
-          return callback(null, true);
-        }
-        
-        // Check if origin is allowed
-        const isAllowed = allowedOrigins.some(allowed => {
-          if (allowed instanceof RegExp) {
-            return allowed.test(origin);
-          }
-          return allowed === origin;
-        });
-        
-        if (isAllowed) {
-          callback(null, true);
-        } else {
-          console.warn(`[CORS] Blocked origin: ${origin}`);
-          callback(new Error('Not allowed by CORS'));
-        }
+        callback(null, true);
       },
       methods: ["GET", "POST"],
       credentials: true
@@ -139,9 +101,18 @@ app.prepare().then(() => {
         const participantInfo = { userId, userName, socketId: socket.id };
         participants.add(JSON.stringify(participantInfo));
 
+        // Ensure AI agent is always a participant
+        const currentParticipants = Array.from(participants).map(p => JSON.parse(p));
+        const aiAgentExists = currentParticipants.some(p => p.userId === 'ai-agent');
+        if (!aiAgentExists) {
+          // The agent's name will be derived from its profile on the client-side
+          const aiParticipantInfo = { userId: 'ai-agent', userName: 'AI Assistant', socketId: 'ai-agent' };
+          participants.add(JSON.stringify(aiParticipantInfo));
+        }
+
         // Emit updated participants list to all users in the room
-        const participantsList = Array.from(participants).map(p => JSON.parse(p));
-        io.to(chatId).emit('participants-update', { participants: participantsList });
+        const finalParticipantsList = Array.from(participants).map(p => JSON.parse(p));
+        io.to(chatId).emit('participants-update', { participants: finalParticipantsList });
 
         // Emit join message to other users
         socket.to(chatId).emit('user-joined', {
@@ -153,7 +124,7 @@ app.prepare().then(() => {
         // Send acknowledgment to the joining user
         socket.emit('joined-chat', {
           chatId,
-          participants: participantsList
+          participants: finalParticipantsList
         });
       } catch (error) {
         console.error('[SOCKET.IO] Error in join-chat:', error);
@@ -284,11 +255,9 @@ app.prepare().then(() => {
 
   server.listen(port, hostname, (err) => {
     if (err) throw err;
-    console.log(`> Ready on http://${hostname}:${port}`);
+    const displayHost = hostname === '0.0.0.0' ? 'localhost' : hostname;
+    console.log(`> Ready on http://${displayHost}:${port}`);
     console.log('> Socket.IO server running');
     console.log('> Environment:', dev ? 'development' : 'production');
-    if (process.env.ALLOWED_ORIGINS) {
-      console.log('> Allowed origins:', process.env.ALLOWED_ORIGINS);
-    }
   });
 }); 

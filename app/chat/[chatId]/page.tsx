@@ -3,12 +3,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Share2, Users, Check, ArrowLeft, Send, X, Loader2, ChevronLeft, ChevronRight, MessageCircle, AlertCircle, WifiOff, Wifi, Copy, ExternalLink, Star, Sparkles, TrendingUp } from 'lucide-react';
+import { Share2, Users, Check, ArrowLeft, Send, X, Loader2, ChevronLeft, ChevronRight, MessageCircle, AlertCircle, WifiOff, Wifi, Copy, ExternalLink, Star, Sparkles, TrendingUp, Edit2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { v4 as uuidv4 } from "uuid";
 import { useSocketGroupChat } from '@/hooks/useSocketGroupChat';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import Image from "next/image";
 import { AgentProfileSettings } from "@/lib/agent-profile/types";
@@ -130,13 +131,13 @@ const GroupChatShareSection: React.FC<{ chatId: string; participantCount: number
     {
       name: 'WhatsApp',
       icon: '💬',
-      url: `https://wa.me/?text=Join%20this%20amazing%20group%20chat%20discussion!%20${encodeURIComponent(chatUrl)}`,
+      url: `https://wa.me/?text=Check%20out%20this%20conversation%20I'm%20having%20with%20an%20A1%20agent%20I'm%20building.%20You%20can%20create%20one%20too!%20Join%20us:%20${encodeURIComponent(chatUrl)}`,
       description: 'Share instantly'
     },
     {
       name: 'Twitter',
       icon: '🐦',
-      url: `https://twitter.com/intent/tweet?text=Having%20incredible%20conversations%20here!%20Join%20us:%20${encodeURIComponent(chatUrl)}`,
+      url: `https://twitter.com/intent/tweet?text=I'm%20building%20my%20own%20A1%20agent%20and%20having%20some%20fascinating%20conversations.%20Join%20in%20or%20create%20your%20own!&url=${encodeURIComponent(chatUrl)}&hashtags=AI,AIAgent,Founders`,
       description: 'Tweet it out'
     },
     {
@@ -144,12 +145,6 @@ const GroupChatShareSection: React.FC<{ chatId: string; participantCount: number
       icon: '💼',
       url: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(chatUrl)}`,
       description: 'Professional network'
-    },
-    {
-      name: 'Copy Link',
-      icon: '🔗',
-      onClick: handleCopyLink,
-      description: 'Share anywhere'
     }
   ];
 
@@ -160,7 +155,7 @@ const GroupChatShareSection: React.FC<{ chatId: string; participantCount: number
         className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
       >
         <Share2 className="w-4 h-4 mr-2" />
-        Invite Friends
+        Share Chat Link
         <Badge variant="secondary" className="ml-2 bg-white/20 text-white">
           {shareStats.activeUsers} online
         </Badge>
@@ -178,7 +173,7 @@ const GroupChatShareSection: React.FC<{ chatId: string; participantCount: number
                   <Star className="w-5 h-5 text-yellow-400" />
                   Spread the Word
                 </h3>
-                <p className="text-gray-300 text-sm">Share this conversation and build your network</p>
+                <p className="text-gray-300 text-sm">Share your A1 to the world</p>
               </div>
               <Button
                 variant="ghost"
@@ -204,53 +199,25 @@ const GroupChatShareSection: React.FC<{ chatId: string; participantCount: number
               </div>
             </div>
 
-            {/* Copy link section */}
-            <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 mb-6">
-              <p className="text-gray-300 text-sm font-medium mb-3">Quick Share Link</p>
-              <div className="flex items-center gap-3">
-                <div className="flex-1 bg-gray-900 border border-gray-700 rounded-lg p-3">
-                  <p className="text-gray-300 text-sm font-mono truncate">{chatUrl}</p>
-                </div>
-                <Button
-                  onClick={handleCopyLink}
-                  className={copySuccess ? 'bg-green-600' : 'bg-purple-600'}
-                >
-                  {copySuccess ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                </Button>
-              </div>
-            </div>
-
             {/* Share buttons */}
             <div className="space-y-3">
               <p className="text-gray-300 text-sm font-medium flex items-center gap-2">
                 <ExternalLink className="w-4 h-4" />
                 Share on your favorite platform:
               </p>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 {shareOptions.map((option) => (
-                  option.onClick ? (
-                    <button
-                      key={option.name}
-                      onClick={option.onClick}
-                      className="bg-purple-700 hover:bg-purple-600 border border-gray-600 rounded-xl p-4 text-center transition-colors"
-                    >
-                      <div className="text-2xl mb-2">{option.icon}</div>
-                      <div className="text-white font-medium text-sm">{option.name}</div>
-                      <div className="text-gray-300 text-xs">{option.description}</div>
-                    </button>
-                  ) : (
-                    <a
-                      key={option.name}
-                      href={option.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="bg-purple-700 hover:bg-purple-600 border border-gray-600 rounded-xl p-4 text-center transition-colors"
-                    >
-                      <div className="text-2xl mb-2">{option.icon}</div>
-                      <div className="text-white font-medium text-sm">{option.name}</div>
-                      <div className="text-gray-300 text-xs">{option.description}</div>
-                    </a>
-                  )
+                  <a
+                    key={option.name}
+                    href={option.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="bg-purple-700 hover:bg-purple-600 border border-gray-600 rounded-xl p-4 text-center transition-colors"
+                  >
+                    <div className="text-2xl mb-2">{option.icon}</div>
+                    <div className="text-white font-medium text-sm">{option.name}</div>
+                    <div className="text-gray-300 text-xs">{option.description}</div>
+                  </a>
                 ))}
               </div>
             </div>
@@ -273,6 +240,123 @@ const GroupChatShareSection: React.FC<{ chatId: string; participantCount: number
   );
 };
 
+// User Name Editor Component
+const UserNameEditor: React.FC<{ currentName: string; onNameChange: (name: string) => void }> = ({ currentName, onNameChange }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [newName, setNewName] = useState(currentName);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    setNewName(currentName);
+  }, [currentName]);
+
+  const handleSave = async () => {
+    const trimmedName = newName.trim();
+    
+    if (!trimmedName) {
+      toast.error('Name cannot be empty');
+      setNewName(currentName);
+      setIsEditing(false);
+      return;
+    }
+    
+    if (trimmedName === currentName) {
+      setIsEditing(false);
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      // Update localStorage
+      localStorage.setItem('group-chat-user-name', trimmedName);
+      onNameChange(trimmedName);
+      setIsEditing(false);
+      toast.success('Display name updated! Refreshing to apply changes...');
+      
+      // Reload the page to update the socket connection with new name
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    } catch (error) {
+      console.error('Failed to update name:', error);
+      toast.error('Failed to update name');
+      setNewName(currentName);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setNewName(currentName);
+    setIsEditing(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSave();
+    } else if (e.key === 'Escape') {
+      handleCancel();
+    }
+  };
+
+  if (isEditing) {
+    return (
+      <div className="flex items-center gap-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+        <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-sm font-medium text-white">
+          {currentName?.charAt(0).toUpperCase() || '?'}
+        </div>
+        <div className="flex-1 flex items-center gap-2">
+          <Input
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Enter your name"
+            className="h-8 text-sm"
+            maxLength={30}
+            disabled={isLoading}
+            autoFocus
+          />
+          <Button 
+            size="sm" 
+            variant="ghost" 
+            onClick={handleSave} 
+            disabled={isLoading || !newName.trim()}
+            className="h-8 w-8 p-0"
+          >
+            {isLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+          </Button>
+          <Button 
+            size="sm" 
+            variant="ghost" 
+            onClick={handleCancel} 
+            disabled={isLoading}
+            className="h-8 w-8 p-0"
+          >
+            <X className="w-3 h-3" />
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      onClick={() => setIsEditing(true)}
+      className="flex items-center w-full gap-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors text-left"
+    >
+      <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-sm font-medium text-white flex-shrink-0">
+        {currentName?.charAt(0).toUpperCase() || '?'}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium truncate">{currentName}</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400">(You)</p>
+      </div>
+      <Edit2 className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+    </button>
+  );
+};
+
 function GroupChatContent() {
   const params = useParams();
   const router = useRouter();
@@ -282,8 +366,15 @@ function GroupChatContent() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const [profileSettings, setProfileSettings] = useState<AgentProfileSettings | null>(null);
+  const [currentUserName, setCurrentUserName] = useState<string>('');
   
   const { messages, participants, isLoading, error, sendMessage, setTyping, typingUsers, connectionStatus, reconnect } = useSocketGroupChat(chatId);
+
+  // Initialize current user name from localStorage
+  useEffect(() => {
+    const userName = localStorage.getItem('group-chat-user-name') || 'Anonymous User';
+    setCurrentUserName(userName);
+  }, []);
 
   // Load profile settings for agent info
   useEffect(() => {
@@ -311,6 +402,11 @@ function GroupChatContent() {
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handleNameChange = (newName: string) => {
+    setCurrentUserName(newName);
+    // The UserNameEditor component will handle the page reload
   };
 
   const handleSendMessage = () => {
@@ -397,7 +493,6 @@ function GroupChatContent() {
 
   // Enhanced participants list with agent profile
   const renderParticipant = (participant: any) => {
-    const isCurrentUser = participant.userId === localStorage.getItem('group-chat-user-id');
     const isAgent = participant.userId === 'ai-agent';
     const settings = profileSettings || defaultAgentProfileSettings;
 
@@ -426,7 +521,7 @@ function GroupChatContent() {
             </p>
             {settings.groupChatPreferences?.respond_only_when_mentioned && (
               <p className="text-xs text-amber-600 dark:text-amber-400">
-                Mention to activate
+                @mention {settings.name} to chat
               </p>
             )}
           </div>
@@ -437,11 +532,7 @@ function GroupChatContent() {
     return (
       <div
         key={participant.userId}
-        className={`flex items-center gap-2 p-2 rounded-lg ${
-          isCurrentUser
-            ? 'bg-blue-50 dark:bg-blue-900/20'
-            : 'hover:bg-gray-100 dark:hover:bg-gray-800'
-        }`}
+        className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
       >
         <div className="w-8 h-8 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center text-sm font-medium">
           {participant.userName?.charAt(0).toUpperCase() || '?'}
@@ -449,7 +540,6 @@ function GroupChatContent() {
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium truncate">
             {participant.userName}
-            {isCurrentUser && ' (You)'}
           </p>
         </div>
       </div>
@@ -480,6 +570,11 @@ function GroupChatContent() {
               <Users className="w-5 h-5" />
             </Button>
           </div>
+        </div>
+
+        {/* Floating Share Button - Growth Hack */}
+        <div className="absolute bottom-24 right-4 z-40">
+           <GroupChatShareSection chatId={chatId} participantCount={participants.length} />
         </div>
 
         {/* Error Display */}
@@ -518,8 +613,26 @@ function GroupChatContent() {
                 <Users className="h-4 w-4" />
                 Participants ({participants.length})
               </h3>
+              
+              {/* Current User Name Editor */}
+              <div className="mb-4">
+                <p className="text-xs text-gray-500 dark:text-gray-400 font-medium mb-2">Your Profile</p>
+                <UserNameEditor currentName={currentUserName} onNameChange={handleNameChange} />
+              </div>
+              
+              {/* Divider */}
+              <div className="h-px bg-gray-200 dark:bg-gray-700 mb-4"></div>
+              
+              {/* Other Participants */}
+              <p className="text-xs text-gray-500 dark:text-gray-400 font-medium mb-2">Other Participants</p>
               <div className="space-y-2">
-                {participants.map(renderParticipant)}
+                {/* Always render the AI agent first */}
+                {renderParticipant({ userId: 'ai-agent', userName: 'AI Assistant' })}
+                
+                {/* Then render the rest of the human participants */}
+                {participants
+                  .filter(p => p.userId !== localStorage.getItem('group-chat-user-id') && p.userId !== 'ai-agent')
+                  .map(renderParticipant)}
               </div>
             </div>
           )}
@@ -544,8 +657,26 @@ function GroupChatContent() {
                     <X className="h-4 w-4" />
                   </Button>
                 </div>
+                
+                {/* Current User Name Editor */}
+                <div className="mb-4">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 font-medium mb-2">Your Profile</p>
+                  <UserNameEditor currentName={currentUserName} onNameChange={handleNameChange} />
+                </div>
+                
+                {/* Divider */}
+                <div className="h-px bg-gray-200 dark:bg-gray-700 mb-4"></div>
+                
+                {/* Other Participants */}
+                <p className="text-xs text-gray-500 dark:text-gray-400 font-medium mb-2">Other Participants</p>
                 <div className="space-y-2">
-                  {participants.map(renderParticipant)}
+                  {/* Always render the AI agent first */}
+                  {renderParticipant({ userId: 'ai-agent', userName: 'AI Assistant' })}
+                  
+                  {/* Then render the rest of the human participants */}
+                  {participants
+                    .filter(p => p.userId !== localStorage.getItem('group-chat-user-id') && p.userId !== 'ai-agent')
+                    .map(renderParticipant)}
                 </div>
               </div>
             </div>
