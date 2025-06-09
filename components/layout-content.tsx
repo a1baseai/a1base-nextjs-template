@@ -5,7 +5,7 @@ import { Navbar } from "@/components/ui/navbar";
 
 export function LayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const hideNavbar = pathname === '/data-viewer';
+  const hideNavbar = pathname === '/data-viewer' || pathname.startsWith('/chat/');
 
   return (
     <>

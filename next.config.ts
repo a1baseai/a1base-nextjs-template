@@ -16,12 +16,10 @@ const nextConfig: NextConfig = {
   },
   output: 'standalone',
   reactStrictMode: true,
-  experimental: {
-    turbo: {
-      rules: {
-        // Add any specific turbo rules here if needed
-      }
-    },
+  turbopack: {
+    rules: {
+      // Add any specific turbo rules here if needed
+    }
   },
   images: {
     remotePatterns: [

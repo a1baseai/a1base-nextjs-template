@@ -109,8 +109,19 @@ export class EmailService {
     });
   }
 
-  async sendWelcomeEmail(recipientEmail: string, userName: string): Promise<A1BaseEmailResponse> {
+  async sendWelcomeEmail(recipientEmail: string, userName: string, summary_content?: string): Promise<A1BaseEmailResponse> {
     const subject = `Hello from Felicie! 🎉`;
+    
+    // Build the email body with optional summary
+    let summarySection = '';
+    if (summary_content) {
+      summarySection = `
+        <div style="background-color: #f0f0f0; padding: 15px; border-radius: 8px; margin: 20px 0;">
+          <h2 style="margin-top: 0;">Here's what's been happening in the conversation:</h2>
+          <div style="white-space: pre-wrap;">${summary_content}</div>
+        </div>
+      `;
+    }
     
     const htmlBody = `
       <!DOCTYPE html>
@@ -119,13 +130,14 @@ export class EmailService {
         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
         <title>Hello World</title>
       </head>
-      <body>
-        <h1>Hello World!</h1>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <h1>Welcome to the conversation, ${userName}! 🎉</h1>
         <p>Hi ${userName},</p>
-        <p>This is Felicie, your AI assistant. Thank you for sharing your email address!</p>
-        <p>I'm excited to be part of your journey. Feel free to reach out anytime you need assistance.</p>
+        <p>This is ${process.env.AGENT_NAME}, your A1 Zap. Thank you for sharing your email address!</p>
+        <p>I'm excited to help you build your own A1 agent! Want to learn more? Join our group chat with founders Pasha, Pennie and their A1 Zap agent to get started.</p>
+        ${summarySection}
         <br>
-        <p>Best regards,<br>Felicie 🤖</p>
+        <p>Best regards,<br>${process.env.AGENT_NAME} 🤖</p>
       </body>
       </html>
     `;

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { EmailService } from '@/lib/services/email-service';
+import { generateChatSummary } from '@/lib/workflows/chat_workflow.js';
 
 // Initialize email service
 const emailService = new EmailService();
@@ -34,7 +35,11 @@ export async function POST(request: Request) {
 
       // Send the welcome email
       try {
-        await emailService.sendWelcomeEmail(email, userName);
+        // Generate a summary of the chat history
+        const summary = await generateChatSummary(chatId);
+        
+        // Send the welcome email with the summary
+        await emailService.sendWelcomeEmail(email, userName, summary);
         
         // Send success message
         await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/chat/socket-message`, {
@@ -46,7 +51,7 @@ export async function POST(request: Request) {
             chatId,
             message: {
               id: `confirm-${Date.now()}`,
-              content: "✅ I've sent you a welcome email! Check your inbox for a special message from me. Now, how can I help you today?",
+              content: "✅ I've sent you a welcome email with a summary of our conversation! Check your inbox for the details.",
               role: 'assistant',
               timestamp: new Date().toISOString()
             },

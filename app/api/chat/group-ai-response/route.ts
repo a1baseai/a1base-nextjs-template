@@ -22,6 +22,12 @@ export async function POST(request: Request) {
     const agentName = profileSettings.name || 'AI Assistant';
     const respondOnlyWhenMentioned = profileSettings.groupChatPreferences?.respond_only_when_mentioned ?? false;
 
+    // Check if this is a system message about someone joining
+    if (message.role === 'system' || message.content?.includes('joined the chat')) {
+      console.log('[GROUP-AI] Ignoring system message about user joining');
+      return NextResponse.json({ shouldRespond: false });
+    }
+
     // Check if agent should respond
     if (respondOnlyWhenMentioned) {
       // Check if the message mentions the agent

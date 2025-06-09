@@ -7,7 +7,7 @@ const emailService = new EmailService();
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { recipientEmail, userName } = body;
+    const { recipientEmail, userName, summary } = body;
 
     if (!recipientEmail || !userName) {
       return NextResponse.json(
@@ -16,7 +16,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const result = await emailService.sendWelcomeEmail(recipientEmail, userName);
+    const result = await emailService.sendWelcomeEmail(recipientEmail, userName, summary);
     return NextResponse.json(result);
   } catch (error) {
     console.error('[API] Failed to send welcome email:', error);

@@ -3,6 +3,7 @@ const { parse } = require('url');
 const next = require('next');
 const { Server } = require('socket.io');
 const { generateChatSummary } = require('./lib/workflows/chat_workflow');
+const { getAdapter } = require('./lib/supabase/adapter');
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = process.env.HOSTNAME || '0.0.0.0'; // Listen on all interfaces
@@ -32,8 +33,18 @@ app.prepare().then(() => {
   // Initialize Socket.IO with production-ready configuration
   const io = new Server(server, {
     cors: {
-      // WARNING: This allows all origins. For a production environment, it's recommended
-      // to implement a whitelist of allowed domains.
+      // WARNING: This allows all origins, which is convenient for development but insecure for production.
+      // For a production environment, you MUST implement a whitelist of allowed domains
+      // by checking the `origin` value against your app's URL.
+      // Example:
+      // origin: (origin, callback) => {
+      //   const allowedOrigins = ['https://yourapp.com', 'https://www.yourapp.com'];
+      //   if (!origin || allowedOrigins.includes(origin)) {
+      //     callback(null, true);
+      //   } else {
+      //     callback(new Error('Not allowed by CORS'));
+      //   }
+      // },
       origin: (origin, callback) => {
         callback(null, true);
       },
@@ -128,36 +139,59 @@ app.prepare().then(() => {
           participants: finalParticipantsList
         });
 
-        // Automatically send a welcome summary from the AI agent
+        // Automatically send a welcome summary and email request from the AI agent
         if (userId !== 'ai-agent') {
-          console.log(`[SOCKET.IO] User ${userName} joined. Fetching summary for chat ${chatId}...`);
+          console.log(`[SOCKET.IO] User ${userName} joined. Checking if chat ${chatId} has history...`);
           
-          generateChatSummary(chatId)
-            .then(summary => {
-              if (summary) {
-                const welcomeMessage = {
-                  id: `summary-${Date.now()}`,
-                  content: `Welcome, ${userName}! 👋 Here's a quick summary of what's happened so far:\n\n${summary}`,
-                  role: 'assistant',
-                  timestamp: new Date().toISOString()
-                };
+          try {
+            // First check if the chat has any message history
+            const adapter = getAdapter();
+            let hasHistory = false;
+            
+            if (adapter) {
+              const thread = await adapter.getThread(chatId);
+              hasHistory = thread && thread.messages && thread.messages.length > 0;
+            }
+            
+            if (hasHistory) {
+              // Chat has history, generate and send summary
+              const summary = await generateChatSummary(chatId);
+              
+              const summaryMessage = {
+                id: `summary-${Date.now()}`,
+                content: `Welcome, ${userName}! 👋 Here's a quick summary of what's happened so far:\n\n${summary}`,
+                role: 'assistant',
+                timestamp: new Date().toISOString()
+              };
+              socket.emit('new-message', { ...summaryMessage, senderName: 'Felicie', senderId: 'ai-agent' });
+              console.log(`[SOCKET.IO] Sent summary to ${userName} in chat ${chatId}`);
+            } else {
+              // New chat with no history, send a simple welcome
+              const welcomeMessage = {
+                id: `welcome-${Date.now()}`,
+                content: `Welcome, ${userName}! 👋 I'm ${process.env.A1BASE_AGENT_NAME || 'AI Assistant'}, your AI assistant. I'm here to help facilitate this group chat. Feel free to start the conversation!`,
+                role: 'assistant',
+                timestamp: new Date().toISOString()
+              };
+              socket.emit('new-message', { ...welcomeMessage, senderName: 'Felicie', senderId: 'ai-agent' });
+              console.log(`[SOCKET.IO] Sent welcome message to ${userName} in new chat ${chatId}`);
+            }
 
-                // Emit the message directly to the user who just joined
-                socket.emit('new-message', {
-                  id: welcomeMessage.id,
-                  content: welcomeMessage.content,
-                  role: welcomeMessage.role,
-                  timestamp: welcomeMessage.timestamp,
-                  senderName: 'Felicie',
-                  senderId: 'ai-agent'
-                });
-                
-                console.log(`[SOCKET.IO] Sent summary to ${userName} in chat ${chatId}`);
-              }
-            })
-            .catch(error => {
-              console.error('[SOCKET.IO] Failed to fetch chat summary:', error);
-            });
+            // 2. Wait a moment, then ask for their email
+            setTimeout(() => {
+              const emailRequestMessage = {
+                id: `email-request-${Date.now()}`,
+                content: `To make sure you don't lose this conversation, I can send you a link to it. Just reply with your email address!`,
+                role: 'assistant',
+                timestamp: new Date().toISOString()
+              };
+              socket.emit('new-message', { ...emailRequestMessage, senderName: 'Felicie', senderId: 'ai-agent' });
+              console.log(`[SOCKET.IO] Sent email request to ${userName} in chat ${chatId}`);
+            }, 1500); // 1.5 second delay
+
+          } catch (error) {
+            console.error('[SOCKET.IO] Failed to generate and send summary:', error);
+          }
         }
       } catch (error) {
         console.error('[SOCKET.IO] Error in join-chat:', error);
