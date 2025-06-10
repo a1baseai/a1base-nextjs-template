@@ -280,7 +280,21 @@ async function storeAIResponseEmail(
 export async function handleEmailIncoming(
   emailPayload: EmailWebhookPayload
 ): Promise<void> {
-  console.log(`[EmailHandler] Processing email from ${emailPayload.sender_address} with subject: ${emailPayload.subject}`);
+  // Do not reply to mailer-daemon or no-reply addresses to avoid loops
+  const senderAddress = emailPayload.sender_address.toLowerCase();
+  if (
+    senderAddress.startsWith('mailer-daemon@') ||
+    senderAddress.includes('no-reply')
+  ) {
+    console.log(
+      `[EmailHandler] Received automated email from ${emailPayload.sender_address}, skipping auto-reply.`
+    );
+    return;
+  }
+
+  console.log(
+    `[EmailHandler] Processing email from ${emailPayload.sender_address} with subject: ${emailPayload.subject}`
+  );
 
   try {
     // 1. Extract email body from raw email data
