@@ -92,7 +92,6 @@ export function useSocketGroupChat(chatId: string): SocketGroupChatHook {
     setError(null);
 
     const socket = io(socketUrl, {
-      transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionAttempts: maxReconnectAttempts,
       reconnectionDelay: Math.min(1000 * Math.pow(2, reconnectAttempts.current), 10000),
@@ -106,7 +105,16 @@ export function useSocketGroupChat(chatId: string): SocketGroupChatHook {
       query: {
         userId: currentUserInfo.userId,
         chatId
-      }
+      },
+      // Additional production settings
+      autoConnect: true,
+      closeOnBeforeunload: false,
+      withCredentials: true,
+      // Force polling as initial transport in production
+      // This helps with proxies that don't immediately support WebSocket
+      transports: process.env.NODE_ENV === 'production' 
+        ? ['polling', 'websocket'] 
+        : ['websocket', 'polling']
     });
 
     socketRef.current = socket;

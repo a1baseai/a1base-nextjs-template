@@ -56,7 +56,21 @@ app.prepare().then(() => {
     // Production optimizations
     pingTimeout: 60000,
     pingInterval: 25000,
-    transports: ['websocket', 'polling']
+    transports: ['websocket', 'polling'],
+    // Additional settings for Railway/proxy environments
+    allowEIO3: true,
+    path: '/socket.io/',
+    serveClient: false,
+    // Enable WebSocket compression
+    perMessageDeflate: {
+      threshold: 1024
+    },
+    // Increase upgrade timeout for slow connections
+    upgradeTimeout: 30000,
+    // Allow request buffering
+    allowBuffers: true,
+    // Maximum buffer size
+    maxHttpBufferSize: 1e6
   });
 
   // Add error handling for Socket.IO
