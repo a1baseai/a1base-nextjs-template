@@ -14,7 +14,7 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  output: 'standalone',
+  // output: 'standalone', //Pennie commented this out
   reactStrictMode: true,
   
   images: {
