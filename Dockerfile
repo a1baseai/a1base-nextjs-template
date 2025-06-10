@@ -46,10 +46,18 @@ RUN adduser --system --uid 1001 nextjs
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# Copy package files
+COPY --from=builder /app/package*.json ./
+
+# Install production dependencies only
+RUN npm ci --only=production
+
 # Copy necessary files from builder
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/server.js ./server.js
+COPY --from=builder /app/lib ./lib
+COPY --from=builder /app/data ./data
 
 # Set proper permissions
 RUN chown -R nextjs:nodejs /app
@@ -57,8 +65,8 @@ RUN chown -R nextjs:nodejs /app
 # Switch to non-root user
 USER nextjs
 
-# Expose port
-EXPOSE 3000
+# Expose port - using 8080 to match your Railway config
+EXPOSE 8080
 
 # Set environment variables that can be overridden at runtime
 ENV A1BASE_API_KEY=
@@ -75,5 +83,5 @@ ENV SUPABASE_KEY=
 ENV AGENT_PROFILE_SETTINGS=
 ENV AGENT_BASE_INFORMATION=
 
-# Start the application
+# Start the application with custom server
 CMD ["node", "server.js"] 
