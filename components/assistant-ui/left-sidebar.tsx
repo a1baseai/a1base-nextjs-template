@@ -31,39 +31,39 @@ const MultiUserChatSection: React.FC = () => {
   };
 
   return (
-    <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-purple-900/20 via-black to-indigo-900/20 dark:from-purple-900/40 dark:via-black dark:to-indigo-900/40 p-5 border border-purple-500/20 dark:border-purple-500/30">
+    <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-orange-100 via-orange-200 to-amber-300 dark:from-orange-200 dark:via-orange-300 dark:to-amber-400 p-5 border border-orange-400 dark:border-orange-500">
       {/* Animated background effect */}
-      <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 via-transparent to-indigo-600/10 animate-pulse" />
+      <div className="absolute inset-0 bg-gradient-to-r from-orange-300/30 via-transparent to-amber-300/30 animate-pulse" />
       
       {/* Glow effect */}
-      <div className="absolute -top-20 -right-20 w-40 h-40 bg-purple-500/20 dark:bg-purple-500/30 rounded-full blur-3xl animate-pulse" />
-      <div className="absolute -bottom-20 -left-20 w-40 h-40 bg-indigo-500/20 dark:bg-indigo-500/30 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+      <div className="absolute -top-20 -right-20 w-40 h-40 bg-orange-400/40 rounded-full blur-3xl animate-pulse" />
+      <div className="absolute -bottom-20 -left-20 w-40 h-40 bg-amber-400/40 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
       
       {/* Content */}
       <div className="relative z-10">
         {/* Header with icon */}
         <div className="flex items-center gap-2 mb-3">
-          <div className="p-2 bg-gradient-to-br from-purple-500/20 to-indigo-500/20 dark:from-purple-500/30 dark:to-indigo-500/30 rounded-lg backdrop-blur-sm">
-            <Users className="h-5 w-5 text-purple-300 dark:text-purple-200" />
+          <div className="p-2 bg-gradient-to-br from-orange-400/50 to-amber-400/50 rounded-lg backdrop-blur-sm">
+            <Users className="h-5 w-5 text-black" />
           </div>
-          <h3 className="text-lg font-bold bg-gradient-to-r from-purple-200 to-indigo-200 dark:from-purple-100 dark:to-indigo-100 bg-clip-text text-transparent">
+          <h3 className="text-lg font-bold text-black">
             Group Chats
           </h3>
-          <Sparkles className="h-4 w-4 text-yellow-400 animate-pulse" />
+          <Sparkles className="h-4 w-4 text-yellow-600 animate-pulse" />
         </div>
         
         {/* Enhanced description */}
-        <p className="text-sm text-gray-300 dark:text-gray-200 mb-4 leading-relaxed">
+        <p className="text-sm text-black mb-4 leading-relaxed">
           Start live conversations with friends, collaborate in real-time, and share your AI assistant
         </p>
         
         {/* Feature pills */}
         <div className="flex flex-wrap gap-2 mb-4">
-          <div className="px-2 py-1 bg-purple-500/20 dark:bg-purple-500/30 rounded-full text-xs text-purple-200 dark:text-purple-100 flex items-center gap-1">
+          <div className="px-2 py-1 bg-orange-300/60 rounded-full text-xs text-black flex items-center gap-1">
             <MessageCircle className="h-3 w-3" />
             Real-time chat
           </div>
-          <div className="px-2 py-1 bg-indigo-500/20 dark:bg-indigo-500/30 rounded-full text-xs text-indigo-200 dark:text-indigo-100 flex items-center gap-1">
+          <div className="px-2 py-1 bg-amber-300/60 rounded-full text-xs text-black flex items-center gap-1">
             <Share2 className="h-3 w-3" />
             Share instantly
           </div>
@@ -73,11 +73,11 @@ const MultiUserChatSection: React.FC = () => {
         <Button
           onClick={handleNewGroupChat}
           size="default"
-          className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold shadow-lg hover:shadow-purple-500/25 dark:hover:shadow-purple-500/40 transition-all duration-300 group relative overflow-hidden"
+          className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-semibold shadow-lg hover:shadow-blue-500/25 transition-all duration-300 group relative overflow-hidden"
         >
-          <div className="absolute inset-0 bg-gradient-to-r from-purple-400/0 via-white/20 to-purple-400/0 -skew-x-12 translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000" />
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-300/0 via-white/30 to-blue-300/0 -skew-x-12 translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000" />
           <Plus className="h-4 w-4 mr-2 group-hover:rotate-90 transition-transform duration-300" />
-          <span className="relative z-10">Start Group Chat</span>
+          <span className="relative z-10 font-bold">Start Group Chat</span>
         </Button>
         
         {/* Subtle hint */}

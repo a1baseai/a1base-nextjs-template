@@ -14,9 +14,9 @@ HOSTNAME=0.0.0.0
 
 # CORS Configuration (comma-separated list)
 # For production, specify exact domains
-ALLOWED_ORIGINS=https://yourdomain.com,https://app.yourdomain.com
+# ALLOWED_ORIGINS=https://yourdomain.com,https://app.yourdomain.com
 
-# For development with ngrok
+# For development with ngrok //TODO: SECURITY UPGRADE THIS LATER
 # ALLOWED_ORIGINS=http://localhost:3000,https://*.ngrok.io
 
 # Existing variables (keep these)
