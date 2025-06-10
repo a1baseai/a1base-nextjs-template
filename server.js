@@ -34,7 +34,15 @@ app.prepare().then(() => {
   const server = createServer(async (req, res) => {
     try {
       const parsedUrl = parse(req.url, true);
-      await handle(req, res, parsedUrl);
+      const { pathname } = parsedUrl;
+
+      // Let Next.js handle all requests except for the Socket.IO path
+      if (pathname?.startsWith('/socket.io')) {
+        // Let Socket.IO handle its own requests
+        // We do nothing here and let the request fall through
+      } else {
+        await handle(req, res, parsedUrl);
+      }
     } catch (err) {
       console.error('Error occurred handling', req.url, err);
       res.statusCode = 500;
