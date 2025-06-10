@@ -61,28 +61,24 @@ app.prepare().then(() => {
     maxHttpBufferSize: 1e6
   });
 
-  // 3. Add the Next.js handler as a listener. It will only receive requests
-  // that were NOT handled by Socket.IO.
-  server.on('request', (req, res) => {
-    const parsedUrl = parse(req.url, true);
-    handle(req, res, parsedUrl);
-  });
-
   // Add explicit logging for Socket.IO initialization
   console.log('[SOCKET.IO] Initializing Socket.IO server...');
 
-  // Now add the request handler for Next.js
-  // This ensures Socket.IO handles its own requests first
+  // 3. Add ONE request handler that properly routes requests
   server.on('request', async (req, res) => {
     try {
       const parsedUrl = parse(req.url, true);
       const { pathname } = parsedUrl;
 
-      // Socket.IO will have already handled its own requests
-      // We only need to handle Next.js requests
-      if (!pathname?.startsWith('/socket.io')) {
-        await handle(req, res, parsedUrl);
+      // Check if this is a Socket.IO request
+      if (pathname?.startsWith('/socket.io/')) {
+        // Socket.IO's internal handlers will process this
+        // We don't need to do anything here
+        return;
       }
+
+      // For all other requests, let Next.js handle them
+      await handle(req, res, parsedUrl);
     } catch (err) {
       console.error('Error occurred handling', req.url, err);
       res.statusCode = 500;
