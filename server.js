@@ -1,6 +1,10 @@
 // Load environment variables
 require('dotenv').config({ path: '.env.local' });
 
+console.log('[SERVER.JS] Starting server initialization...');
+console.log('[SERVER.JS] Port:', process.env.PORT || '8080');
+console.log('[SERVER.JS] NODE_ENV:', process.env.NODE_ENV);
+
 const { createServer } = require('http');
 const { parse } = require('url');
 const next = require('next');
@@ -20,6 +24,8 @@ const dev = process.env.NODE_ENV !== 'production';
 const hostname = process.env.HOSTNAME || '0.0.0.0'; // Listen on all interfaces
 const port = dev ? parseInt(process.env.PORT || '3000', 10) : 8080;
 
+console.log('[SERVER.JS] Creating Next.js app...');
+
 // Create Next.js app
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
@@ -28,6 +34,8 @@ const handle = app.getRequestHandler();
 const rooms = new Map(); // chatId -> Set of participant info
 const userSockets = new Map(); // userId -> socket.id
 const userEmailRequested = new Map(); // userId -> boolean (tracks if we've asked for email)
+
+console.log('[SERVER.JS] Calling app.prepare()...');
 
 app.prepare().then(() => {
   console.log('[INFO] Next.js app prepared. Setting up server...');
@@ -446,4 +454,7 @@ app.prepare().then(() => {
     console.log('[SOCKET.IO] Socket.IO server running on port', port);
     console.log('> Environment:', dev ? 'development' : 'production');
   });
+}).catch(err => {
+  console.error('[SERVER.JS] Error during app.prepare():', err);
+  process.exit(1);
 }); 
