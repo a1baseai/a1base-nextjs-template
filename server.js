@@ -31,26 +31,11 @@ const userEmailRequested = new Map(); // userId -> boolean (tracks if we've aske
 
 app.prepare().then(() => {
   console.log('[INFO] Next.js app prepared. Setting up server...');
-  const server = createServer(async (req, res) => {
-    try {
-      const parsedUrl = parse(req.url, true);
-      const { pathname } = parsedUrl;
+  
+  // Create a plain HTTP server without a request handler
+  const server = createServer();
 
-      // Let Next.js handle all requests except for the Socket.IO path
-      if (pathname?.startsWith('/socket.io')) {
-        // Let Socket.IO handle its own requests
-        // We do nothing here and let the request fall through
-      } else {
-        await handle(req, res, parsedUrl);
-      }
-    } catch (err) {
-      console.error('Error occurred handling', req.url, err);
-      res.statusCode = 500;
-      res.end('internal server error');
-    }
-  });
-
-  // Initialize Socket.IO with production-ready configuration
+  // Initialize Socket.IO first, before adding any request handlers
   const io = new Server(server, {
     cors: {
       // WARNING: This allows all origins. For a production environment, it's recommended
@@ -78,6 +63,25 @@ app.prepare().then(() => {
 
   // Add explicit logging for Socket.IO initialization
   console.log('[SOCKET.IO] Initializing Socket.IO server...');
+
+  // Now add the request handler for Next.js
+  // This ensures Socket.IO handles its own requests first
+  server.on('request', async (req, res) => {
+    try {
+      const parsedUrl = parse(req.url, true);
+      const { pathname } = parsedUrl;
+
+      // Socket.IO will have already handled its own requests
+      // We only need to handle Next.js requests
+      if (!pathname?.startsWith('/socket.io')) {
+        await handle(req, res, parsedUrl);
+      }
+    } catch (err) {
+      console.error('Error occurred handling', req.url, err);
+      res.statusCode = 500;
+      res.end('internal server error');
+    }
+  });
 
   // Add error handling for Socket.IO
   io.on('connection_error', (err) => {
