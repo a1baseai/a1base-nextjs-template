@@ -96,7 +96,7 @@ export function useSocketGroupChat(chatId: string): SocketGroupChatHook {
       reconnectionAttempts: maxReconnectAttempts,
       reconnectionDelay: Math.min(1000 * Math.pow(2, reconnectAttempts.current), 10000),
       timeout: 20000,
-      path: '/socket.io/',
+      path: '/socket.io',
       forceNew: false,
       multiplex: true,
       upgrade: true,

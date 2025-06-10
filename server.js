@@ -22,7 +22,7 @@ const { extractEmailFromMessage, sendGroupChatLinkEmail, requestEmailAfterSummar
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = process.env.HOSTNAME || '0.0.0.0'; // Listen on all interfaces
-const port = dev ? parseInt(process.env.PORT || '3000', 10) : 8080;
+const port = parseInt(process.env.PORT || '8080', 10); // Always use 8080 as default
 
 console.log('[SERVER.JS] Creating Next.js app...');
 
