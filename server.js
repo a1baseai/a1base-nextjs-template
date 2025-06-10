@@ -18,7 +18,7 @@ const { extractEmailFromMessage, sendGroupChatLinkEmail, requestEmailAfterSummar
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = process.env.HOSTNAME || '0.0.0.0'; // Listen on all interfaces
-const port = parseInt(process.env.PORT || (dev ? '3000' : '8080'), 10);
+const port = dev ? parseInt(process.env.PORT || '3000', 10) : 8080;
 
 // Create Next.js app
 const app = next({ dev, hostname, port });
