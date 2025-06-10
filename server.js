@@ -32,10 +32,10 @@ const userEmailRequested = new Map(); // userId -> boolean (tracks if we've aske
 app.prepare().then(() => {
   console.log('[INFO] Next.js app prepared. Setting up server...');
   
-  // Create a plain HTTP server without a request handler
+  // 1. Create a plain HTTP server instance WITHOUT a request handler.
   const server = createServer();
 
-  // Initialize Socket.IO first, before adding any request handlers
+  // 2. Attach Socket.IO to the server. It will now handle its own requests.
   const io = new Server(server, {
     cors: {
       // WARNING: This allows all origins. For a production environment, it's recommended
@@ -59,6 +59,13 @@ app.prepare().then(() => {
     upgradeTimeout: 30000,
     allowBuffers: true,
     maxHttpBufferSize: 1e6
+  });
+
+  // 3. Add the Next.js handler as a listener. It will only receive requests
+  // that were NOT handled by Socket.IO.
+  server.on('request', (req, res) => {
+    const parsedUrl = parse(req.url, true);
+    handle(req, res, parsedUrl);
   });
 
   // Add explicit logging for Socket.IO initialization
