@@ -25,6 +25,7 @@ export class EmailService {
   private readonly apiSecret: string;
   private readonly accountId: string;
   private readonly senderAddress: string;
+  private readonly agentName: string;
 
   constructor() {
     // These should be in your environment variables
@@ -32,6 +33,7 @@ export class EmailService {
     this.apiSecret = process.env.A1BASE_API_SECRET || '';
     this.accountId = process.env.A1BASE_ACCOUNT_ID || '';
     this.senderAddress = process.env.A1BASE_AGENT_EMAIL || '';
+    this.agentName = process.env.A1BASE_AGENT_NAME || 'AI Assistant';
     this.apiUrl = `https://api.a1base.com/v1/emails/${this.accountId}/send`;
 
     if (!this.apiKey || !this.apiSecret || !this.accountId || !this.senderAddress) {
@@ -95,9 +97,16 @@ export class EmailService {
         <p>${userName} has invited you to continue your conversation in the group chat.</p>
         <p>You can access the chat anytime by clicking this link:</p>
         <p><a href="${chatUrl}">${chatUrl}</a></p>
+        <p>I'm ${this.agentName}, and I'm here to help you with:</p>
+        <ul>
+          <li>• Answering questions and providing information</li>
+          <li>• Creative brainstorming and problem-solving</li>
+          <li>• Learning and exploring new topics together</li>
+          <li>• Coordinating tasks and projects</li>
+        </ul>
         <p>Looking forward to continuing our conversation!</p>
         <br>
-        <p>Best regards,<br>Felicie</p>
+        <p>Best regards,<br>${this.agentName}</p>
       </body>
       </html>
     `;
@@ -110,22 +119,29 @@ export class EmailService {
   }
 
   async sendWelcomeEmail(recipientEmail: string, userName: string): Promise<A1BaseEmailResponse> {
-    const subject = `Hello from Felicie! 🎉`;
+    const subject = `Hello from ${this.agentName}! 🎉`;
     
     const htmlBody = `
       <!DOCTYPE html>
       <html>
       <head>
         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-        <title>Hello World</title>
+        <title>Welcome!</title>
       </head>
       <body>
-        <h1>Hello World!</h1>
-        <p>Hi ${userName},</p>
-        <p>This is Felicie, your AI assistant. Thank you for sharing your email address!</p>
-        <p>I'm excited to be part of your journey. Feel free to reach out anytime you need assistance.</p>
+        <h1>Hello ${userName}! 👋</h1>
+        <p>I'm ${this.agentName}, from A1 Zap. Thank you for sharing your email address!</p>
+        <p>I'm here to help you with:</p>
+        <ul>
+          <li>• Answering questions and providing information</li>
+          <li>• Creative brainstorming and problem-solving</li>
+          <li>• Learning and exploring new topics together</li>
+          <li>• Project management and task coordination</li>
+          <li>• Real-time communication and collaboration</li>
+        </ul>
+        <p>I'm excited to be part of your journey and ready to assist you with whatever you need. Feel free to reach out anytime!</p>
         <br>
-        <p>Best regards,<br>Felicie 🤖</p>
+        <p>Best regards,<br>${this.agentName} 🤖</p>
       </body>
       </html>
     `;
