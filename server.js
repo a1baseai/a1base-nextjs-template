@@ -50,7 +50,7 @@ app.prepare().then(() => {
     transports: ['polling', 'websocket'], // Changed order for Railway
     pingTimeout: 60000,
     pingInterval: 25000,
-    path: '/socket.io/',
+    path: '/socket.io',
     allowEIO3: true,
     serveClient: false,
     perMessageDeflate: {
@@ -70,8 +70,8 @@ app.prepare().then(() => {
       const parsedUrl = parse(req.url, true);
       const { pathname } = parsedUrl;
 
-      // Check if this is a Socket.IO request
-      if (pathname?.startsWith('/socket.io/')) {
+      // Check if this is a Socket.IO request (handle both with and without trailing slash)
+      if (pathname?.startsWith('/socket.io')) {
         // Socket.IO's internal handlers will process this
         // We don't need to do anything here
         return;
