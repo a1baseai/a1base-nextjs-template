@@ -54,25 +54,22 @@ app.prepare().then(() => {
       methods: ["GET", "POST"],
       credentials: true
     },
-    // Production optimizations
+    transports: ['polling', 'websocket'], // Changed order for Railway
     pingTimeout: 60000,
     pingInterval: 25000,
-    transports: ['websocket', 'polling'],
-    // Additional settings for Railway/proxy environments
-    allowEIO3: true,
     path: '/socket.io/',
+    allowEIO3: true,
     serveClient: false,
-    // Enable WebSocket compression
     perMessageDeflate: {
       threshold: 1024
     },
-    // Increase upgrade timeout for slow connections
     upgradeTimeout: 30000,
-    // Allow request buffering
     allowBuffers: true,
-    // Maximum buffer size
     maxHttpBufferSize: 1e6
   });
+
+  // Add explicit logging for Socket.IO initialization
+  console.log('[SOCKET.IO] Initializing Socket.IO server...');
 
   // Add error handling for Socket.IO
   io.on('connection_error', (err) => {
@@ -431,7 +428,7 @@ app.prepare().then(() => {
     if (err) throw err;
     const displayHost = hostname === '0.0.0.0' ? 'localhost' : hostname;
     console.log(`> Ready on http://${displayHost}:${port}`);
-    console.log('> Socket.IO server running');
+    console.log('[SOCKET.IO] Socket.IO server running on port', port);
     console.log('> Environment:', dev ? 'development' : 'production');
   });
 }); 
