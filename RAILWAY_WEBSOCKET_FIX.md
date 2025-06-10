@@ -28,7 +28,7 @@ Ensure these are set in your Railway dashboard:
 
 ```bash
 NODE_ENV=production
-PORT=3000
+PORT=8080
 HOSTNAME=0.0.0.0
 
 # Your existing variables

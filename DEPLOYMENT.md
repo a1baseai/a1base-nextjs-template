@@ -9,7 +9,7 @@ Create a `.env.local` file (or set these in your production environment):
 ```bash
 # Server Configuration
 NODE_ENV=production
-PORT=3000
+PORT=8080
 HOSTNAME=0.0.0.0
 
 # CORS Configuration (comma-separated list)

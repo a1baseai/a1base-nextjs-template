@@ -74,16 +74,16 @@ export function useSocketGroupChat(chatId: string): SocketGroupChatHook {
     // Connect socket
     const getSocketUrl = () => {
       if (typeof window === 'undefined') {
-        return 'http://localhost:3000'; // Default for server-side
+        return 'http://localhost:8080'; // Update this to match Railway port
       }
       
-      // For production (e.g., on Railway), use wss://
-      if (process.env.NODE_ENV === 'production' && window.location.protocol === 'https:') {
-        return `wss://${window.location.host}`;
+      // For production (e.g., on Railway), use the window.location.origin
+      if (process.env.NODE_ENV === 'production') {
+        return window.location.origin;
       }
       
-      // For local development, use the current protocol and host
-      return `${window.location.protocol}//${window.location.host}`;
+      // For local development
+      return 'http://localhost:8080'; // Update this to match your local port
     };
 
     const socketUrl = getSocketUrl();
