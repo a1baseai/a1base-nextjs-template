@@ -47,6 +47,7 @@ app.prepare().then(() => {
     cors: {
       // WARNING: This allows all origins. For a production environment, it's recommended
       // to implement a whitelist of allowed domains.
+      // TODO: LATER FOR SECURITY
       origin: (origin, callback) => {
         callback(null, true);
       },
